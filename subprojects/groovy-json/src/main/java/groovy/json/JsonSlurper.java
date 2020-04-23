@@ -18,10 +18,10 @@
  */
 package groovy.json;
 
-import groovy.json.internal.JsonFastParser;
-import groovy.json.internal.JsonParserCharArray;
-import groovy.json.internal.JsonParserLax;
-import groovy.json.internal.JsonParserUsingCharacterSource;
+import org.apache.groovy.json.internal.JsonFastParser;
+import org.apache.groovy.json.internal.JsonParserCharArray;
+import org.apache.groovy.json.internal.JsonParserLax;
+import org.apache.groovy.json.internal.JsonParserUsingCharacterSource;
 import org.codehaus.groovy.runtime.DefaultGroovyMethodsSupport;
 import org.codehaus.groovy.runtime.ResourceGroovyMethods;
 
@@ -30,7 +30,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
 import java.net.URL;
-import java.util.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Map;
 
 /**
  * This has the same interface as the original JsonSlurper written for version 1.8.0, but its
@@ -83,9 +85,6 @@ import java.util.*;
  * </pre></code>
  *
  * @see groovy.json.JsonParserType
- *
- * @author Guillaume Laforge
- * @author Rick Hightower
  * @since 1.8.0
  */
 public class JsonSlurper {
@@ -199,7 +198,7 @@ public class JsonSlurper {
      * @return a data structure of lists and maps
      */
     public Object parseText(String text) {
-        if (text == null || "".equals(text)) {
+        if (text == null || text.isEmpty()) {
             throw new IllegalArgumentException("Text must not be null or empty");
         }
         return createParser().parse(text);
@@ -335,6 +334,27 @@ public class JsonSlurper {
             default:
                 return new JsonParserCharArray();
         }
+    }
+
+    /**
+     * Parse a JSON data structure from content within a given Path.
+     *
+     * @param path {@link Path} containing JSON content
+     * @return a data structure of lists and maps
+     */
+    public Object parse(Path path) throws IOException {
+        return parse(Files.newInputStream(path));
+    }
+
+    /**
+     * Parse a JSON data structure from content within a given Path.
+     *
+     * @param path {@link Path} containing JSON content
+     * @param charset the charset for this File
+     * @return a data structure of lists and maps
+     */
+    public Object parse(Path path, String charset) throws IOException {
+        return parse(Files.newInputStream(path), charset);
     }
 
     /**

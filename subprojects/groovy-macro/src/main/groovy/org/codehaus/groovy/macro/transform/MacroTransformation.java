@@ -19,17 +19,17 @@
 package org.codehaus.groovy.macro.transform;
 
 import groovy.transform.CompilationUnitAware;
-import org.codehaus.groovy.ast.*;
+import org.codehaus.groovy.ast.ASTNode;
+import org.codehaus.groovy.ast.GroovyCodeVisitor;
+import org.codehaus.groovy.ast.MethodCallTransformation;
 import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.CompilePhase;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.transform.GroovyASTTransformation;
 
 /**
- * @author Sergei Egorov <bsideup@gmail.com>
  * @since 2.5.0
  */
-
 @GroovyASTTransformation(phase = CompilePhase.CONVERSION)
 public class MacroTransformation extends MethodCallTransformation implements CompilationUnitAware {
 

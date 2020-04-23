@@ -18,6 +18,8 @@
  */
 package org.apache.groovy.plugin
 
+import groovy.test.GroovyTestCase
+
 import static java.util.Collections.emptyMap
 
 class GroovyRunnerRegistryTest extends GroovyTestCase {
@@ -53,18 +55,6 @@ class GroovyRunnerRegistryTest extends GroovyTestCase {
             assert result == 'DummyClass was run'
         } finally {
             realRegistry.remove('DummyRunner')
-        }
-    }
-
-    void testLegacyCustomRunner() {
-        LegacyDummyRunner customRunner = new LegacyDummyRunner()
-        GroovyRunnerRegistry realRegistry = GroovyRunnerRegistry.getInstance()
-        realRegistry.put('LegacyDummyRunner', customRunner)
-        try {
-            def result = new GroovyShell().run('class LegacyDummyClass {}', 'LegacyDummyClass.groovy', [])
-            assert result == 'LegacyDummyClass was run'
-        } finally {
-            realRegistry.remove('LegacyDummyRunner')
         }
     }
 
@@ -180,17 +170,4 @@ class GroovyRunnerRegistryTest extends GroovyTestCase {
             return 'DummyClass was run'
         }
     }
-
-    static class LegacyDummyRunner implements org.codehaus.groovy.plugin.GroovyRunner {
-        @Override
-        boolean canRun(Class<?> scriptClass, GroovyClassLoader loader) {
-            return scriptClass.getSimpleName() == 'LegacyDummyClass'
-        }
-
-        @Override
-        Object run(Class<?> scriptClass, GroovyClassLoader loader) {
-            return 'LegacyDummyClass was run'
-        }
-    }
-
 }

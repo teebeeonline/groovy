@@ -18,15 +18,12 @@
  */
 package groovy.swing.impl;
 
-import java.awt.Component;
-import java.awt.GridBagConstraints;
+import java.awt.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /** 
  * Represents a cell in a table layout.
- *
- * @author <a href="mailto:james@coredevelopers.net">James Strachan</a>
  */
 public class TableLayoutCell {
 

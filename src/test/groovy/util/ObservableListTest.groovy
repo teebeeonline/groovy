@@ -18,12 +18,11 @@
  */
 package groovy.util
 
+import groovy.test.GroovyTestCase
+
 import java.beans.PropertyChangeEvent
 import java.beans.PropertyChangeListener
 
-/**
- * @author <a href="mailto:aalmiray@users.sourceforge.net">Andres Almiray</a>
- */
 class ObservableListTest extends GroovyTestCase {
     void testFireEvent_add_withoutTest() {
         def list = new ObservableList()

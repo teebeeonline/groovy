@@ -19,14 +19,17 @@
 package org.codehaus.groovy.ant;
 
 import groovy.lang.GroovyRuntimeException;
-import groovy.util.GroovyTestCase;
+import groovy.test.GroovyTestCase;
 import junit.framework.Test;
 import junit.framework.TestSuite;
+import org.apache.groovy.io.StringBuilderWriter;
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.Project;
 import org.apache.tools.ant.ProjectHelper;
 
-import java.io.*;
+import java.io.File;
+import java.io.PrintWriter;
+import java.io.Writer;
 import java.util.regex.Pattern;
 
 /**
@@ -34,11 +37,10 @@ import java.util.regex.Pattern;
  * Caution: the *.groovy files used by this test should not get compiled with the rest of the
  * test classes compilation process otherwise they would be available in the classpath
  * and the tests here would be meaningless (tested by testClasspath_missing).
- *
- * @author Marc Guillemot
  */
 public class GroovyTest extends GroovyTestCase {
     public static String FLAG = null;
+    public static final String CODE_FRAGMENT = "org.codehaus.groovy.ant.GroovyTest.FLAG = \"from Java constant resource\"";
     private final File antFile = new File("src/test-resources/org/codehaus/groovy/ant/GroovyTest.xml");
     private Project project;
 
@@ -50,6 +52,10 @@ public class GroovyTest extends GroovyTestCase {
         TestSuite suite = new TestSuite();
         suite.addTest(new GroovyTest("testGroovyCodeWithinTag"));
         suite.addTest(new GroovyTest("testGroovyCodeExternalFile"));
+        suite.addTest(new GroovyTest("testGroovyCodeExternalFileset"));
+        suite.addTest(new GroovyTest("testGroovyCodeExternalFileResource"));
+        suite.addTest(new GroovyTest("testGroovyCodeExternalURLResource"));
+        suite.addTest(new GroovyTest("testGroovyCodeExternalJavaConstantResource"));
         suite.addTest(new GroovyTest("testGroovyCodeInExternalFileWithOtherClass"));
         suite.addTest(new GroovyTest("testPropertiesWithoutFork"));
         suite.addTest(new GroovyTest("testClasspath_missing"));
@@ -58,6 +64,7 @@ public class GroovyTest extends GroovyTestCase {
         suite.addTest(new GroovyTest("testClasspath_nestedclasspath"));
         suite.addTest(new GroovyTest("testGroovyArgUsage"));
         suite.addTest(new GroovyTest("testFileNameInStackTrace"));
+        suite.addTest(new GroovyTest("testNonExistingFile"));
         return suite;
     }
 
@@ -83,6 +90,30 @@ public class GroovyTest extends GroovyTestCase {
         assertNull(FLAG);
         project.executeTarget("groovyCodeInExternalFile");
         assertEquals("from groovy file called from ant", FLAG);
+    }
+
+    public void testGroovyCodeExternalFileset() {
+        assertNull(FLAG);
+        project.executeTarget("groovyCodeInExternalFileset");
+        assertEquals("from groovy file called from ant", FLAG);
+    }
+
+    public void testGroovyCodeExternalFileResource() {
+        assertNull(FLAG);
+        project.executeTarget("groovyCodeInExternalFileResource");
+        assertEquals("from groovy file called from ant", FLAG);
+    }
+
+    public void testGroovyCodeExternalURLResource() {
+        assertNull(FLAG);
+        project.executeTarget("groovyCodeInExternalURLResource");
+        assertEquals("from groovy file called from ant", FLAG);
+    }
+
+    public void testGroovyCodeExternalJavaConstantResource() {
+        assertNull(FLAG);
+        project.executeTarget("groovyCodeInExternalJavaConstantResource");
+        assertEquals("from Java constant resource", FLAG);
     }
 
     public void testPropertiesWithoutFork() {
@@ -130,6 +161,16 @@ public class GroovyTest extends GroovyTestCase {
         assertEquals("from groovytest3.GroovyTest3Class.doSomethingWithArgs() 1 2 3", FLAG);
     }
 
+    public void testNonExistingFile() {
+        try {
+            project.executeTarget("groovyErrorMsg_NonExistingFile");
+            fail();
+        }
+        catch (final BuildException e) {
+            assertTrue(e.getMessage().contains("Source resource does not exist!"));
+        }
+    }
+
     /**
      * Test that helpful "file name" appears in the stack trace and not just "Script1" 
      */
@@ -148,7 +189,7 @@ public class GroovyTest extends GroovyTestCase {
             final Throwable cause = e.getCause();
             assertTrue(cause instanceof GroovyRuntimeException);
 
-            final StringWriter sw = new StringWriter();
+            final Writer sw = new StringBuilderWriter();
             cause.printStackTrace(new PrintWriter(sw));
             
             final String stackTrace = sw.toString();

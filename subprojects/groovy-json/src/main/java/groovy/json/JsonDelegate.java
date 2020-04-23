@@ -21,13 +21,16 @@ package groovy.json;
 import groovy.lang.Closure;
 import groovy.lang.GroovyObjectSupport;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Utility class used as delegate of closures representing JSON objects.
  *
- * @author Guillaume Laforge
- * @author Andrey Bloschetsov
  * @since 1.8.0
  */
 public class JsonDelegate extends GroovyObjectSupport {

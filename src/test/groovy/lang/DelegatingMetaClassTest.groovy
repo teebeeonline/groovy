@@ -18,13 +18,11 @@
  */
 package groovy.lang
 
+import groovy.test.GroovyTestCase
 
 /**
  * Tests for the DelegatingMetaClass
- *
- * @author Graeme Rocher
- **/
-
+ */
 class DelegatingMetaClassTest extends GroovyTestCase {
 
     void testIsGroovyObject() {

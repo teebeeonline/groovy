@@ -17,16 +17,21 @@
  *  under the License.
  */
 dependencies {
-    compile rootProject
-    testCompile rootProject.sourceSets.test.runtimeClasspath
-    compile project(':groovy-templates')
-    testCompile project(':groovy-test')
-    testCompile project(':groovy-ant')
-    testCompile "org.apache.ant:ant-testutil:$antVersion"
+    api rootProject // GroovydocVisitor extends ClassCodeVisitorSupport...
+    api "com.github.javaparser:javaparser-core:$javaParserVersion" // GroovydocJavaVisitor extends VoidVisitorAdapter...
+    implementation project(':groovy-templates')
+    implementation project(':groovy-docgenerator')
+    testImplementation rootProject.sourceSets.test.runtimeClasspath
+    testImplementation project(':groovy-test')
+    testImplementation "org.apache.ant:ant-testutil:$antVersion"
 }
 
 compileJava {
     doLast {
-        mkdir "$sourceSets.main.output.classesDir/META-INF"
+        mkdir "$sourceSets.main.java.outputDir/META-INF"
     }
+}
+
+eclipse.classpath.file.whenMerged {
+    entries.removeAll { entry -> entry.path == '/groovy-xml' }
 }

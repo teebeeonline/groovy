@@ -18,7 +18,11 @@
  */
 package groovy.swing.binding;
 
-import org.codehaus.groovy.binding.*;
+import org.apache.groovy.swing.binding.FullBinding;
+import org.apache.groovy.swing.binding.PropertyBinding;
+import org.apache.groovy.swing.binding.SourceBinding;
+import org.apache.groovy.swing.binding.TargetBinding;
+import org.apache.groovy.swing.binding.TriggerBinding;
 
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
@@ -29,9 +33,7 @@ import java.beans.PropertyChangeListener;
 import java.util.HashMap;
 import java.util.Map;
 
-
 /**
- * @author <a href="mailto:shemnon@yahoo.com">Danno Ferrin</a>
  * @since Groovy 1.1
  */
 public class JTextComponentProperties {

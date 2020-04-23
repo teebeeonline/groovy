@@ -19,7 +19,7 @@
 package org.codehaus.groovy.runtime;
 
 import groovy.lang.MissingMethodException;
-import groovy.util.GroovyTestCase;
+import groovy.test.GroovyTestCase;
 import groovy.util.HeadlessTestSupport;
 import groovy.util.Node;
 
@@ -32,25 +32,23 @@ import java.util.Map;
 
 /**
  * Test the property access of the Invoker class
- *
- * @author <a href="mailto:james@coredevelopers.net">James Strachan</a>
  */
 public class PropertyTest extends GroovyTestCase {
 
     public void testMapProperties() throws Exception {
         Map map = new HashMap();
         map.put("foo", "abc");
-        map.put("bar", new Integer(123));
+        map.put("bar", Integer.valueOf(123));
 
         assertGetSetProperty(map, "foo", "abc", "def");
-        assertGetSetProperty(map, "bar", new Integer(123), new Double(12.34));
+        assertGetSetProperty(map, "bar", Integer.valueOf(123), new Double(12.34));
     }
 
     public void testBeanProperties() throws Exception {
         DummyBean bean = new DummyBean();
 
         assertGetSetProperty(bean, "name", "James", "Bob");
-        assertGetSetProperty(bean, "i", new Integer(123), new Integer(455));
+        assertGetSetProperty(bean, "i", Integer.valueOf(123), Integer.valueOf(455));
 
         // dynamic properties
         assertGetSetProperty(bean, "dynamicFoo", null, "aValue");
@@ -84,8 +82,8 @@ public class PropertyTest extends GroovyTestCase {
     public void testListCoercionProperty() throws Exception {
         DummyBean bean = new DummyBean();
         List list = new ArrayList();
-        list.add(new Integer(10));
-        list.add(new Integer(20));
+        list.add(Integer.valueOf(10));
+        list.add(Integer.valueOf(20));
 
         InvokerHelper.setProperty(bean, "point", list);
         assertEquals("Should have set a point", new Point(10, 20), bean.getPoint());
@@ -97,8 +95,8 @@ public class PropertyTest extends GroovyTestCase {
         try {
             JFrame bean = new JFrame();
             List list = new ArrayList();
-            list.add(new Integer(10));
-            list.add(new Integer(20));
+            list.add(Integer.valueOf(10));
+            list.add(Integer.valueOf(20));
 
             InvokerHelper.setProperty(bean, "location", list);
             assertEquals("Should have set a point", new Point(10, 20), bean.getLocation());

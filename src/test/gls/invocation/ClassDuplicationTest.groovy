@@ -16,7 +16,11 @@
  *  specific language governing permissions and limitations
  *  under the License.
  */
-class ClassDuplicationTest extends GroovyTestCase {
+package gls.invocation
+
+import groovy.test.GroovyTestCase
+
+final class ClassDuplicationTest extends GroovyTestCase {
     void testDuplicationOnMethodSignatureTest() {
         def shell1 = new GroovyShell(this.class.classLoader)
         def obj1 = shell1.evaluate("""
@@ -34,6 +38,6 @@ class ClassDuplicationTest extends GroovyTestCase {
             assert false
         } catch (MissingMethodException mme) {
             assert mme.toString().contains("A (defined by")
-        }     
+        }
     }
 }

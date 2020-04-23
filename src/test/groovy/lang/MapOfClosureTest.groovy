@@ -18,11 +18,10 @@
  */
 package groovy.lang
 
+import groovy.test.GroovyTestCase
+
 /**
  * Tests maps of closures coerced to classes by asType()
- *
- * @author Jochen Theodorou
- * @author Guillaume Laforge
  */
 class MapOfClosureTest extends GroovyTestCase {
 
@@ -36,17 +35,17 @@ class MapOfClosureTest extends GroovyTestCase {
     }
 
     void testInterfaceProxyWithoutAllMethods() {
-        def proxy = [ methodOne: { 'some string' } ] as MultiMethodInterface
-        
+        def proxy = [methodOne: { 'some string' }] as MultiMethodInterface
+
         assert proxy instanceof MultiMethodInterface
-        
+
         assertEquals 'some string', proxy.methodOne()
-        
+
         shouldFail(UnsupportedOperationException) {
             proxy.methodTwo()
         }
     }
-    
+
     void testObject() {
         def m = [bar: { "foo" }]
         def x = m as Object
@@ -92,24 +91,29 @@ class MapOfClosureTest extends GroovyTestCase {
 
         assert ["map foo"] as String[] == c.foo(1, ['a', 'b'], [0.2, 0.3] as Double[])
     }
-}
 
-abstract class A {
-    protected prot() { "prot" }
-    def pub() { "pub" }
-    abstract abstractMethod()
-}
+    //--------------------------------------------------------------------------
 
-class B extends A {
-    protected child() { "child" }
-    def abstractMethod() { "abstract" }
-}
+    static abstract class A {
+        protected prot() { "prot" }
 
-class C {
-    String[] foo(int a, List b, Double[] c) { ["foo"] as String[] }
-}
+        def pub() { "pub" }
 
-interface MultiMethodInterface {
-    String methodOne()
-    String methodTwo()
+        abstract abstractMethod()
+    }
+
+    static class B extends A {
+        protected child() { "child" }
+
+        def abstractMethod() { "abstract" }
+    }
+
+    static class C {
+        String[] foo(int a, List b, Double[] c) { ["foo"] as String[] }
+    }
+
+    interface MultiMethodInterface {
+        String methodOne()
+        String methodTwo()
+    }
 }

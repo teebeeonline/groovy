@@ -32,14 +32,12 @@ import org.codehaus.groovy.ast.stmt.ExpressionStatement;
 import org.codehaus.groovy.ast.stmt.Statement;
 import org.codehaus.groovy.control.SourceUnit;
 
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 /**
  * This transformer is responsible for adding calls to the <i>newLine</i> method
  * depending on the layout of the source code, inside builder like blocks.
- *
- * @author Cedric Champeau
  */
 class AutoNewLineTransformer extends ClassCodeVisitorSupport {
     private final SourceUnit unit;
@@ -84,7 +82,7 @@ class AutoNewLineTransformer extends ClassCodeVisitorSupport {
             Statement oldCode = expression.getCode();
             BlockStatement block = oldCode instanceof BlockStatement?
                     ((BlockStatement)oldCode):
-                    new BlockStatement(Arrays.asList(oldCode), new VariableScope());
+                    new BlockStatement(Collections.singletonList(oldCode), new VariableScope());
             List<Statement> statements = block.getStatements();
             if (!statements.isEmpty()) {
                 Statement first = statements.get(0);

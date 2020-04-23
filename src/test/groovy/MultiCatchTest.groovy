@@ -18,12 +18,14 @@
  */
 package groovy
 
+import groovy.test.GroovyTestCase
+import org.codehaus.groovy.control.CompilerConfiguration
+import org.codehaus.groovy.control.ParserPluginFactory
+
 /**
  * Test for the multi-catch exception from JDK 7 (Project Coin)
- *
- * @author Cedric Champeau
  */
-class MultiCatchTest extends GroovyTestCase{
+class MultiCatchTest extends GroovyTestCase {
 
     void testDynamicCatch() {
         def catched = false

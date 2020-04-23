@@ -18,15 +18,27 @@
  */
 package org.codehaus.groovy.runtime.memoize
 
-/**
- * @author Vaclav Pech
- */
-public class NullValueTest extends GroovyTestCase {
-    public void testEquals() throws Exception {
-        assert new Memoize.MemoizeNullValue() == new Memoize.MemoizeNullValue()
+import org.junit.Test
+
+import static groovy.test.GroovyAssert.assertScript
+
+final class NullValueTest {
+
+    @Test
+    void testEquals() {
+        assertScript '''
+            def one = new org.codehaus.groovy.runtime.memoize.Memoize.MemoizeNullValue()
+            def two = new org.codehaus.groovy.runtime.memoize.Memoize.MemoizeNullValue()
+            assert one.equals(two)
+        '''
     }
 
-    public void testHashCode() throws Exception {
-        assert new Memoize.MemoizeNullValue().hashCode() == new Memoize.MemoizeNullValue().hashCode()
+    @Test
+    void testHashCode() throws Exception {
+        assertScript '''
+            def one = new org.codehaus.groovy.runtime.memoize.Memoize.MemoizeNullValue()
+            def two = new org.codehaus.groovy.runtime.memoize.Memoize.MemoizeNullValue()
+            assert one.hashCode() == two.hashCode()
+        '''
     }
 }

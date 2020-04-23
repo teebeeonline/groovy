@@ -18,9 +18,8 @@
  */
 package groovy.bugs
 
-/**
- *  @author Pilho Kim
- */ 
+import groovy.test.GroovyTestCase
+
 class Groovy675_Bug extends GroovyTestCase {
     void testStringAndGString() {
     assert "\\"!="\\\\" 

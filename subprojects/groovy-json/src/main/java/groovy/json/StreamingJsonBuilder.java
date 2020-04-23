@@ -18,11 +18,19 @@
  */
 package groovy.json;
 
-import groovy.lang.*;
+import groovy.lang.Closure;
+import groovy.lang.DelegatesTo;
+import groovy.lang.GString;
+import groovy.lang.GroovyObjectSupport;
+import groovy.lang.Writable;
 
 import java.io.IOException;
 import java.io.Writer;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 
 /**
  * A builder for creating JSON payloads.
@@ -40,7 +48,7 @@ import java.util.*;
  * <p>
  * Example:
  * <pre class="groovyTestCase">
- *     new StringWriter().with { w ->
+ *     new StringWriter().with { w {@code ->}
  *         def builder = new groovy.json.StreamingJsonBuilder(w)
  *         builder.people {
  *             person {
@@ -60,10 +68,6 @@ import java.util.*;
  *         assert w.toString() == '{"people":{"person":{"firstName":"Tim","lastName":"Yates","address":{"city":"Manchester","country":"UK","zip":"M1 2AB"},"living":true,"eyes":["left","right"]}}}'
  *    }
  * </pre>
- *
- * @author Tim Yates
- * @author Andrey Bloschetsov
- * @author Graeme Rocher
  *
  * @since 1.8.1
  */
@@ -131,7 +135,7 @@ public class StreamingJsonBuilder extends GroovyObjectSupport {
      * <p>
      * Example:
      * <pre class="groovyTestCase">
-     * new StringWriter().with { w ->
+     * new StringWriter().with { w {@code ->}
      *   def json = new groovy.json.StreamingJsonBuilder(w)
      *   json name: "Tim", age: 31
      *
@@ -151,7 +155,7 @@ public class StreamingJsonBuilder extends GroovyObjectSupport {
     /**
      * The empty args call will create a key whose value will be an empty JSON object:
      * <pre class="groovyTestCase">
-     * new StringWriter().with { w ->
+     * new StringWriter().with { w {@code ->}
      *     def json = new groovy.json.StreamingJsonBuilder(w)
      *     json.person()
      *
@@ -171,7 +175,7 @@ public class StreamingJsonBuilder extends GroovyObjectSupport {
      * <p>
      * Example:
      * <pre class="groovyTestCase">
-     * new StringWriter().with { w ->
+     * new StringWriter().with { w {@code ->}
      *   def json = new groovy.json.StreamingJsonBuilder(w)
      *   def result = json([1, 2, 3])
      *
@@ -194,7 +198,7 @@ public class StreamingJsonBuilder extends GroovyObjectSupport {
      * <p>
      * Example:
      * <pre class="groovyTestCase">
-     * new StringWriter().with { w ->
+     * new StringWriter().with { w {@code ->}
      *   def json = new groovy.json.StreamingJsonBuilder(w)
      *   def result = json 1, 2, 3
      *
@@ -221,9 +225,9 @@ public class StreamingJsonBuilder extends GroovyObjectSupport {
      * }
      * def authors = [new Author (name: "Guillaume"), new Author (name: "Jochen"), new Author (name: "Paul")]
      *
-     * new StringWriter().with { w ->
+     * new StringWriter().with { w {@code ->}
      *     def json = new groovy.json.StreamingJsonBuilder(w)
-     *     json authors, { Author author ->
+     *     json authors, { Author author {@code ->}
      *         name author.name
      *     }
      *
@@ -249,7 +253,7 @@ public class StreamingJsonBuilder extends GroovyObjectSupport {
      * <p>
      * Example:
      * <pre class="groovyTestCase">
-     * new StringWriter().with { w ->
+     * new StringWriter().with { w {@code ->}
      *   def json = new groovy.json.StreamingJsonBuilder(w)
      *   json {
      *      name "Tim"
@@ -275,7 +279,7 @@ public class StreamingJsonBuilder extends GroovyObjectSupport {
      * <p>
      * Example:
      * <pre class="groovyTestCase">
-     * new StringWriter().with { w ->
+     * new StringWriter().with { w {@code ->}
      *   def json = new groovy.json.StreamingJsonBuilder(w)
      *   json.person {
      *      name "Tim"
@@ -308,9 +312,9 @@ public class StreamingJsonBuilder extends GroovyObjectSupport {
      * }
      * def authors = [new Author (name: "Guillaume"), new Author (name: "Jochen"), new Author (name: "Paul")]
      *
-     * new StringWriter().with { w ->
+     * new StringWriter().with { w {@code ->}
      *     def json = new groovy.json.StreamingJsonBuilder(w)
-     *     json.people authors, { Author author ->
+     *     json.people authors, { Author author {@code ->}
      *         name author.name
      *     }
      *
@@ -344,7 +348,7 @@ public class StreamingJsonBuilder extends GroovyObjectSupport {
      * in case the same key is used.
      *
      * <pre class="groovyTestCase">
-     * new StringWriter().with { w ->
+     * new StringWriter().with { w {@code ->}
      *     def json = new groovy.json.StreamingJsonBuilder(w)
      *     json.person(name: "Tim", age: 35) { town "Manchester" }
      *
@@ -399,7 +403,7 @@ public class StreamingJsonBuilder extends GroovyObjectSupport {
      * <p>
      * Example with a classical builder-style:
      * <pre class="groovyTestCase">
-     * new StringWriter().with { w ->
+     * new StringWriter().with { w {@code ->}
      *     def json = new groovy.json.StreamingJsonBuilder(w)
      *     json.person {
      *         name "Tim"
@@ -412,7 +416,7 @@ public class StreamingJsonBuilder extends GroovyObjectSupport {
      *
      * Or alternatively with a method call taking named arguments:
      * <pre class="groovyTestCase">
-     * new StringWriter().with { w ->
+     * new StringWriter().with { w {@code ->}
      *     def json = new groovy.json.StreamingJsonBuilder(w)
      *     json.person name: "Tim", age: 32
      *
@@ -427,7 +431,7 @@ public class StreamingJsonBuilder extends GroovyObjectSupport {
      * the closure properties overriding the map key/values
      * in case the same key is used.
      * <pre class="groovyTestCase">
-     * new StringWriter().with { w ->
+     * new StringWriter().with { w {@code ->}
      *     def json = new groovy.json.StreamingJsonBuilder(w)
      *     json.person(name: "Tim", age: 35) { town "Manchester" }
      *
@@ -437,7 +441,7 @@ public class StreamingJsonBuilder extends GroovyObjectSupport {
      *
      * The empty args call will create a key whose value will be an empty JSON object:
      * <pre class="groovyTestCase">
-     * new StringWriter().with { w ->
+     * new StringWriter().with { w {@code ->}
      *     def json = new groovy.json.StreamingJsonBuilder(w)
      *     json.person()
      *
@@ -523,7 +527,7 @@ public class StreamingJsonBuilder extends GroovyObjectSupport {
             this(w, first, null);
         }
 
-        StreamingJsonDelegate(Writer w, boolean first, JsonGenerator generator) {
+        public StreamingJsonDelegate(Writer w, boolean first, JsonGenerator generator) {
             this.writer = w;
             this.first = first;
             this.generator = (generator != null) ? generator : JsonOutput.DEFAULT_GENERATOR;
@@ -624,10 +628,10 @@ public class StreamingJsonBuilder extends GroovyObjectSupport {
          * }
          * def authorList = [new Author (name: "Guillaume"), new Author (name: "Jochen"), new Author (name: "Paul")]
          *
-         * new StringWriter().with { w ->
+         * new StringWriter().with { w {@code ->}
          *     def json = new groovy.json.StreamingJsonBuilder(w)
          *     json.book {
-         *        authors authorList, { Author author ->
+         *        authors authorList, { Author author {@code ->}
          *         name author.name
          *       }
          *     }

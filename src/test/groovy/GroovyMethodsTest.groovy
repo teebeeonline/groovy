@@ -18,7 +18,10 @@
  */
 package groovy
 
+import groovy.test.GroovyTestCase
+
 import java.awt.Dimension
+import java.nio.CharBuffer
 import java.util.concurrent.LinkedBlockingQueue
 import org.codehaus.groovy.util.StringUtil
 
@@ -96,9 +99,14 @@ class GroovyMethodsTest extends GroovyTestCase {
     void testAsCoercionInterface() {
         def letters = ['a', 'b', 'c']
         def ol = new ObserverLike()
-        def o = new Observable()
+        def o = new Observable() {
+            @Override
+            synchronized void setChanged() {
+                super.setChanged()
+            }
+        }
         o.addObserver(ol as Observer) // addObserver takes Observer as param
-        letters.each{ o.changed = true; o.notifyObservers(it) }
+        letters.each{ o.setChanged(); o.notifyObservers(it) }
         assert ol.observed == letters
     }
 
@@ -785,6 +793,13 @@ class GroovyMethodsTest extends GroovyTestCase {
         assert result2['cc']['cd']['ce'] == [cc: 33]
     }
 
+    void testCountBy() {
+        def list = ['a', 'b', 'c', 'a']
+        def result = list.countBy { it }
+
+        assert [a: 2, b: 1, c: 1] == result
+    }
+
     def leftCol = ["2"]
     def rightCol = ["1", "2", "3"]
 
@@ -809,10 +824,10 @@ class GroovyMethodsTest extends GroovyTestCase {
     }
 
     void doIt(col) {
-        col.clear();
-        col.addAll(leftCol);
-        // not really concerned about  correctness, rather that the method can be called, however..
-        assert col.intersect(rightCol) == ["2"]
+        col.clear()
+        col.addAll(leftCol)
+        // not really concerned about correctness, rather that the method can be called, however..
+        assert col.intersect(rightCol) as List == ["2"]
     }
 
     void testFileWithReader() {
@@ -1565,6 +1580,15 @@ class GroovyMethodsTest extends GroovyTestCase {
         assert [4, 5] == iterableA.intersect(iterableB)
     }
 
+    void testIntersectForSets() {
+        assert [].toSet() == [].toSet().intersect([] as Iterable)
+        assert [].toSet() == [].toSet().intersect([1, 2, 3] as Iterable)
+        assert [].toSet() == [1, 2, 3].toSet().intersect([] as Iterable)
+        assert [2, 3].toSet() == [2, 3, 4].toSet().intersect([1, 2, 3] as Iterable)
+        assert [2, 3, 4].toSet() == [2, 3, 4].toSet().intersect([1, 2, 3, 4] as Iterable)
+        assert [2, 3].toSet() == [2, 3, 4, 5].toSet().intersect([1, 2, 3] as Iterable)
+    }
+
     void testIntersectForMaps() {
         // GROOVY-7602
         def list1 = [[language: 'Java'], [language: 'Groovy'], [language: 'Scala']]
@@ -1809,6 +1833,339 @@ class GroovyMethodsTest extends GroovyTestCase {
         }
         shouldFail(ArrayIndexOutOfBoundsException) {
             ([] as int[]).swap(1, 2)
+        }
+    }
+
+    void testCharSequenceTakeRight() {
+        def data = ['groovy',      // String
+                    "${'groovy'}", // GString
+                    java.nio.CharBuffer.wrap('groovy'),
+                    new StringBuffer('groovy'),
+                    new StringBuilder('groovy')]
+        data.each {
+            // Need toString() as CharBuffer.subSequence returns a java.nio.StringCharBuffer
+            assert it.takeRight(-1).toString() == ''
+            assert it.takeRight(0).toString() == ''
+            assert it.takeRight(3).toString() == 'ovy'
+            assert it.takeRight(6).toString() == 'groovy'
+            assert it.takeRight(10).toString() == 'groovy'
+        }
+    }
+
+    void testCharSequenceTakeAfter() {
+        def text = 'Groovy development. Groovy team'
+
+        def data = [text,      // String
+                    "${text}", // GString
+                    java.nio.CharBuffer.wrap(text),
+                    new StringBuffer(text),
+                    new StringBuilder(text)]
+
+        List<List<String>> searchStringsAndResults = [
+
+                ['Groovy', ' development. Groovy team'],
+                ['team', ''],
+                ['Java.', ''],
+                ['Unavailable text', ''],
+                ['Some larger String than self', ''],
+                ['', ''],
+                [null, '']
+        ]
+
+        data.each { s ->
+
+            searchStringsAndResults.each { r ->
+
+                // Need toString() as CharBuffer.subSequence returns a java.nio.StringCharBuffer
+
+                assert s.takeAfter(r[0]).toString() == r[1]                //String as searchString
+                assert s.takeAfter("${r[0]}").toString() == r[1]  //GString as searchString
+
+                if (r[0]) {
+                    assert s.takeAfter(java.nio.CharBuffer.wrap(r[0])).toString() == r[1] //CharBuffer as searchString
+                    assert s.takeAfter(new StringBuffer(r[0])).toString() == r[1]  //StringBuffer as searchString
+                    assert s.takeAfter(new StringBuilder(r[0])).toString() == r[1] //StringBuilder as searchString
+                }
+            }
+        }
+
+    }
+
+    void testCharSequenceTakeBefore() {
+        def text = "Groovy development. Groovy team"
+
+        def data = [text,      // String
+                    "${text}", // GString
+                    java.nio.CharBuffer.wrap(text),
+                    new StringBuffer(text),
+                    new StringBuilder(text)]
+
+        List<List<String>> searchStringsAndResults = [
+
+                [' Groovy ', 'Groovy development.'],
+                ['Groovy', ''],
+                [' ', 'Groovy'],
+                ['Unavailable text', ''],
+                ['Some larger String than self', ''],
+                ['r', 'G'],
+                ['', ''],
+                [null, '']
+        ]
+
+        data.each { s ->
+
+            searchStringsAndResults.each { r ->
+
+                // Need toString() as CharBuffer.subSequence returns a java.nio.StringCharBuffer
+
+                assert s.takeBefore(r[0]).toString() == r[1]                //String as searchString
+                assert s.takeBefore("${r[0]}").toString() == r[1]  //GString as searchString
+
+                if (r[0]) {
+                    assert s.takeBefore(java.nio.CharBuffer.wrap(r[0])).toString() == r[1] //CharBuffer as searchString
+                    assert s.takeBefore(new StringBuffer(r[0])).toString() == r[1]  //StringBuffer as searchString
+                    assert s.takeBefore(new StringBuilder(r[0])).toString() == r[1] //StringBuilder as searchString
+                }
+            }
+        }
+
+    }
+
+    void testCharSequenceDropRight() {
+        def data = ['groovy',      // String
+                    "${'groovy'}", // GString
+                    java.nio.CharBuffer.wrap('groovy'),
+                    new StringBuffer('groovy'),
+                    new StringBuilder('groovy')]
+        data.each {
+            // Need toString() as CharBuffer.subSequence returns a java.nio.StringCharBuffer
+            assert it.dropRight(-1).toString() == 'groovy'
+            assert it.dropRight(0).toString() == 'groovy'
+            assert it.dropRight(3).toString() == 'gro'
+            assert it.dropRight(6).toString() == ''
+            assert it.dropRight(10).toString() == ''
+        }
+    }
+
+    void testCharSequenceTakeBetween() {
+
+        def text = 'Time taken for Select Query = 12 ms, Update Query = 15 ms. Result = "One", "Two"'
+
+        def data = [text,      // String
+                    "${text}", // GString
+                    java.nio.CharBuffer.wrap(text),
+                    new StringBuffer(text),
+                    new StringBuilder(text)]
+
+        data.each { s ->
+
+            List<List<String>> fromToCasesWithoutNum = [
+
+                    ['Query = ', ' ms', '12'], //positive case
+                    ['Query = ', ' MS', ''],   //negative case with invalid 'to'
+                    ['Query123 = ', ' ms', '']     //negative case with invalid 'from'
+            ]
+
+            fromToCasesWithoutNum.each { r ->
+
+                assert s.takeBetween(r[0], r[1]).toString() == r[2]
+                assert s.takeBetween("${r[0]}", "${r[1]}").toString() == r[2]
+
+                if (r[0] && r[1]) {
+                    assert s.takeBetween(CharBuffer.wrap(r[0]), CharBuffer.wrap(r[1])).toString() == r[2]
+                    assert s.takeBetween(new StringBuffer(r[0]), CharBuffer.wrap(r[1])).toString() == r[2]
+                    assert s.takeBetween(CharBuffer.wrap(r[0]), new StringBuilder(r[1])).toString() == r[2]
+                }
+            }
+        }
+
+        data.each { s ->
+
+            List<List<String>> enclosureWithoutNum = [
+
+                    ['"', 'One'],               //positive case
+                    ['Query', ' = 12 ms, Update '], //negative case with invalid enclosure
+                    ['Query123', '']                   //negative case with invalid enclosure
+            ]
+
+            enclosureWithoutNum.each { r ->
+
+                assert s.takeBetween(r[0]).toString() == r[1]
+                assert s.takeBetween("${r[0]}").toString() == r[1]
+
+                if (r[0] && r[1]) {
+                    assert s.takeBetween(CharBuffer.wrap(r[0])).toString() == r[1]
+                    assert s.takeBetween(new StringBuffer(r[0])).toString() == r[1]
+                    assert s.takeBetween(new StringBuilder(r[0])).toString() == r[1]
+                }
+            }
+        }
+
+        data.each { s ->
+
+            List<List<Object>> fromToCasesWithNum = [
+
+                    ['Query = ', ' ms', 1, '15'],
+                    ['Query = ', ' ms', 2, '']
+            ]
+
+            fromToCasesWithNum.each { r ->
+
+                assert s.takeBetween(r[0], r[1], r[2]).toString() == r[3]
+                assert s.takeBetween("${r[0]}", "${r[1]}", r[2]).toString() == r[3]
+
+                if (r[0] && r[1]) {
+                    assert s.takeBetween(CharBuffer.wrap(r[0]), CharBuffer.wrap(r[1]), r[2]).toString() == r[3]
+                    assert s.takeBetween(new StringBuffer(r[0]), new StringBuffer(r[1]), r[2]).toString() == r[3]
+                    assert s.takeBetween(new StringBuilder(r[0]), new StringBuilder(r[1]), r[2]).toString() == r[3]
+                }
+            }
+        }
+
+        data.each { s ->
+
+            List<List<Object>> enclosureWithNum = [
+
+                    ['"', 1, 'Two'],
+                    ['"', 2, ''],
+                    ['"', -1, '']
+            ]
+
+            enclosureWithNum.each { r ->
+
+                assert s.takeBetween(r[0], r[1]).toString() == r[2]
+                assert s.takeBetween("${r[0]}", r[1]).toString() == r[2]
+
+                if (r[0] && r[1]) {
+                    assert s.takeBetween(CharBuffer.wrap(r[0]), r[1]).toString() == r[2]
+                    assert s.takeBetween(new StringBuffer(r[0]), r[1]).toString() == r[2]
+                    assert s.takeBetween(new StringBuilder(r[0]), r[1]).toString() == r[2]
+                }
+            }
+        }
+
+        assert 'smalltext'.takeBetween('somelargertextfrom', 'somelargertextto') == ''
+        assert 'smalltext'.takeBetween('somelargertextfrom', 'somelargertextto', 0) == ''
+
+        def text2 = "name = 'some name'"
+
+        assert text2.takeBetween("'") == 'some name'
+        assert text2.takeBetween('z') == ''
+
+        def text3 = "t1=10 ms, t2=100 ms"
+
+        assert text3.takeBetween('=', ' ', 0) == '10'
+        assert text3.takeBetween('=', ' ', 1) == '100'
+        assert text3.takeBetween('t1', 'z') == ''
+
+        assert 'one\ntwo\nthree'.takeBetween('\n') == 'two'
+    }
+
+    void testCharSequenceStartsWithIgnoreCase() {
+        def text = 'Some Text'
+
+        def data = [text,      // String
+                    "${text}", // GString
+                    java.nio.CharBuffer.wrap(text),
+                    new StringBuffer(text),
+                    new StringBuilder(text)]
+
+        List<List<Object>> searchStringsAndResults = [
+
+                ['SOME', true],
+                ['some', true],
+                ['Some', true],
+                ['Wrong', false],
+                ['Some larger String than self', false],
+                ['', false],
+                [null, false]
+        ]
+
+        data.each { s ->
+
+            searchStringsAndResults.each { r ->
+
+                assert s.startsWithIgnoreCase(r[0]) == r[1]
+                assert s.startsWithIgnoreCase("${r[0]}") == r[1]
+
+                if (r[0]) {
+                    assert s.startsWithIgnoreCase(CharBuffer.wrap(r[0])) == r[1]
+                    assert s.startsWithIgnoreCase(new StringBuffer(r[0])) == r[1]
+                    assert s.startsWithIgnoreCase(new StringBuilder(r[0])) == r[1]
+                }
+            }
+        }
+    }
+
+    void testCharSequenceEndsWithIgnoreCase() {
+        def text = 'Some Text'
+
+        def data = [text,      // String
+                    "${text}", // GString
+                    java.nio.CharBuffer.wrap(text),
+                    new StringBuffer(text),
+                    new StringBuilder(text)]
+
+        List<List<Object>> searchStringsAndResults = [
+
+                ['TEXT', true],
+                ['text', true],
+                ['Text', true],
+                ['Wrong', false],
+                ['Some larger String than self', false],
+                ['', false],
+                [null, false]
+        ]
+
+        data.each { s ->
+
+            searchStringsAndResults.each { r ->
+
+                assert s.endsWithIgnoreCase(r[0]) == r[1]
+                assert s.endsWithIgnoreCase("${r[0]}") == r[1]
+
+                if (r[0]) {
+                    assert s.endsWithIgnoreCase(CharBuffer.wrap(r[0])) == r[1]
+                    assert s.endsWithIgnoreCase(new StringBuffer(r[0])) == r[1]
+                    assert s.endsWithIgnoreCase(new StringBuilder(r[0])) == r[1]
+                }
+            }
+        }
+    }
+
+    void testCharSequenceContainsIgnoreCase() {
+        def text = 'Some Text'
+
+        def data = [text,      // String
+                    "${text}", // GString
+                    java.nio.CharBuffer.wrap(text),
+                    new StringBuffer(text),
+                    new StringBuilder(text)]
+
+        List<List<Object>> searchStringsAndResults = [
+
+                ['E TEX', true],
+                ['Me t', true],
+                ['me T', true],
+                ['Wrong', false],
+                ['Some larger String than self', false],
+                ['', false],
+                [null, false]
+        ]
+
+        data.each { s ->
+
+            searchStringsAndResults.each { r ->
+
+                assert s.containsIgnoreCase(r[0]) == r[1]
+                assert s.containsIgnoreCase("${r[0]}") == r[1]
+
+                if (r[0]) {
+                    assert s.containsIgnoreCase(CharBuffer.wrap(r[0])) == r[1]
+                    assert s.containsIgnoreCase(new StringBuffer(r[0])) == r[1]
+                    assert s.containsIgnoreCase(new StringBuilder(r[0])) == r[1]
+                }
+            }
         }
     }
 }

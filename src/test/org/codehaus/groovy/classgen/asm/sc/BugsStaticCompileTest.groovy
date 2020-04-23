@@ -170,7 +170,7 @@ class BugsStaticCompileTest extends BugsSTCTest implements StaticCompilationTest
     void testCanonicalInInnerClass() {
         new GroovyShell().evaluate '''import groovy.transform.*
             @CompileStatic
-            class CanonicalStaticTest extends GroovyTestCase {
+            class CanonicalStaticTest extends groovy.test.GroovyTestCase {
               @Canonical class Thing {
                 String stuff
               }
@@ -196,7 +196,7 @@ class BugsStaticCompileTest extends BugsSTCTest implements StaticCompilationTest
             @groovy.transform.CompileStatic
             class Main {
                 void test() {
-                    @ASTTest(phase=INSTRUCTION_SELECTION, value= {
+                    @ASTTest(phase=INSTRUCTION_SELECTION, value={
                         assert node.rightExpression.getNodeMetaData(INFERRED_TYPE).nameWithoutPackage == 'Sql'
                     })
                     def sql = Sql.newInstance("a", "b", "c", "d")
@@ -720,7 +720,7 @@ import groovy.transform.TypeCheckingMode
         shouldFailWithMessages '''
             def fieldMatcher = '[x=1] [a=b] [foo=bar]' =~ ~"\\\\[([^=\\\\[]+)=([^\\\\]]+)\\\\]"
             assert fieldMatcher instanceof java.util.regex.Matcher
-            @ASTTest(phase=INSTRUCTION_SELECTION, value = {
+            @ASTTest(phase=INSTRUCTION_SELECTION, value={
                 assert node.getNodeMetaData(INFERRED_TYPE) == OBJECT_TYPE
             })
             def value = fieldMatcher[0]
@@ -1198,83 +1198,83 @@ println someInt
 
     void testAccessOuterClassMethodFromInnerClassConstructor() {
         assertScript '''
-    class Parent {
-        String str
-        Parent(String s) { str = s }
-    }
-    class Outer {
-        String a
+            class Parent {
+                String str
+                Parent(String s) { str = s }
+            }
+            class Outer {
+                String a
 
-        private class Inner extends Parent {
-           Inner() { super(getA()) }
-        }
+                private class Inner extends Parent {
+                   Inner() { super(getA()) }
+                }
 
-        String test() { new Inner().str }
-    }
-    def o = new Outer(a:'ok')
-    assert o.test() == 'ok'
-    '''
+                String test() { new Inner().str }
+            }
+            def o = new Outer(a:'ok')
+            assert o.test() == 'ok'
+        '''
     }
 
     void testAccessOuterClassMethodFromInnerClassConstructorUsingExplicitOuterThis() {
         assertScript '''
-    class Parent {
-        String str
-        Parent(String s) { str = s }
-    }
-    class Outer {
-        String a
+            class Parent {
+                String str
+                Parent(String s) { str = s }
+            }
+            class Outer {
+                String a
 
-        private class Inner extends Parent {
-           Inner() { super(Outer.this.getA()) }
-        }
+                private class Inner extends Parent {
+                   Inner() { super(Outer.this.getA()) }
+                }
 
-        String test() { new Inner().str }
-    }
-    def o = new Outer(a:'ok')
-    assert o.test() == 'ok'
-    '''
+                String test() { new Inner().str }
+            }
+            def o = new Outer(a:'ok')
+            assert o.test() == 'ok'
+        '''
     }
 
     void testAccessOuterClassMethodFromInnerClassConstructorUsingExplicitOuterThisAndProperty() {
         assertScript '''
-    class Parent {
-        String str
-        Parent(String s) { str = s }
-    }
-    class Outer {
-        String a
+            class Parent {
+                String str
+                Parent(String s) { str = s }
+            }
+            class Outer {
+                String a
 
-        private class Inner extends Parent {
-           Inner() { super(Outer.this.a) }
-        }
+                private class Inner extends Parent {
+                   Inner() { super(Outer.this.a) }
+                }
 
-        String test() { new Inner().str }
-    }
-    def o = new Outer(a:'ok')
-    assert o.test() == 'ok'
-    '''
+                String test() { new Inner().str }
+            }
+            def o = new Outer(a:'ok')
+            assert o.test() == 'ok'
+        '''
     }
 
     void testAccessOuterClassStaticMethodFromInnerClassConstructor() {
         assertScript '''
-    class Parent {
-        String str
-        Parent(String s) { str = s }
-    }
-    class Outer {
-        static String a
+            class Parent {
+                String str
+                Parent(String s) { str = s }
+            }
+            class Outer {
+                static String a
 
-        private class Inner extends Parent {
-           Inner() { super(getA()) }
-        }
+                private class Inner extends Parent {
+                   Inner() { super(getA()) }
+                }
 
-        String test() { new Inner().str }
-    }
-    def o = new Outer()
-    Outer.a = 'ok'
-    assert o.test() == 'ok'
-    '''
+                String test() { new Inner().str }
+            }
+            def o = new Outer()
+            Outer.a = 'ok'
+            assert o.test() == 'ok'
+        '''
     }
 
     void testStaticMethodFromInnerClassConstructor() {
@@ -1464,5 +1464,48 @@ println someInt
             assert Groovy7784.multiVarArgs() == 'foo-bar-baz1-baz2'
         '''
     }
-}
 
+    // GROOVY-7160
+    void testGenericsArrayPlaceholder() {
+        assertScript '''
+            import static java.nio.file.AccessMode.*
+
+            class Dummy {
+                static main() {
+                    // more than 5 to match `of(E first, E[] rest)` variant
+                    EnumSet.of(READ, WRITE, EXECUTE, READ, WRITE, EXECUTE)
+                }
+            }
+
+            assert Dummy.main() == [READ, WRITE, EXECUTE].toSet()
+        '''
+    }
+
+    void testNumberWrapperMultiAssign() {
+        assertScript '''
+            import org.codehaus.groovy.ast.CodeVisitorSupport
+            import org.codehaus.groovy.ast.expr.ConstantExpression
+
+            void test() {
+                @ASTTest(phase=INSTRUCTION_SELECTION, value={
+                    node.visit(new CodeVisitorSupport() {
+                        @Override
+                        void visitConstantExpression(ConstantExpression expr) {
+                            switch (expr.text) {
+                            case '123':
+                            case '456':
+                                assert ClassHelper.isNumberType(expr.type)
+                                break
+                            default:
+                                assert false : "unexpected constant: $expr"
+                            }
+                        }
+                    })
+                })
+                def (Integer i, Long j) = [123, 456L]
+            }
+
+            test()
+        '''
+    }
+}

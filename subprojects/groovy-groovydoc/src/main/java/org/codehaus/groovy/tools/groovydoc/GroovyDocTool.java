@@ -28,9 +28,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 
-/**
- * @author Jeremy Rayner
- */
 public class GroovyDocTool {
     private final Logger log = Logger.create(GroovyDocTool.class);
     private final GroovyRootDocBuilder rootDocBuilder;
@@ -52,7 +49,7 @@ public class GroovyDocTool {
     }
 
     public GroovyDocTool(ResourceManager resourceManager, String[] sourcepaths, String[] docTemplates, String[] packageTemplates, String[] classTemplates, List<LinkArgument> links, Properties properties) {
-        rootDocBuilder = new GroovyRootDocBuilder(this, sourcepaths, links, properties);
+        rootDocBuilder = new GroovyRootDocBuilder(sourcepaths, links, properties);
 
         String defaultCharset = Charset.defaultCharset().name();
 
@@ -92,7 +89,7 @@ public class GroovyDocTool {
         if ("true".equals(properties.getProperty("packageScope"))) properties.setProperty("protectedScope", "true");
         if ("true".equals(properties.getProperty("protectedScope"))) properties.setProperty("publicScope", "true");
         if (templateEngine != null) {
-            GroovyDocWriter writer = new GroovyDocWriter(this, output, templateEngine, properties);
+            GroovyDocWriter writer = new GroovyDocWriter(output, templateEngine, properties);
             GroovyRootDoc rootDoc = rootDocBuilder.getRootDoc();
             writer.writeRoot(rootDoc, destdir);
             writer.writePackages(rootDoc, destdir);
@@ -102,6 +99,7 @@ public class GroovyDocTool {
         }
     }
 
+    @Deprecated
     static String getPath(String filename) {
         String path = new File(filename).getParent();
         // path length of 1 indicates that probably is 'default package' i.e. "/"
@@ -111,6 +109,7 @@ public class GroovyDocTool {
         return path;
     }
 
+    @Deprecated
     static String getFile(String filename) {
         return new File(filename).getName();
     }

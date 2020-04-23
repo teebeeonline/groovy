@@ -18,6 +18,8 @@
  */
 package groovy
 
+import groovy.test.GroovyTestCase
+
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
@@ -25,8 +27,6 @@ import java.util.concurrent.TimeUnit
  * Test case for the eachObject method on a file containing
  * zero, one or more objects (object stream).  Also test cases
  * for eachDir, eachFileMatch and runAfter methods.
- *
- * @author Hein Meling
  */
 class GroovyClosureMethodsTest extends GroovyTestCase {
 

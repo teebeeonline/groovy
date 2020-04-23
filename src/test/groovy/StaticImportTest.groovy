@@ -27,7 +27,7 @@ import static junit.framework.Assert.format
 import static junit.framework.Assert.assertEquals
 import static groovy.StaticImportTarget.x
 import static groovy.StaticImportTarget.z // do not remove
-import static groovy.StaticImportTarget.cl
+import static groovy.StaticImportTarget.getCl
 import static java.lang.Math.*
 import static java.util.Calendar.getInstance as now
 import static groovy.API.*
@@ -257,12 +257,14 @@ class StaticImportTest extends CompilableTestSupport {
             fail()
         } catch (MissingMethodException expected) {}
     }
-    
-    void testStaticImportOfAClosureField() { //GROOVY-3945
+
+    // GROOVY-3945
+    void testStaticImportOfAClosureProperty() {
         assert cl() == 'StaticImportTarget#static closure called'
     }
 
-    void testStaticPropertyImportedImplementedAsGetter() { //GROOVY-4145
+    // GROOVY-4145
+    void testStaticPropertyImportedImplementedAsGetter() {
         assert foo4145 == 3
     }
 
@@ -372,9 +374,19 @@ class Foo4964 {
 import static Foo4964.*
 class Bar4964 {
     static doIt() { [k: 'bar'] }
+
+    /*
+     The following `run` method is invoked by `testExplicitStaticMethodCallHasPrecedenceOverStaticImport`
+     As the method name shows, "ExplicitStaticMethodCall Has Precedence Over StaticImport", but the original test code does not conform to the intention
+     */
     static run() {
-        assert doIt().k == 'foo'
-        assert doIt() == [k: 'foo']
+//        The original test code is commented as follows:
+//        assert doIt().k == 'foo'
+//        assert doIt() == [k: 'foo']
+
+        assert doIt().k == 'bar'
+        assert doIt() == [k: 'bar']
+
         assert Bar4964.doIt() == [k: 'bar']
         assert Bar4964.doIt().k == 'bar'
     }

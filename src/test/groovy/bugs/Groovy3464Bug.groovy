@@ -18,14 +18,13 @@
  */
 package groovy.bugs
 
+import groovy.test.GroovyTestCase
 import org.codehaus.groovy.tools.javac.JavaAwareCompilationUnit
 import org.codehaus.groovy.control.CompilerConfiguration
 
 /**
  * GROOVY-3463:
  * Spring/CGLIB proxies throw exception "object is not an instance of declaring class"
- *
- * @author Guillaume Laforge
  */
 class Groovy3464Bug extends GroovyTestCase {
 
@@ -42,8 +41,8 @@ class Groovy3464Bug extends GroovyTestCase {
             jointCompilationOptions = [stubDir: createTempDir()]
         }
 
-        def groovyFile = new File('GroovyThing.groovy', config.targetDirectory)
-        def javaFile = new File('JavaThing.java', config.targetDirectory)
+        def groovyFile = new File(config.targetDirectory, 'GroovyThing.groovy')
+        def javaFile = new File(config.targetDirectory, 'JavaThing.java')
 
         groovyFile << '''
             class GroovyThing {
@@ -112,4 +111,3 @@ class Groovy3464Bug extends GroovyTestCase {
         return tempDirectory
     }
 }
-

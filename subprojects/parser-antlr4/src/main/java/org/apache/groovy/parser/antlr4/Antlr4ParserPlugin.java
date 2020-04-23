@@ -20,55 +20,41 @@ package org.apache.groovy.parser.antlr4;
 
 import org.codehaus.groovy.GroovyBugError;
 import org.codehaus.groovy.ast.ModuleNode;
-import org.codehaus.groovy.control.CompilationFailedException;
 import org.codehaus.groovy.control.ParserPlugin;
 import org.codehaus.groovy.control.SourceUnit;
-import org.codehaus.groovy.control.io.ReaderSource;
 import org.codehaus.groovy.control.io.StringReaderSource;
 import org.codehaus.groovy.runtime.IOGroovyMethods;
-import org.codehaus.groovy.syntax.ParserException;
 import org.codehaus.groovy.syntax.Reduction;
 
 import java.io.IOException;
+import java.io.Reader;
 
 /**
- * A parser plugin for the new parser
- *
- * @author  <a href="mailto:realbluesun@hotmail.com">Daniel.Sun</a>
- * Created on    2016/08/14
+ * A parser plugin for the new parser.
  */
 public class Antlr4ParserPlugin implements ParserPlugin {
-    private ReaderSource readerSource;
 
     @Override
-    public Reduction parseCST(SourceUnit sourceUnit, java.io.Reader reader) throws CompilationFailedException {
-        try {
-            ReaderSource readerSource = sourceUnit.getSource();
-            if (null != readerSource && null != readerSource.getReader()) {
-                this.readerSource = readerSource;
-            } else {
-                this.readerSource = new StringReaderSource(IOGroovyMethods.getText(reader), sourceUnit.getConfiguration());
+    public Reduction parseCST(final SourceUnit sourceUnit, final Reader reader) {
+        if (!sourceUnit.getSource().canReopenSource()) {
+            try {
+                sourceUnit.setSource(new StringReaderSource(
+                        IOGroovyMethods.getText(reader),
+                        sourceUnit.getConfiguration()
+                ));
+            } catch (IOException e) {
+                throw new GroovyBugError("Failed to create StringReaderSource", e);
             }
-        } catch (IOException e) {
-            throw new GroovyBugError("Failed to create StringReaderSource instance", e);
         }
-
         return null;
     }
 
     @Override
-    public ModuleNode buildAST(SourceUnit sourceUnit, ClassLoader classLoader, Reduction cst) throws ParserException {
-        try {
-            ReaderSource readerSource = sourceUnit.getSource();
-            if (null == readerSource || null == readerSource.getReader()) {
-                sourceUnit.setSource(this.readerSource);
-            }
-        } catch (IOException e) {
-            sourceUnit.setSource(this.readerSource);
-        }
-
-        AstBuilder builder = new AstBuilder(sourceUnit, classLoader);
-
+    public ModuleNode buildAST(final SourceUnit sourceUnit, final ClassLoader classLoader, final Reduction cst) {
+        AstBuilder builder = new AstBuilder(sourceUnit,
+                sourceUnit.getConfiguration().isGroovydocEnabled(),
+                sourceUnit.getConfiguration().isRuntimeGroovydocEnabled()
+        );
         return builder.buildAST();
     }
 }

@@ -18,16 +18,15 @@
  */
 package groovy
 
-/** 
- * @author <a href="mailto:james@coredevelopers.net">James Strachan</a>
- */
+import groovy.test.GroovyTestCase
+
 class ClosureUsingOuterVariablesTest extends GroovyTestCase {
-    
+
     void testUseOfOuterVariable() {
-        
+
         def x = 123
         def y = "hello"
-        
+
         def closure = { i ->
             assert x == 123
             assert y == 'hello'
@@ -36,27 +35,27 @@ class ClosureUsingOuterVariablesTest extends GroovyTestCase {
         closure.call(321)
     }
 
-     /*
-     TODO: is this a valid test case?
-     void testInnerVariablesVisibleInOuterScope() {
-                
-        closure = { z = 456 } 
-        closure.call(321)
-        
-        assert z == 456
-    }
-    */
-    
+    /*
+    TODO: is this a valid test case?
+    void testInnerVariablesVisibleInOuterScope() {
+
+       closure = { z = 456 }
+       closure.call(321)
+
+       assert z == 456
+   }
+   */
+
     void testModifyingOuterVariable() {
-        
+
         def m = 123
-        
-        def closure = { m = 456 } 
+
+        def closure = { m = 456 }
         closure.call(321)
-        
+
         assert m == 456
     }
-    
+
     void testCounting() {
         def sum = 0
 
@@ -64,15 +63,15 @@ class ClosureUsingOuterVariablesTest extends GroovyTestCase {
 
         assert sum == 10
     }
-    
+
     void testExampleUseOfClosureScopes() {
         def a = 123
         def b
         def c = { b = a + it }
         c(5)
-        
+
         assert b == a + 5
-    }    
+    }
 
     void testExampleUseOfClosureScopesUsingEach() {
         def a = 123

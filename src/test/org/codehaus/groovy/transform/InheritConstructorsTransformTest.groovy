@@ -18,9 +18,8 @@
  */
 package org.codehaus.groovy.transform
 
-/**
- * @author Paul King
- */
+import groovy.test.GroovyShellTestCase
+
 class InheritConstructorsTransformTest extends GroovyShellTestCase {
 
     void testStandardCase() {
@@ -97,16 +96,16 @@ class InheritConstructorsTransformTest extends GroovyShellTestCase {
                 def ans = cons.annotations.toString() + cons.parameterAnnotations.toString()
                 switch(cons.toString()) {
                     case 'public Baz(java.lang.String,java.lang.Integer)':
-                        assert ans == '[][[], [@Foo3()]]'
+                        assert ans == '[@groovy.transform.Generated()][[], [@Foo3()]]'
                         break
                     case 'public Baz(java.lang.String)':
-                        assert ans == '[][[@Foo3()]]'
+                        assert ans == '[@groovy.transform.Generated()][[@Foo3()]]'
                         break
                     case 'public Baz(java.lang.Integer)':
-                        assert ans == '[@Foo1()][[]]'
+                        assert ans == '[@groovy.transform.Generated(), @Foo1()][[]]'
                         break
                     case 'public Baz()':
-                        assert ans == '[@Foo1()][]'
+                        assert ans == '[@groovy.transform.Generated(), @Foo1()][]'
                         break
                 }
             }
@@ -221,8 +220,23 @@ class InheritConstructorsTransformTest extends GroovyShellTestCase {
             assert op.toString() == '3|DOWN'
         """
         assert message.contains('Cannot call OrderPublisher <RoundingMode>#<init>(java.util.Deque <java.lang.Integer>) with arguments [java.util.LinkedList <String>]')
-        assert message.contains('Cannot call OrderPublisher <RoundingMode>#<init>(java.math.RoundingMode) with arguments [java.util.Date]')
+        assert message.contains('Cannot find matching method OrderPublisher#<init>(java.util.Date)')
         assert message.contains('Cannot call OrderPublisher <RoundingMode>#<init>(java.util.Set <RoundingMode>) with arguments [java.util.HashSet <Date>]')
     }
 
+    // GROOVY-9323
+    void testAnnotationsCopiedForConstructorsFromPrecompiledClass() {
+        assertScript '''
+            @groovy.transform.InheritConstructors(constructorAnnotations=true)
+            class MyChildException extends org.codehaus.groovy.transform.MyException9323 {}
+
+            def annos = MyChildException.constructors[0].annotations*.annotationType().simpleName
+            assert annos.contains('Generated') && annos.contains('Deprecated')
+        '''
+    }
+}
+
+class MyException9323 extends RuntimeException {
+    @Deprecated
+    MyException9323() {}
 }

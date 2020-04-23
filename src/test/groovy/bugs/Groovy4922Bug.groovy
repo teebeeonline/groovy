@@ -18,6 +18,7 @@
  */
 package groovy.bugs
 
+import groovy.test.GroovyTestCase
 
 class Groovy4922Bug extends GroovyTestCase {
     void testShouldNotThrowStackOverflow() {
@@ -34,7 +35,7 @@ class Groovy4922Bug extends GroovyTestCase {
                 }
             }
             class Groovy4922BugChild extends Groovy4922BugSupport {
-                protected void someMethod(String parameter) {
+                void someMethod(String parameter) {
                     super.someMethod(parameter)
                 }
             }
@@ -42,7 +43,5 @@ class Groovy4922Bug extends GroovyTestCase {
             child.someMethod("value")
             assert child.support == "value"
         """
-        
     }
 }
-

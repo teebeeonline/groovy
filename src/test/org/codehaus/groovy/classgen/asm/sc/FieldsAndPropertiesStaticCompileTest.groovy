@@ -20,7 +20,7 @@ package org.codehaus.groovy.classgen.asm.sc
 
 import groovy.transform.stc.FieldsAndPropertiesSTCTest
 
-class FieldsAndPropertiesStaticCompileTest extends FieldsAndPropertiesSTCTest implements StaticCompilationTestSupport{
+final class FieldsAndPropertiesStaticCompileTest extends FieldsAndPropertiesSTCTest implements StaticCompilationTestSupport {
 
     void testMapGetAt() {
         assertScript '''
@@ -185,6 +185,75 @@ class FieldsAndPropertiesStaticCompileTest extends FieldsAndPropertiesSTCTest im
         assert astTrees['B'][1].contains('INVOKEVIRTUAL B.setX')
     }
 
+    void testUseDirectWriteFieldAccessFromOutsideClass() {
+        assertScript '''
+            class A {
+                public int x
+            }
+            class B  {
+                void directAccess(A a) {
+                    a.@x = 2
+                }
+            }
+            B b = new B()
+            A a = new A()
+            b.directAccess(a)
+            assert a.x == 2
+        '''
+        assert astTrees['B'][1].contains('PUTFIELD A.x')
+    }
+
+    void testUseDirectWriteFieldAccessPrivateWithRuntimeClassBeingDifferent() {
+        assertScript '''
+            class A {
+                private int x
+                public A(int x) {
+                    this.@x = x
+                }
+                public boolean sameAs(A a) {
+                    return this.@x == a.@x
+                }
+            }
+            class B extends A {
+                // B.x visible in B A.x in A, but reflection depending on the runtime type
+                // would see B.x in A#sameAs and not A.x
+                private int x
+                public B(int x) {
+                    super(x)
+                    this.@x = x + 50
+                }
+            }
+            B b = new B(1)
+            A a = new A(1)
+            assert b.sameAs(a)
+        '''
+        // same with property style access:
+        assertScript '''
+            class A {
+                private int x
+                public A(int x) {
+                    this.x = x
+                }
+                public boolean sameAs(A a) {
+                    return this.x == a.x
+                }
+            }
+            class B extends A {
+                // B.x visible in B A.x in A, but reflection depending on the runtime type
+                // would see B.x in A#sameAs and not A.x
+                private int x
+                public B(int x) {
+                    super(x)
+                    this.x = x + 50
+                }
+            }
+            B b = new B(1)
+            A a = new A(1)
+            assert b.sameAs(a)
+        '''
+
+    }
+
     void testDirectReadFieldFromSameClass() {
         assertScript '''
             class A {
@@ -279,6 +348,7 @@ class FieldsAndPropertiesStaticCompileTest extends FieldsAndPropertiesSTCTest im
             assert a.isSetterCalled() == false
         '''
     }
+
     void testUseAttributeExternalSafe() {
         assertScript '''
             class A {
@@ -295,6 +365,7 @@ class FieldsAndPropertiesStaticCompileTest extends FieldsAndPropertiesSTCTest im
             assert a.isSetterCalled() == false
         '''
     }
+
     void testUseAttributeExternalSafeWithNull() {
         assertScript '''
             class A {
@@ -309,6 +380,7 @@ class FieldsAndPropertiesStaticCompileTest extends FieldsAndPropertiesSTCTest im
             a?.@x = 100
         '''
     }
+
     void testUseGetterExternal() {
         assertScript '''
             class A {
@@ -414,6 +486,7 @@ class FieldsAndPropertiesStaticCompileTest extends FieldsAndPropertiesSTCTest im
         assert o.helpOption
         '''
     }
+
     void testShouldNotThrowStackOverflow() {
         new GroovyShell().evaluate '''class HaveOption {
 
@@ -519,7 +592,7 @@ import org.codehaus.groovy.transform.sc.ListOfExpressionsExpression
         }
     }
 
-    //GROOVY-7698
+    // GROOVY-7698
     void testSafePropertyStyleSetterCalls() {
         assertScript '''
             class Foo {
@@ -690,10 +763,43 @@ import org.codehaus.groovy.transform.sc.ListOfExpressionsExpression
                 new A().test()
             '''
         } finally {
-            assert !astTrees['A'][1].contains('pfaccess$00') // no mutator bridge method for 'accessed'
-            assert !astTrees['A'][1].contains('pfaccess$1') // no accessor bridge method for 'mutated'
-            assert astTrees['A$_closure1'][1].contains('INVOKESTATIC A.pfaccess$2 (LA;)Ljava/lang/String;')
-            assert astTrees['A$_closure1'][1].contains('INVOKESTATIC A.pfaccess$02 (LA;Ljava/lang/String;)Ljava/lang/String;')
+            def dump = astTrees['A'][1]
+            assert dump.contains('pfaccess$0') // accessor bridge method for 'accessed'
+            assert !dump.contains('pfaccess$00') // no mutator bridge method for 'accessed'
+            assert dump.contains('pfaccess$01') // mutator bridge method for 'mutated'
+            assert dump.contains('pfaccess$1') // accessor bridge method for 'mutated' -- GROOVY-9385
+            assert dump.contains('pfaccess$2') // accessor bridge method for 'accessedAndMutated'
+            assert dump.contains('pfaccess$02') // mutator bridge method for 'accessedAndMutated'
+            dump = astTrees['A$_closure1'][1]
+            assert dump.contains('INVOKESTATIC A.pfaccess$2 (LA;)Ljava/lang/String;')
+            assert dump.contains('INVOKESTATIC A.pfaccess$02 (LA;Ljava/lang/String;)Ljava/lang/String;')
         }
+    }
+
+    // GROOVY-8369
+    void testPropertyAccessOnEnumClass() {
+        assertScript '''
+            enum Foo {}
+
+            def test() {
+                assert Foo.getModifiers() == Foo.modifiers
+            }
+            test()
+        '''
+    }
+
+    // GROOVY-8753
+    void testPrivateFieldWithPublicGetter() {
+        assertScript '''
+            @groovy.transform.CompileStatic
+            class A {
+               private List<String> fooNames = []
+               public A(Collection<String> names) {
+                  names.each { fooNames << it }
+               }
+               public List<String> getFooNames() { fooNames }
+            }
+            assert new A(['foo1', 'foo2']).fooNames.size() == 2
+        '''
     }
 }

@@ -18,11 +18,10 @@
  */
 package groovy.io
 
+import groovy.test.GroovyTestCase
+
 import java.nio.CharBuffer
 
-/**
- * @author Guillaume Laforge
- */
 class LineColumnReaderTest extends GroovyTestCase {
 
     String text = '''L'invitation au voyage

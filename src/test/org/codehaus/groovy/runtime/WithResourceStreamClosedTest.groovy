@@ -16,16 +16,14 @@
  *  specific language governing permissions and limitations
  *  under the License.
  */
-package org.codehaus.groovy.runtime;
+package org.codehaus.groovy.runtime
+
+import groovy.test.GroovyTestCase;
 
 /**
- * Test withWriter with inner loop closing the stream
- * in advance.
+ * Test withWriter with inner loop closing the stream in advance.
  * Some methods e.g. transformChar() close the streams.
- * If used inside a withWriter(), it must not lead to 
- * problems
- *
- * @author Joachim Baumann</a>
+ * If used inside a withWriter(), it must not lead to problems
  */
 
 class WithResourceStreamClosedTest extends GroovyTestCase {

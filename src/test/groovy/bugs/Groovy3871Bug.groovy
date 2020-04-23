@@ -18,9 +18,10 @@
  */
 package groovy.bugs
 
+import groovy.test.GroovyTestCase
+
 /**
  * Fix for https://issues.apache.org/jira/browse/GROOVY-3871
- * @author Guillaume Laforge
  */
 class Groovy3871Bug extends GroovyTestCase {
 

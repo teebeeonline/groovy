@@ -24,23 +24,25 @@ import java.util.List;
 
 /**
  * Tests the ClassNode
- *
- * @author <a href="mailto:james@coredevelopers.net">James Strachan</a>
  */
 public class ModuleNodeTest extends TestParserSupport {
 
-    public void testStatementClass_FAILS() throws Exception {
-        if (notYetImplemented()) return;
-
+    public void testStatementClass() {
         ModuleNode module = parse("x = [1, 2, 3]; println(x)", "Cheese.groovy");
+        assertFalse("Should have statements", module.getStatementBlock().isEmpty());
 
-        assertTrue("Should have statements", !module.getStatementBlock().isEmpty());
-
-        List classes = module.getClasses();
+        List<ClassNode> classes = module.getClasses();
         assertEquals("Number of classes", 1, classes.size());
 
         ClassNode classNode = (ClassNode) classes.get(0);
-
         assertEquals("Class name", "Cheese", classNode.getName());
+    }
+
+    // GROOVY-9194
+    public void testScriptStartingWithHash() {
+        ModuleNode mn = new ModuleNode((CompileUnit) null);
+        mn.setDescription("#script.groovy");
+        ClassNode cn = mn.getScriptClassDummy();
+        assertEquals("Dummy class name should not be empty", "#script", cn.getName());
     }
 }

@@ -19,16 +19,17 @@
 evaluationDependsOn(':groovy-swing')
 
 dependencies {
-    compile rootProject
-    compile project(':groovy-swing')
-    compile project(':groovy-templates')
-    testCompile project(':groovy-test')
-    testCompile project(':groovy-swing').sourceSets.test.runtimeClasspath
+    api rootProject // AstBrowser has methods with Closure params...
+    implementation "com.github.javaparser:javaparser-core:$javaParserVersion"
+    implementation project(':groovy-swing')
+    implementation project(':groovy-templates')
+    testImplementation project(':groovy-test')
+    testImplementation project(':groovy-swing').sourceSets.test.runtimeClasspath
 }
 
 task console(type: JavaExec, dependsOn:classes) {
     jvmArgs += ["-Dgroovy.attach.groovydoc=true"]
 
-    main = 'groovy.ui.Console'
+    main = 'groovy.console.ui.Console'
     classpath = sourceSets.main.runtimeClasspath
 }

@@ -18,11 +18,8 @@
  */
 package org.codehaus.groovy.classgen;
 
-import groovy.util.GroovyTestCase;
+import groovy.test.GroovyTestCase;
 
-/**
- * @author <a href="mailto:james@coredevelopers.net">James Strachan</a>
- */
 public class CapitalizeTest extends GroovyTestCase {
 
     public void testCapitalize() {

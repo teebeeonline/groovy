@@ -18,7 +18,7 @@
  */
 package groovy.lang;
 
-import groovy.util.GroovyTestCase;
+import groovy.test.GroovyTestCase;
 import junit.framework.Test;
 import junit.framework.TestSuite;
 import junit.textui.TestRunner;
@@ -32,10 +32,6 @@ import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * @author sam
- * @author Merlyn Albery-Speyer
- */
 public class GroovyShellTest extends GroovyTestCase {
 
     private String script1 = "test = 1";
@@ -52,7 +48,7 @@ public class GroovyShellTest extends GroovyTestCase {
         GroovyShell shell = new GroovyShell();
         try {
             Object result = shell.evaluate(script1, "Test.groovy");
-            assertEquals(new Integer(1), result);
+            assertEquals(Integer.valueOf(1), result);
         }
         catch (Exception e) {
             fail(e.toString());
@@ -79,7 +75,7 @@ public class GroovyShellTest extends GroovyTestCase {
         GroovyShell shell = new GroovyShell(context);
         try {
             Object result = shell.evaluate(script2, "Test.groovy");
-            assertEquals(new Integer(2), result);
+            assertEquals(Integer.valueOf(2), result);
         }
         catch (Exception e) {
             fail(e.toString());
@@ -123,7 +119,7 @@ public class GroovyShellTest extends GroovyTestCase {
     }
 
     public void testWithGCSWithURL() throws Exception {
-        String scriptFileName = "src/test/groovy/bugs/GROOVY3934Helper.groovy";
+        String scriptFileName = "src/test/groovy/bugs/scriptForGroovy3934.groovy";
         File helperScript = new File(scriptFileName);
         if(!helperScript.exists()) {
             fail("File " + scriptFileName + " does not exist");

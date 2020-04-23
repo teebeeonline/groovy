@@ -18,7 +18,7 @@
  */
 package groovy.bugs;
 
-import groovy.util.GroovyTestCase;
+import groovy.test.GroovyTestCase;
 import org.junit.Ignore;
 
 import java.util.Arrays;
@@ -26,8 +26,6 @@ import java.util.Iterator;
 
 /**
  * Base class for test cases
- *
- * @author <a href="mailto:james@coredevelopers.net">James Strachan</a>
  */
 @Ignore("base class for tests")
 public abstract class TestSupport extends GroovyTestCase {

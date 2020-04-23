@@ -18,18 +18,21 @@
  */
 package org.codehaus.groovy.classgen.asm
 
+import groovy.test.GroovyTestCase
+import org.apache.groovy.io.StringBuilderWriter
 import org.codehaus.groovy.control.CompilationUnit
-import org.objectweb.asm.util.TraceClassVisitor
-import org.objectweb.asm.tree.*
-import org.objectweb.asm.*
-import org.codehaus.groovy.control.Phases
 import org.codehaus.groovy.control.CompilerConfiguration
+import org.codehaus.groovy.control.Phases
+import org.objectweb.asm.ClassReader
+import org.objectweb.asm.ClassVisitor
+import org.objectweb.asm.FieldVisitor
+import org.objectweb.asm.MethodVisitor
+import org.objectweb.asm.util.TraceClassVisitor
+
 import java.security.CodeSource
 
 /**
  * Abstract test case to extend to check the instructions we generate in the bytecode of groovy programs.
- *
- * @author Guillaume Laforge
  */
 abstract class AbstractBytecodeTestCase extends GroovyTestCase {
 
@@ -45,7 +48,7 @@ abstract class AbstractBytecodeTestCase extends GroovyTestCase {
 
 
     protected void assertScript(final String script) throws Exception {
-        GroovyShell shell = new GroovyShell();
+        GroovyShell shell = new GroovyShell()
         def unit
         shell.loader = new GroovyClassLoader() {
             @Override
@@ -75,14 +78,14 @@ abstract class AbstractBytecodeTestCase extends GroovyTestCase {
      * @param scriptText the script to compile
      * @return the decompiled <code>InstructionSequence</code>
      */
-    InstructionSequence compile(Map options=[:], String scriptText) {
-        options = [method:"run", classNamePattern:'.*script', *:options]
+    InstructionSequence compile(Map options = [:], String scriptText) {
+        options = [method: "run", classNamePattern: '.*script', *: options]
         sequence = null
         clazz = null
         def cu = new CompilationUnit()
         def su = cu.addSource("script", scriptText)
         cu.compile(Phases.CONVERSION)
-        if (options.conversionAction!=null) {
+        if (options.conversionAction != null) {
             options.conversionAction(su)
         }
         cu.compile(Phases.CLASS_GENERATION)
@@ -92,7 +95,7 @@ abstract class AbstractBytecodeTestCase extends GroovyTestCase {
                 sequence = extractSequence(it.bytes, options)
             }
         }
-        if (sequence==null && cu.classes.size()>0) {
+        if (sequence == null && cu.classes.size() > 0) {
             sequence = extractSequence(cu.classes[0].bytes, options)
         }
         cu.classes.each {
@@ -109,11 +112,11 @@ abstract class AbstractBytecodeTestCase extends GroovyTestCase {
         return sequence
     }
 
-    InstructionSequence extractSequence(byte[] bytes, Map options=[method:"run"]) {
+    InstructionSequence extractSequence(byte[] bytes, Map options = [method: "run"]) {
         InstructionSequence sequence
-        def output = new StringWriter()
+        def output = new StringBuilderWriter()
         def tcf;
-        tcf = new TraceClassVisitor(new ClassVisitor(Opcodes.ASM4) {
+        tcf = new TraceClassVisitor(new ClassVisitor(CompilerConfiguration.ASM_API_VERSION) {
             MethodVisitor visitMethod(int access, String name, String desc, String signature, String... exceptions) {
                 if (options.method == name) {
                     tcf.p.text << '--BEGIN--'
@@ -149,8 +152,6 @@ abstract class AbstractBytecodeTestCase extends GroovyTestCase {
 /**
  * A sequence of instruction with matching and strict matching capabilities
  * to find subsequences of bytecode instructions.
- *
- * @author Guillaume Laforge
  */
 class InstructionSequence {
     List<String> instructions
@@ -172,11 +173,11 @@ class InstructionSequence {
             // not the first call with offset 0 and check that the next instruction match
             // is the exact following instruction in the pattern and in the bytecode instructions
             if (strict && offset > 0 && idx != offset) return false
-            if (hasSequence(pattern.tail(), idx+1, strict)) return true
+            if (hasSequence(pattern.tail(), idx + 1, strict)) return true
             idx++
-        } 
+        }
         return false
-    }    
+    }
 
     /**
      * Find a strict sub-sequence of instructions of the list of instructions.

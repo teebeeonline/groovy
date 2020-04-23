@@ -18,7 +18,7 @@
  */
 package org.codehaus.groovy.tools;
 
-import groovy.util.GroovyTestCase;
+import groovy.test.GroovyTestCase;
 import org.codehaus.groovy.control.CompilerConfiguration;
 
 import java.io.File;
@@ -29,8 +29,6 @@ import java.util.ArrayList;
 
 /**
  * Tests the compiling & running of GroovyTestCases
- *
- * @author <a href="mailto:james@coredevelopers.net">James Strachan</a>
  */
 public class FileSystemCompilerTest extends GroovyTestCase {
 

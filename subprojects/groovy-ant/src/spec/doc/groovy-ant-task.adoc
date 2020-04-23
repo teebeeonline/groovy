@@ -19,22 +19,92 @@
 
 //////////////////////////////////////////
 
+[[title-heading]]
 = The <groovy> Ant Task
 
+[NOTE]
+Here we describe an Ant task for using Groovy
+from within an Ant build file.
+You may also be interested in
+Ant's built-in https://ant.apache.org/manual/Tasks/script.html[`script`] task
+which supports Groovy and other languages, or
+<<ant-builder.adoc#title-heading,`AntBuilder`>> which lets you write Ant build scripts
+in Groovy rather than XML.
+
 Executes a series of Groovy statements from http://ant.apache.org/[Apache Ant].
-Statements can either be read in from a text file using the `src` attribute or from between the enclosing Groovy tags.
+Statements can either be read in from a resource or as direct text between the enclosing Groovy tags.
 
 == Required taskdef
 
-Assuming `groovy-all-VERSION.jar` is in `my.classpath` you will need to declare this task in the `build.xml` prior to using it:
+Assuming all the groovy jars you need are in _my.classpath_ (this will be `groovy-VERSION.jar`,
+`groovy-ant-VERSION.jar` plus any modules and transitive dependencies you might be using)
+you will need to declare this task at some point in the `build.xml` prior to
+the `groovy` task being invoked.
 
 [source,xml]
 ----
 <taskdef name="groovy"
          classname="org.codehaus.groovy.ant.Groovy"
          classpathref="my.classpath"/>
-<groovy>
 ----
+
+You can simply place statements between the `groovy` tags like this:
+
+[source,xml]
+----
+<groovy>
+...
+</groovy>
+----
+
+Or you can supply the Groovy source script as a resource. You can specify the pathname using the `src` attribute like this:
+
+[source,xml]
+----
+<groovy src="/some/path/MyGroovyScript.groovy" otherAttributes="...">
+----
+
+Or as a nested `fileset` like this (though the fileset definition is expected to select just one file):
+
+[source,xml]
+----
+<groovy>
+    <fileset file="MyGroovyScript.groovy"/>
+</groovy>
+----
+
+Or as a nested single element https://ant.apache.org/manual/Types/resources.html#collection[resource collection] which could look like any of these:
+
+[source,xml]
+----
+<groovy>
+    <file file="MyGroovyScript.groovy"/>
+</groovy>
+
+<groovy>
+    <url url="https://some.domain/some/path/to/MyGroovyScript.groovy"/>
+</groovy>
+
+<groovy>
+    <javaconstant name="some.packagename.SomeClass.MY_CODE_FRAGMENT"/>
+</groovy>
+----
+
+You may also supply a https://ant.apache.org/manual/Types/filterchain.html[filter chain] like this:
+
+[source,xml]
+----
+<groovy>
+    <fileset file="MyGroovyScript.groovy"/>
+    <!-- take 5 lines after skipping 18 lines, just as an example -->
+    <filterchain>
+        <headfilter lines="5" skip="18"/>
+    </filterchain>
+</groovy>
+----
+
+
+You might need to use the _contextClassLoader_ attribute (see below) if any of your modules load services via the classpath, e.g. `groovy-json`.
 
 == <groovy> attributes
 
@@ -45,10 +115,16 @@ Assuming `groovy-all-VERSION.jar` is in `my.classpath` you will need to declare 
 |classpath|The classpath to use.|No
 |classpathref|The classpath to use, given as reference to a PATH defined elsewhere.|No
 |output|Set the output file; defaults to the Ant log.|No
-|fork|If enabled the script will be executed in another JVM (disabled by default).|No
+|append|If enabled and output is to a file, append to existing file rather than overwrite. Defaults to false.|No
+|fork|If enabled the script will be executed in a forked JVM process (disabled by default).|No
 |scriptBaseClass|The name of the base class for scripts.|No
 |indy|If enabled the script will be executed with `invokedynamic` (disabled by default).|No
-|parameters |Generates metadata for reflection on method parameter names on JDK 8 and above. Defaults to false. |No
+|parameters|Generates metadata for reflection on method parameter names on JDK 8 and above. Defaults to false. |No
+|useGroovyShell|If enabled a new GroovyShell is used to run the script. Special variables won't be available but you don't need Ant in the classpath. Defaults to false. |No
+|includeAntRuntime|If enabled the system classpath will be included on the classpath when forking. Defaults to true. |No
+|stacktrace|If enabled a stacktrace will be reported if an error occurs during compilation. Defaults to false. |No
+|configScript|Sets the configuration script for the groovy compiler configuration. |No
+|contextClassLoader|If enabled, the contextClassLoader to be set with the classLoader of the shell used to run the script. Not used if fork is true. |No
 |============================================
 
 == Parameters specified as nested elements
@@ -190,7 +266,7 @@ Calling out to a web service from your Ant script:
     <target name="main">
         <taskdef name="groovy" classname="org.codehaus.groovy.ant.Groovy">
             <classpath>
-                <fileset dir="${env.GROOVY_HOME}" includes="embeddable/groovy-all-*.jar,lib/ivy*.jar"/>
+                <fileset dir="${env.GROOVY_HOME}" includes="lib/groovy-*.jar,lib/ivy*.jar"/>
             </classpath>
         </taskdef>
         <groovy>

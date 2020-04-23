@@ -18,15 +18,14 @@
  */
 package groovy
 
-/**
- * @author Jeremy Rayner 
- */
-class NullPropertyTest extends GroovyTestCase { 
+import groovy.test.GroovyTestCase
+
+class NullPropertyTest extends GroovyTestCase {
     def wensleydale = null
 
-    void testNullProperty() { 
-        assert wensleydale == null 
-    } 
+    void testNullProperty() {
+        assert wensleydale == null
+    }
 } 
 
 

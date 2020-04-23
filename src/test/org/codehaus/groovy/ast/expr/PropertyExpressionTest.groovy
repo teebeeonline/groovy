@@ -18,10 +18,8 @@
  */
 package org.codehaus.groovy.ast.expr
 
-/**
- * 
- * @author Hamlet D'Arcy
- */
+import groovy.test.GroovyTestCase
+
 class PropertyExpressionTest extends GroovyTestCase {
 
     void testGetText() {

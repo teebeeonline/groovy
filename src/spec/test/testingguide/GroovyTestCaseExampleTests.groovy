@@ -18,7 +18,8 @@
  */
 package testingguide
 
-import groovy.transform.NotYetImplemented
+import groovy.test.GroovyTestCase
+import groovy.test.NotYetImplemented
 
 class GroovyTestCaseExampleTests extends GroovyTestCase {
 
@@ -81,7 +82,9 @@ class MyTestCase extends GroovyTestCase {
         def msg = shouldFail IndexOutOfBoundsException, {
             numbers.get(4)
         }
-        assert msg.contains('Index: 4, Size: 4') || msg.contains('Index 4 out-of-bounds for length 4')
+        assert msg.contains('Index: 4, Size: 4') ||
+            msg.contains('Index 4 out-of-bounds for length 4') ||
+            msg.contains('Index 4 out of bounds for length 4')
     }
     // end::should_fail_with_msg[]
 

@@ -17,9 +17,9 @@
  *  under the License.
  */
 package org.codehaus.groovy.transform.tailrec
-/**
- * @author Johannes Link
- */
+
+import groovy.test.GroovyShellTestCase
+
 class TailRecursiveTogetherWithOtherASTsTest extends GroovyShellTestCase {
 
     void testStaticallyCompiledRecursiveMethod() {

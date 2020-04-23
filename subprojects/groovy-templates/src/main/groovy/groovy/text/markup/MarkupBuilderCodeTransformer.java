@@ -32,7 +32,6 @@ import org.codehaus.groovy.ast.expr.ConstantExpression;
 import org.codehaus.groovy.ast.expr.DeclarationExpression;
 import org.codehaus.groovy.ast.expr.EmptyExpression;
 import org.codehaus.groovy.ast.expr.Expression;
-import org.codehaus.groovy.ast.expr.GStringExpression;
 import org.codehaus.groovy.ast.expr.MapEntryExpression;
 import org.codehaus.groovy.ast.expr.MapExpression;
 import org.codehaus.groovy.ast.expr.MethodCallExpression;
@@ -44,7 +43,6 @@ import org.codehaus.groovy.ast.stmt.Statement;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.syntax.Types;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -60,8 +58,6 @@ import java.util.Map;
  * <i>getModel().get(...)</i> calls into <i>tryEscape</i> calls for automatic escaping</li> <li>replace <i>include
  * XXX:'...'</i> calls with the appropriate <i>includeXXXX</i> method calls</li> <li>replace <i>':tagName'()</i> calls
  * into <i>methodMissing('tagName', ...)</i> calls</li> </ul>
- *
- * @author Cedric Champeau
  */
 class MarkupBuilderCodeTransformer extends ClassCodeExpressionTransformer {
 

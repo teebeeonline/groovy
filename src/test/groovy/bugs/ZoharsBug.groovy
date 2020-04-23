@@ -18,9 +18,8 @@
  */
 package groovy.bugs
 
-/**
- * @author Zohar Melamed
- */
+import groovy.test.GroovyTestCase
+
 class ZoharsBug extends GroovyTestCase {
     
     void testBug() {

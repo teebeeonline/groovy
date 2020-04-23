@@ -18,11 +18,11 @@
  */
 package groovy.bugs
 
+import groovy.test.GroovyTestCase
+
 /**
  * Test to fix the Jira issues GROOVY-810 and GROOVY-811.
  * Test of "string as Boolean" against the issue GROOVY-812.
- *
- * @author Pilho Kim
  */
 
 public class AsBoolBug extends GroovyTestCase {

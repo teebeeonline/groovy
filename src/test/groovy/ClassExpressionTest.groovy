@@ -18,10 +18,10 @@
  */
 package groovy
 
+import groovy.test.GroovyTestCase
+
 /** 
  * Tests the use of classes as variable expressions
- * 
- * @author <a href="mailto:james@coredevelopers.net">James Strachan</a>
  */
 class ClassExpressionTest extends GroovyTestCase {
 

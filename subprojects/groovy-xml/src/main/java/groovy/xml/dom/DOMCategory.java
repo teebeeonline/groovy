@@ -22,9 +22,9 @@ import groovy.lang.Closure;
 import groovy.lang.GroovyRuntimeException;
 import groovy.lang.IntRange;
 import groovy.xml.DOMBuilder;
-import groovy.xml.QName;
+import groovy.namespace.QName;
+import org.apache.groovy.xml.extensions.XmlExtensions;
 import org.codehaus.groovy.runtime.InvokerHelper;
-import org.codehaus.groovy.runtime.XmlGroovyMethods;
 import org.w3c.dom.Attr;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -45,9 +45,6 @@ import java.util.Map;
 
 /**
  * Category class which adds GPath style operations to Java's DOM classes.
- *
- * @author sam
- * @author paulk
  */
 public class DOMCategory {
     private static boolean trimWhitespace = false;
@@ -284,7 +281,7 @@ public class DOMCategory {
 
     public static List<Node> list(NodeList self) {
         List<Node> answer = new ArrayList<Node>();
-        Iterator<Node> it = XmlGroovyMethods.iterator(self);
+        Iterator<Node> it = XmlExtensions.iterator(self);
         while (it.hasNext()) {
             answer.add(it.next());
         }
@@ -354,7 +351,7 @@ public class DOMCategory {
     }
 
     public static Node replaceNode(NodesHolder self, Closure c) {
-        if (self.getLength() <= 0 || self.getLength() > 1) {
+        if (self.getLength() != 1) {
             throw new GroovyRuntimeException(
                     "replaceNode() can only be used to replace a single element, " +
                     "but was applied to " + self.getLength() + " elements."
@@ -384,7 +381,7 @@ public class DOMCategory {
         Node beforeNode = self.getNextSibling();
         DOMBuilder b = new DOMBuilder(self.getOwnerDocument());
         Element newNodes = (Element) b.invokeMethod("rootNode", c);
-        Iterator<Node> iter = XmlGroovyMethods.iterator(children(newNodes));
+        Iterator<Node> iter = XmlExtensions.iterator(children(newNodes));
         while (iter.hasNext()) {
             parent.insertBefore(iter.next(), beforeNode);
         }
@@ -510,7 +507,7 @@ public class DOMCategory {
     private static String toString(NodeList self) {
         StringBuilder sb = new StringBuilder();
         sb.append("[");
-        Iterator it = XmlGroovyMethods.iterator(self);
+        Iterator it = XmlExtensions.iterator(self);
         while (it.hasNext()) {
             if (sb.length() > 1) sb.append(", ");
             sb.append(it.next().toString());

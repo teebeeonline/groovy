@@ -18,23 +18,32 @@
  */
 package groovy.annotations
 
-class PackageAndImportAnnotationTest extends GroovyTestCase {
+import groovy.transform.CompileStatic
+import org.junit.Test
+
+import static groovy.test.GroovyAssert.assertScript
+
+@CompileStatic
+final class PackageAndImportAnnotationTest {
+
+    @Test
     void testTransformationOfPropertyInvokedOnThis() {
-        assertScript """
+        assertScript '''
             def x = new groovy.annotations.MyClass()
             assert x.class.annotations[0].value() == 60
             assert x.class.package.annotations[0].value() == 30
-            new AntBuilder().with {
+            new groovy.ant.AntBuilder().with {
                 mkdir(dir:'temp')
                 delete(file:'temp/log.txt')
-                taskdef(name:'groovyc', classname:"org.codehaus.groovy.ant.Groovyc")
+                taskdef(name:'groovyc', classname:'org.codehaus.groovy.ant.Groovyc')
                 groovyc(srcdir:'src/test', destdir:'temp', includes:'groovy/annotations/MyClass.groovy')
                 def text = new File('temp/log.txt').text
+                delete(dir:'temp')
+
                 assert text.contains('ClassNode 60')
                 assert text.contains('PackageNode 40')
                 assert text.contains('ImportNode 50')
-                delete(dir:'temp')
             }
-        """
+        '''
     }
 }

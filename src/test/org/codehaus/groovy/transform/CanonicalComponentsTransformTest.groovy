@@ -18,6 +18,7 @@
  */
 package org.codehaus.groovy.transform
 
+import groovy.test.GroovyShellTestCase
 import groovy.transform.AutoClone
 import groovy.transform.AutoExternalize
 import groovy.transform.CompileStatic
@@ -442,13 +443,13 @@ class CanonicalComponentsTransformTest extends GroovyShellTestCase {
     // GROOVY-5864
     void testExternalizeMethodsWithImmutable() {
         try {
-            new GroovyShell().parse """
+            new GroovyShell().parse '''
                 @groovy.transform.ExternalizeMethods
                 @groovy.transform.Immutable
                 class Person {
                     String first
                 }
-            """
+            '''
             fail('The compilation should have failed as the final field first (created via @Immutable) is being assigned to (via @ExternalizeMethods).')
         } catch (MultipleCompilationErrorsException e) {
             def syntaxError = e.errorCollector.getSyntaxError(0)
@@ -459,10 +460,10 @@ class CanonicalComponentsTransformTest extends GroovyShellTestCase {
     // GROOVY-5864
     void testExternalizeVerifierWithNonExternalizableClass() {
         try {
-            new GroovyShell().parse """
+            new GroovyShell().parse '''
                 @groovy.transform.ExternalizeVerifier
                 class Person { }
-            """
+            '''
             fail("The compilation should have failed as the class doesn't implement Externalizable")
         } catch (MultipleCompilationErrorsException e) {
             def syntaxError = e.errorCollector.getSyntaxError(0)
@@ -473,14 +474,14 @@ class CanonicalComponentsTransformTest extends GroovyShellTestCase {
     // GROOVY-5864
     void testExternalizeVerifierWithFinalField() {
         try {
-            new GroovyShell().parse """
+            new GroovyShell().parse '''
                 @groovy.transform.ExternalizeVerifier
                 class Person implements Externalizable {
                     final String first
                     void writeExternal(ObjectOutput out)throws IOException{ }
                     void readExternal(ObjectInput objectInput)throws IOException,ClassNotFoundException{ }
                 }
-            """
+            '''
             fail("The compilation should have failed as the final field first (can't be set inside readExternal).")
         } catch (MultipleCompilationErrorsException e) {
             def syntaxError = e.errorCollector.getSyntaxError(0)
@@ -491,13 +492,13 @@ class CanonicalComponentsTransformTest extends GroovyShellTestCase {
     // GROOVY-5864
     void testAutoExternalizeWithoutNoArg() {
         try {
-            new GroovyShell().parse """
+            new GroovyShell().parse '''
                 @groovy.transform.AutoExternalize
                 class Person {
                     Person(String first) {}
                     String first
                 }
-            """
+            '''
             fail("The compilation should have failed as there is no no-arg constructor.")
         } catch (MultipleCompilationErrorsException e) {
             def syntaxError = e.errorCollector.getSyntaxError(0)
@@ -508,7 +509,7 @@ class CanonicalComponentsTransformTest extends GroovyShellTestCase {
     // GROOVY-5864
     void testExternalizeVerifierWithNonExternalizableField() {
         try {
-            new GroovyShell().parse """
+            new GroovyShell().parse '''
                 class Name {}
 
                 @groovy.transform.ExternalizeVerifier(checkPropertyTypes=true)
@@ -518,7 +519,7 @@ class CanonicalComponentsTransformTest extends GroovyShellTestCase {
                     void writeExternal(ObjectOutput out)throws IOException{ }
                     void readExternal(ObjectInput objectInput)throws IOException,ClassNotFoundException{ }
                 }
-            """
+            '''
             fail("The compilation should have failed as the type of Name isn't Externalizable or Serializable.")
         } catch (MultipleCompilationErrorsException e) {
             def syntaxError = e.errorCollector.getSyntaxError(0)
@@ -760,6 +761,46 @@ class CanonicalComponentsTransformTest extends GroovyShellTestCase {
             assert d1.hashCode() == d2.hashCode()
             assert d1 == d2
         """
+    }
+
+    void testHashCodeForInstanceWithNullPropertyAndField() {
+        new GroovyShell().evaluate """
+            import groovy.transform.*
+            @EqualsAndHashCode(includeFields = true)
+            class FieldAndPropertyIncludedInHashCode {            
+                private String field
+                String property
+            }
+            assert new FieldAndPropertyIncludedInHashCode().hashCode() == 442087
+        """
+    }
+
+    void testHashCodeForInstanceWithNullPropertyAndJavaBeanProperty() {
+        new GroovyShell().evaluate '''
+            import groovy.transform.*
+            @EqualsAndHashCode(allProperties = true)
+            class FieldAndPropertyIncludedInHashCode {            
+                String property
+                String getField() { null }
+            }
+            assert new FieldAndPropertyIncludedInHashCode().hashCode() == 442087
+        '''
+    }
+
+    // GROOVY-9009
+    void testAutoCloneToStringCompileStatic() {
+        new GroovyShell().evaluate '''
+            import groovy.transform.*
+
+            @ToString
+            @CompileStatic
+            @AutoClone
+            class SomeClass {
+                String someId
+            }
+
+            assert new SomeClass(someId: 'myid').clone().toString() == 'SomeClass(myid)'
+        '''
     }
 }
 

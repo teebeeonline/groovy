@@ -18,9 +18,8 @@
  */
 package groovy.bugs
 
-/**
- * @author John Wilson
- */
+import groovy.test.GroovyTestCase
+
 class ForLoopBug extends GroovyTestCase {
 
     void testBug() {

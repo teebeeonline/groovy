@@ -18,15 +18,11 @@
  */
 package groovy.lang
 
-import java.util.logging.*
+import groovy.test.GroovyTestCase
 
 /**
  * Tests for the GroovySystem class
- *
- * @author Graeme Rocher
- * @author Roshan Dawrani
- **/
-
+ */
 class GroovySystemTest extends GroovyTestCase {
 
     void testGetMetaClassRegistry() {

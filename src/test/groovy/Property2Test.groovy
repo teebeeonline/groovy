@@ -18,11 +18,10 @@
  */
 package groovy
 
+import groovy.test.GroovyTestCase
+
 /**
  * Tests the use of getMetaPropertyValues() and getProperties() for Beans and Expandos.
- *
- * @author john stump
- * @author dierk koenig
  */
 class Property2Test extends GroovyTestCase {
 

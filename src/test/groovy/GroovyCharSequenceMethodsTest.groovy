@@ -18,6 +18,8 @@
  */
 package groovy
 
+import groovy.test.GroovyTestCase
+
 /**
  * Tests for DGM methods on CharSequence.
  */
@@ -130,6 +132,18 @@ class GroovyCharSequenceMethodsTest extends GroovyTestCase {
 
     void testDrop() {
         assert cs2.drop(3) == 'bar'
+    }
+
+    void testDropTakeTC() {
+        assertScript '''
+            @groovy.transform.TypeChecked
+            def method() {
+                assert 'Foo Bar'.drop(4).toLowerCase() == 'bar'
+                assert 'Foo Bar'.take(3).toLowerCase() == 'foo'
+            }
+
+            method()
+        '''
     }
 
     void testAsBoolean() {

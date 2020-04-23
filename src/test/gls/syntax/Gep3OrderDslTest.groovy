@@ -18,11 +18,9 @@
  */
 package gls.syntax
 
+import groovy.test.GroovyTestCase
 import org.codehaus.groovy.control.CompilerConfiguration
 
-/**
- * @author Guillaume Laforge
- */
 class Gep3OrderDslTest extends GroovyTestCase {
     @Override
     protected void setUp() {

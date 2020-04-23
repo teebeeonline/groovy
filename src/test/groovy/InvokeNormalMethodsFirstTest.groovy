@@ -18,10 +18,10 @@
  */
 package groovy
 
+import groovy.test.GroovyTestCase
+
 /**
  * Invoke normal methods first: if no statically typed method exist, use invokeMethod().
- *
- * @author Guillaume Laforge
  */
 class InvokeNormalMethodsFirstTest extends GroovyTestCase {
 

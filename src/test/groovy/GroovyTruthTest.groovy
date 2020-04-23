@@ -18,6 +18,8 @@
  */
 package groovy
 
+import groovy.test.GroovyTestCase
+
 class GroovyTruthTest extends GroovyTestCase {
 
     void testTruth() {
@@ -43,8 +45,10 @@ class GroovyTruthTest extends GroovyTestCase {
         testTrue([1])
         testFalse([].toArray())
 
-        testFalse [:]
+        testFalse Collections.EMPTY_MAP
+        testFalse([:])
         testTrue([bla: 'some value'])
+
         testTrue 1234
         testFalse 0
         testTrue 0.3f

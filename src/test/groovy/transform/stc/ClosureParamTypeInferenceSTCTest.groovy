@@ -18,12 +18,8 @@
  */
 package groovy.transform.stc
 
-import groovy.transform.NotYetImplemented
-
 /**
  * Unit tests for static type checking : closure parameter type inference.
- *
- * @author Cedric Champeau
  */
 class ClosureParamTypeInferenceSTCTest extends StaticTypeCheckingTestCase {
     void testInferenceForDGM_CollectUsingExplicitIt() {
@@ -225,6 +221,23 @@ def items = []
 '''
     }
 
+    void testDGM_collectOnArray() {
+        assertScript '''
+            String[] arr = ['foo', 'bar', 'baz']
+            assert arr.collect { it.startsWith('ba') } == [false, true, true]
+            List<Boolean> answer = [true]
+            arr.collect(answer) { it.startsWith('ba') }
+            assert answer == [true, false, true, true]
+        '''
+    }
+
+    void testDGM_collectOnIterator() {
+        assertScript '''
+            Iterator<String> itr = ['foo', 'bar', 'baz'].iterator()
+            assert itr.collect { it.startsWith('ba') } == [false, true, true]
+        '''
+    }
+
     void testInferenceOnNonExtensionMethod() {
         assertScript '''import groovy.transform.stc.ClosureParams
             import groovy.transform.stc.FirstParam
@@ -415,6 +428,12 @@ import groovy.transform.stc.ClosureParams
 ''', 'Expected parameter of type java.lang.String but got java.util.Date'
     }
 
+    void testStringGroovyMethodsFindMethodWithList() {
+        assertScript '''
+            "75001 Paris".find(/(\\d{5}\\s(\\w+))/) { List<String> all -> println all*.toUpperCase() }
+'''
+    }
+
     void testInferenceForDGM_countIterableOrIterator() {
         assertScript '''
             assert ['Groovy','Java'].count { it.length() > 4 } == 1
@@ -526,7 +545,7 @@ import groovy.transform.stc.ClosureParams
             assert sum == 110
         '''
     }
-    
+
     void testInferenceForDGM_upto() {
         assertScript '''
             BigDecimal sum = 0
@@ -672,6 +691,84 @@ import groovy.transform.stc.ClosureParams
             assert ['foo','bar','baz'].iterator().every { String it -> it.length() == 3 }
             assert ['foo','bar','baz'].iterator().every { it -> it.length() == 3 }
             assert ['foo','bar','baz'].iterator().every { it.length() == 3 }
+        '''
+    }
+    void testInferenceForDGM_everyOnArray() {
+        assertScript '''
+            String[] items = ['foo','bar','baz']
+            assert items.every { it.length() == 3 }
+            assert items.every { String s -> s.length() == 3 }
+        '''
+    }
+
+    void testInferenceForDGM_findIndexOf() {
+        assertScript '''
+            String[] items1 = ['foo','bar','baz']
+            assert items1.findIndexOf { it.startsWith('ba') == 1 }
+            assert items1.findIndexOf { String s -> s.startsWith('ba') == 1 }
+            def items2 = ['foo','bar','baz']
+            assert items2.findIndexOf { it.startsWith('ba') == 1 }
+            assert items2.iterator().findIndexOf { it.startsWith('ba') == 1 }
+        '''
+    }
+
+    void testInferenceForDGM_findLastIndexOf() {
+        assertScript '''
+            String[] items1 = ['foo','bar','baz']
+            assert items1.findLastIndexOf { it.startsWith('ba') == 2 }
+            assert items1.findLastIndexOf { String s -> s.startsWith('ba') == 2 }
+            def items2 = ['foo','bar','baz']
+            assert items2.findLastIndexOf { it.startsWith('ba') == 2 }
+            assert items2.iterator().findLastIndexOf { it.startsWith('ba') == 2 }
+        '''
+    }
+
+    void testInferenceForDGM_findIndexValues() {
+        assertScript '''
+            String[] items1 = ['foo','bar','baz']
+            assert items1.findIndexValues { it.startsWith('ba') } == [1, 2]
+            assert items1.findIndexValues { String s -> s.startsWith('ba') } == [1, 2]
+            def items2 = ['foo','bar','baz']
+            assert items2.findIndexValues { it.startsWith('ba') } == [1, 2]
+            assert items2.iterator().findIndexValues { it.startsWith('ba') } == [1, 2]
+        '''
+    }
+
+    void testInferenceForDGM_findResult() {
+        assertScript '''
+            String[] items1 = ['foo','bar','baz']
+            assert items1.findResult { it.startsWith('ba') ? it : null } == 'bar'
+            def items2 = ['foo','bar','baz']
+            assert items2.findResult { it.startsWith('ba') ? it : null } == 'bar'
+            assert items2.iterator().findResult { it.startsWith('ba') ? it : null } == 'bar'
+        '''
+    }
+
+    void testInferenceForDGM_findResults() {
+        assertScript '''
+            String[] items1 = ['foo','bar','baz']
+            assert items1.findResults { it.startsWith('ba') ? it : null } == ['bar', 'baz']
+            def items2 = ['foo','bar','baz']
+            assert items2.findResults { it.startsWith('ba') ? it : null } == ['bar', 'baz']
+            assert items2.iterator().findResults { it.startsWith('ba') ? it : null } == ['bar', 'baz']
+        '''
+    }
+
+    void testInferenceForDGM_split() {
+        assertScript '''
+            String[] items1 = ['foo','bar','baz']
+            assert items1.split { it.startsWith('ba') } == [['bar', 'baz'], ['foo']]
+            Collection items2 = ['foo','bar','baz']
+            assert items2.split { it.startsWith('ba') } == [['bar', 'baz'], ['foo']]
+        '''
+    }
+
+    void testInferenceForDGM_sum() {
+        assertScript '''
+            String[] items1 = ['foo','bar','baz']
+            assert items1.sum { it.toUpperCase() } == 'FOOBARBAZ'
+            def items2 = ['fi','fo','fum']
+            assert items2.sum('FEE') { it.toUpperCase() } == 'FEEFIFOFUM'
         '''
     }
 
@@ -1099,6 +1196,12 @@ import groovy.transform.stc.ClosureParams
             assert ['abc','de','f'].iterator().any { it.length() == 2 }
         '''
     }
+    void testDGM_anyOnArray() {
+        assertScript '''
+            String[] strings = ['abc','de','f']
+            assert strings.any { it.length() == 2 }
+        '''
+    }
 
     void testDGM_mapWithDefault() {
         assertScript '''
@@ -1221,5 +1324,55 @@ def method() {
 
 method()
 '''
+    }
+
+    void testGroovy9058() {
+        assertScript '''
+            List<Object[]> bar() { [['fee', 'fi'] as Object[], ['fo', 'fum'] as Object[]] }
+
+            def foo() {
+                def result = []
+                List<Object[]> bar = bar()
+                bar.each { row -> result << row[0].toString().toUpperCase() }
+                result
+            }
+
+            assert foo() == ['FEE', 'FO']
+        '''
+    }
+
+    void testGroovy9518() {
+        assertScript '''
+            class C {
+                C(String s, Comparable<List<Integer>> c) {
+                }
+            }
+
+            new C('blah', { list -> list.get(0) })
+        '''
+    }
+
+    void testGroovy9518a() {
+        assertScript '''
+            class C {
+                C(String s, Comparable<List<Integer>> c) {
+                }
+            }
+
+            new C('blah', { it.get(0) })
+        '''
+    }
+
+    void testGroovy9518b() {
+        assertScript '''
+            import groovy.transform.stc.*
+
+            class C {
+                C(String s, @ClosureParams(value=SimpleType, options='java.util.List') Closure<Integer> c) {
+                }
+            }
+
+            new C('blah', { list -> list.get(0) })
+        '''
     }
 }

@@ -346,6 +346,7 @@ class DelegateTransformTest extends CompilableTestSupport {
 
             def delegateMethod = A_Delegate.getMethod('method', [Object.class] as Class[])
             def delegateAnno = delegateMethod.parameterAnnotations[0][0]
+            println delegateMethod.parameterAnnotations
 
             assert delegateAnno == originalAnno
         """
@@ -375,7 +376,7 @@ class DelegateTransformTest extends CompilableTestSupport {
             def originalAnno = originalMethod.declaredAnnotations[0]
 
             def delegateMethod = A_Delegate.getMethod('method', [Object.class] as Class[])
-            def delegateAnno = delegateMethod.declaredAnnotations[0]
+            def delegateAnno = delegateMethod.declaredAnnotations[1]
 
             assert delegateAnno == originalAnno
 
@@ -827,6 +828,50 @@ assert foo.dm.x == '123'
             assert new BugsMe().length == 2
         '''
     }
+
+    // GROOVY-9289
+    void testExcludesWithInvalidPropertyNameResultsInError() {
+        def message = shouldFail """
+            class WMap {
+                String name
+                @Delegate(excludes = "name")
+                Map<String, String> data
+             
+                WMap(String name, Map<String, String> data) {
+                    this.name = name
+                    this.data = data
+                }
+            }
+
+            new WMap('example', [name: 'weird'])
+        """
+        assert message.contains("Error during @Delegate processing: 'excludes' property or method 'name' does not exist.")
+    }
+
+    // GROOVY-8825
+    void testDelegateToPrecompiledGroovyGeneratedMethod() {
+        assertScript '''
+            import org.codehaus.groovy.transform.CompiledClass8825
+            class B {
+                @Delegate(methodAnnotations = true)
+                private final CompiledClass8825 delegate = new CompiledClass8825()
+            }
+            assert new B().s == '456'
+        '''
+    }
+
+    // GROOVY-9414
+    void testDelegateToPropertyViaGetter() {
+        assertScript '''
+            class Bar {
+                String name
+            }
+            class BarDelegate {
+                @Delegate(includes = "getName") Bar bar = new Bar(name: 'Baz')
+            }
+            assert new BarDelegate().name == 'Baz'
+        '''
+    }
 }
 
 interface DelegateFoo {
@@ -901,6 +946,10 @@ class Bar implements BarInt {
     public <T extends Throwable> T get(Class<T> clazz) throws Exception {
         clazz.newInstance()
     }
+}
+
+class CompiledClass8825 {
+    final String s = '456'
 }
 
 // DO NOT MOVE INSIDE THE TEST SCRIPT OR IT WILL NOT TEST

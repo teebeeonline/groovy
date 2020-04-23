@@ -18,20 +18,18 @@
  */
 package groovy.xml;
 
+import groovy.lang.Tuple3;
+import groovy.namespace.QName;
 import groovy.util.BuilderSupport;
-
-import java.util.Iterator;
-import java.util.Map;
-
 import org.xml.sax.Attributes;
 import org.xml.sax.ContentHandler;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.AttributesImpl;
 
+import java.util.Map;
+
 /**
  * A builder for generating W3C SAX events.  Use similar to MarkupBuilder.
- * 
- * @author <a href="mailto:james@coredevelopers.net">James Strachan</a>
  */
 public class SAXBuilder extends BuilderSupport {
 
@@ -56,39 +54,27 @@ public class SAXBuilder extends BuilderSupport {
         return name;
     }
 
-    /**
-     * @param value
-     */
     private void doText(Object value) {
         try {
             char[] text = value.toString().toCharArray();
             handler.characters(text, 0, text.length);
-        }
-        catch (SAXException e) {
+        } catch (SAXException e) {
             handleException(e);
         }
     }
 
     protected Object createNode(Object name, Map attributeMap, Object text) {
         AttributesImpl attributes = new AttributesImpl();
-        for (Iterator iter = attributeMap.entrySet().iterator(); iter.hasNext();) {
-            Map.Entry entry = (Map.Entry) iter.next();
+        for (Object o : attributeMap.entrySet()) {
+            Map.Entry entry = (Map.Entry) o;
             Object key = entry.getKey();
             Object value = entry.getValue();
-            String uri = "";
-            String localName = null;
-            String qualifiedName = "";
+
+            Tuple3<String, String, String> nameInfo = getNameInfo(key);
+            String uri = nameInfo.getV1();
+            String localName = nameInfo.getV2();
+            String qualifiedName = nameInfo.getV3();
             String valueText = (value != null) ? value.toString() : "";
-            if (key instanceof QName) {
-                QName qname = (QName) key;
-                uri = qname.getNamespaceURI();
-                localName = qname.getLocalPart();
-                qualifiedName = qname.getQualifiedName();
-            }
-            else {
-                localName = key.toString();
-                qualifiedName = localName;
-            }
 
             attributes.addAttribute(uri, localName, qualifiedName, "CDATA", valueText);
         }
@@ -100,45 +86,27 @@ public class SAXBuilder extends BuilderSupport {
     }
 
     protected void doStartElement(Object name, Attributes attributes) {
-        String uri = "";
-        String localName = null;
-        String qualifiedName = "";
-        if (name instanceof QName) {
-            QName qname = (QName) name;
-            uri = qname.getNamespaceURI();
-            localName = qname.getLocalPart();
-            qualifiedName = qname.getQualifiedName();
-        }
-        else {
-            localName = name.toString();
-            qualifiedName = localName;
-        }
+        Tuple3<String, String, String> nameInfo = getNameInfo(name);
+        String uri = nameInfo.getV1();
+        String localName = nameInfo.getV2();
+        String qualifiedName = nameInfo.getV3();
+
         try {
             handler.startElement(uri, localName, qualifiedName, attributes);
-        }
-        catch (SAXException e) {
+        } catch (SAXException e) {
             handleException(e);
         }
     }
 
     protected void nodeCompleted(Object parent, Object name) {
-        String uri = "";
-        String localName = null;
-        String qualifiedName = "";
-        if (name instanceof QName) {
-            QName qname = (QName) name;
-            uri = qname.getNamespaceURI();
-            localName = qname.getLocalPart();
-            qualifiedName = qname.getQualifiedName();
-        }
-        else {
-            localName = name.toString();
-            qualifiedName = localName;
-        }
+        Tuple3<String, String, String> nameInfo = getNameInfo(name);
+        String uri = nameInfo.getV1();
+        String localName = nameInfo.getV2();
+        String qualifiedName = nameInfo.getV3();
+
         try {
             handler.endElement(uri, localName, qualifiedName);
-        }
-        catch (SAXException e) {
+        } catch (SAXException e) {
             handleException(e);
         }
     }
@@ -152,5 +120,25 @@ public class SAXBuilder extends BuilderSupport {
      */
     protected Object createNode(Object name, Map attributes) {
         return createNode(name, attributes, null);
+    }
+
+
+    private Tuple3<String, String, String> getNameInfo(Object name) {
+        String uri;
+        String localName;
+        String qualifiedName;
+
+        if (name instanceof QName) {
+            QName qname = (QName) name;
+            uri = qname.getNamespaceURI();
+            localName = qname.getLocalPart();
+            qualifiedName = qname.getQualifiedName();
+        } else {
+            uri = "";
+            localName = name.toString();
+            qualifiedName = localName;
+        }
+
+        return new Tuple3<>(uri, localName, qualifiedName);
     }
 }

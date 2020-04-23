@@ -20,7 +20,8 @@ package groovy.json
 
 import groovy.json.JsonGenerator.Converter
 import groovy.json.JsonGenerator.Options
-import groovy.json.internal.CharBuf
+import groovy.test.GroovyTestCase
+import org.apache.groovy.json.internal.CharBuf
 
 /**
  * Tests extensibility of JsonGenerator and associated classes

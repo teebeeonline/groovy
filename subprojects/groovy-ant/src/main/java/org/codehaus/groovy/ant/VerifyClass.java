@@ -22,7 +22,6 @@ import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.taskdefs.MatchingTask;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
-import org.objectweb.asm.Label;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
@@ -31,9 +30,11 @@ import org.objectweb.asm.tree.analysis.SimpleVerifier;
 import org.objectweb.asm.util.CheckClassAdapter;
 import org.objectweb.asm.util.TraceMethodVisitor;
 
+import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.List;
 
 /**
@@ -76,17 +77,18 @@ public class VerifyClass extends MatchingTask {
     private int execute(File dir) {
         int fails = 0;
         File[] files = dir.listFiles();
-        for (int i = 0; i < files.length; i++) {
-            File f = files[i];
-            if (f.isDirectory()) {
-                fails += execute(f);
-            } else if (f.getName().endsWith(".class")) {
-                try {
-                    boolean ok = readClass(f.getCanonicalPath());
-                    if (!ok) fails++;
-                } catch (IOException ioe) {
-                    log(ioe.getMessage());
-                    throw new BuildException(ioe);
+        if (files != null) {
+            for (File f : files) {
+                if (f.isDirectory()) {
+                    fails += execute(f);
+                } else if (f.getName().endsWith(".class")) {
+                    try {
+                        boolean ok = readClass(f.getCanonicalPath());
+                        if (!ok) fails++;
+                    } catch (IOException ioe) {
+                        log(ioe.getMessage());
+                        throw new BuildException(ioe);
+                    }
                 }
             }
         }
@@ -94,20 +96,25 @@ public class VerifyClass extends MatchingTask {
     }
 
     private boolean readClass(String clazz) throws IOException {
-        ClassReader cr = new ClassReader(new FileInputStream(clazz));
-        ClassNode ca = new ClassNode() {
-            public void visitEnd() {
-                //accept(cv);
-            }
-        };
-        cr.accept(new CheckClassAdapter(ca), ClassWriter.COMPUTE_MAXS);
-        boolean failed = false;
+        ClassNode ca;
+        try (final InputStream inputStream =
+                     new BufferedInputStream(
+                             new FileInputStream(clazz))) {
+            ClassReader cr = new ClassReader(inputStream);
+            ca = new ClassNode() {
+                @Override
+                public void visitEnd() {
+                    //accept(cv);
+                }
+            };
+            cr.accept(new CheckClassAdapter(ca), ClassWriter.COMPUTE_MAXS);
+        }
 
-        List methods = ca.methods;
-        for (int i = 0; i < methods.size(); ++i) {
-            MethodNode method = (MethodNode) methods.get(i);
+        boolean failed = false;
+        List<MethodNode> methods = ca.methods;
+        for (MethodNode method : methods) {
             if (method.instructions.size() > 0) {
-                Analyzer a = new Analyzer(new SimpleVerifier());
+                Analyzer<?> a = new Analyzer<>(new SimpleVerifier());
                 try {
                     a.analyze(ca.name, method);
                     continue;
@@ -120,31 +127,14 @@ public class VerifyClass extends MatchingTask {
                     log("verifying of class " + clazz + " failed");
                 }
                 if (verbose) log(method.name + method.desc);
-                
-                TraceMethodVisitor mv = new TraceMethodVisitor(null); 
-                /*= new TraceMethodVisitor(null) {
-                    public void visitMaxs(int maxStack, int maxLocals) {
-                        StringBuffer buffer = new StringBuffer();
-                        for (int i = 0; i < text.size(); ++i) {
-                            String s = frames[i] == null ? "null" : frames[i].toString();
-                            while (s.length() < maxStack + maxLocals + 1) {
-                                s += " ";
-                            }
-                            buffer.append(Integer.toString(i + 100000).substring(1));
-                            buffer.append(" ");
-                            buffer.append(s);
-                            buffer.append(" : ");
-                            buffer.append(text.get(i));
-                        }
-                        if (verbose) log(buffer.toString());
-                    }
-                };*/
+
+                TraceMethodVisitor mv = new TraceMethodVisitor(null);
                 for (int j = 0; j < method.instructions.size(); ++j) {
-                    Object insn = method.instructions.get(j);
-                    if (insn instanceof AbstractInsnNode) {
-                        ((AbstractInsnNode) insn).accept(mv);
+                    AbstractInsnNode insn = method.instructions.get(j);
+                    if (insn != null) {
+                        insn.accept(mv);
                     } else {
-                        mv.visitLabel((Label) insn);
+                        mv.visitLabel(null);
                     }
                 }
                 mv.visitMaxs(method.maxStack, method.maxLocals);

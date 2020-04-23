@@ -26,13 +26,10 @@ import java.util.Map;
 
 /**
  * A bean used by the test cases
- *
- * @author <a href="mailto:james@coredevelopers.net">James Strachan</a>
- * @author <a href="mailto:shemnon@yahoo.com">Danno Ferrin</a>
  */
 public class DummyBean {
     private String name = "James";
-    private Integer i = new Integer(123);
+    private Integer i = Integer.valueOf(123);
     private Map dynamicProperties = new HashMap();
     private Point point;
     private PropertyChangeSupport changeSupport = new PropertyChangeSupport(this);

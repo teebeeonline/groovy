@@ -18,13 +18,12 @@
  */
 package groovy.json
 
-import groovy.json.internal.CharBuf
-import groovy.json.internal.IO
+import groovy.test.GroovyTestCase
+import org.apache.groovy.json.internal.CharBuf
+import org.apache.groovy.json.internal.IO
 
 /**
  * Test the internal IO class
- *
- * @author Martin Stockhammer
  */
 class IOTest extends GroovyTestCase {
 

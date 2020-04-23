@@ -18,12 +18,10 @@
  */
 package org.codehaus.groovy.runtime.memoize
 
+import groovy.test.GroovyTestCase
 import org.junit.Ignore
 
-/**
- * @author Rafael Luque
- */
-@Ignore("do not run consistently on the build server")
+@Ignore("does not run consistently on the build server")
 class CacheCleanupCollectedSoftReferencesTest extends GroovyTestCase {
 
     void testCollectedCacheValuesAreEnqueued() {
@@ -35,9 +33,9 @@ class CacheCleanupCollectedSoftReferencesTest extends GroovyTestCase {
         UnlimitedConcurrentCache cache = new UnlimitedConcurrentCache()
         Closure memoizedClosure = Memoize.buildSoftReferenceMemoizeFunction(0, cache, cl)
 
-        assert cache.cache.size() == 0
+        assert cache.map.size() == 0
         memoizedClosure.call(1)
-        assert cache.cache.size() == 1
+        assert cache.map.size() == 1
 
         forceSoftReferencesRecollection()
 
@@ -55,19 +53,19 @@ class CacheCleanupCollectedSoftReferencesTest extends GroovyTestCase {
         UnlimitedConcurrentCache cache = new UnlimitedConcurrentCache()
         Closure memoizedClosure = Memoize.buildSoftReferenceMemoizeFunction(0, cache, cl)
 
-        assert cache.cache.size() == 0
+        assert cache.map.size() == 0
         memoizedClosure.call(1)
-        assert cache.cache.size() == 1
+        assert cache.map.size() == 1
 
         forceSoftReferencesRecollection()
 
-        assert cache.cache.size() == 1
+        assert cache.map.size() == 1
 
         // As there is not a cleanup thread polling the ReferenceQueue, 
         // a call() invocation is needed to fire the cleaning up of null references.
         memoizedClosure.call(2)
 
-        assert cache.cache.size() == 1 : 'collected SoftReferences should be removed from cache'
+        assert cache.map.size() == 1 : 'collected SoftReferences should be removed from cache'
     }
 
     private void checkSoftReferenceAreSoftlyReachable(softReference) {

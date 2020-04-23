@@ -23,6 +23,7 @@ import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.AnnotationNode;
 import org.codehaus.groovy.ast.ConstructorNode;
 import org.codehaus.groovy.ast.MethodNode;
+import org.codehaus.groovy.ast.ModifierNode;
 import org.codehaus.groovy.ast.Parameter;
 import org.codehaus.groovy.ast.expr.VariableExpression;
 import org.objectweb.asm.Opcodes;
@@ -35,8 +36,11 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-import static org.apache.groovy.parser.antlr4.GroovyParser.*;
-import static org.codehaus.groovy.runtime.DefaultGroovyMethods.asBoolean;
+import static org.apache.groovy.parser.antlr4.GroovyLangParser.ABSTRACT;
+import static org.apache.groovy.parser.antlr4.GroovyLangParser.FINAL;
+import static org.apache.groovy.parser.antlr4.GroovyLangParser.NATIVE;
+import static org.apache.groovy.parser.antlr4.GroovyLangParser.STATIC;
+import static org.apache.groovy.parser.antlr4.GroovyLangParser.VOLATILE;
 
 /**
  * Process modifiers for AST nodes
@@ -54,7 +58,7 @@ class ModifierManager {
     public ModifierManager(AstBuilder astBuilder, List<ModifierNode> modifierNodeList) {
         this.astBuilder = astBuilder;
         this.validate(modifierNodeList);
-        this.modifierNodeList = Collections.unmodifiableList(asBoolean((Object) modifierNodeList) ? modifierNodeList : Collections.emptyList());
+        this.modifierNodeList = Collections.unmodifiableList(modifierNodeList);
     }
 
     public int getModifierCount() {
@@ -134,8 +138,16 @@ class ModifierManager {
                 .collect(Collectors.toList());
     }
 
-    public boolean contains(int modifierType) {
-        return modifierNodeList.stream().anyMatch(e -> modifierType == e.getType());
+    public boolean containsAny(final int... modifierTypes) {
+        return modifierNodeList.stream().anyMatch(e -> {
+            for (int modifierType : modifierTypes) {
+                if (modifierType == e.getType()) {
+                    return true;
+                }
+            }
+
+            return false;
+        });
     }
 
     public Optional<ModifierNode> get(int modifierType) {

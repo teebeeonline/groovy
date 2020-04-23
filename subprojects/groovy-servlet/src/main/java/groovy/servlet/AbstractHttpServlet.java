@@ -21,6 +21,11 @@ package groovy.servlet;
 import groovy.util.ResourceConnector;
 import groovy.util.ResourceException;
 
+import javax.servlet.ServletConfig;
+import javax.servlet.ServletContext;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
 import java.io.File;
 import java.io.IOException;
 import java.net.MalformedURLException;
@@ -30,12 +35,6 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import javax.servlet.ServletConfig;
-import javax.servlet.ServletContext;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
 
 /**
  * A base class dealing with common HTTP servlet API housekeeping aspects.
@@ -79,9 +78,6 @@ import javax.servlet.http.HttpServletRequest;
  * <pre>
  * reflection = false(default) | true
  * </pre>
- *
- * @author Christian Stein
- * @author Roshan Dawrani (roshandawrani)
  */
 public abstract class AbstractHttpServlet extends HttpServlet implements ResourceConnector {
 
@@ -179,8 +175,7 @@ public abstract class AbstractHttpServlet extends HttpServlet implements Resourc
         try {
             URL res = servletContext.getResource("/");
             if (res != null) { uri = res.toURI(); }
-        } catch (MalformedURLException ignore) {
-        } catch (URISyntaxException ignore) {
+        } catch (MalformedURLException | URISyntaxException ignore) {
         }
 
         if (uri != null) {

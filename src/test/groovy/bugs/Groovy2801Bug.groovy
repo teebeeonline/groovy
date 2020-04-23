@@ -18,8 +18,10 @@
  */
 package groovy.bugs
 
+import groovy.test.GroovyTestCase
+
 class Groovy2801Bug extends GroovyTestCase {
-    def void testOverrideToStringInMapOfClosures() {
+    void testOverrideToStringInMapOfClosures() {
         def proxyImpl = [foo: { "Foo!" }, toString: { "overridden." }] as IGroovy2801Bug
         assert proxyImpl.toString() == "overridden."
     }

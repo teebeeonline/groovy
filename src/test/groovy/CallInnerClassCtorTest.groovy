@@ -18,9 +18,10 @@
  */
 package groovy
 
+import groovy.test.GroovyTestCase
+
 /**
  * Checks that it's possible to call inner classes constructor from groovy
- * @author Guillaume Laforge
  */
 class CallInnerClassCtorTest extends GroovyTestCase {
 

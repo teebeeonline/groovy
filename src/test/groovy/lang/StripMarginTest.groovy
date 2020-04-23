@@ -18,6 +18,8 @@
  */
 package groovy.lang
 
+import groovy.test.GroovyTestCase
+
 class StripMarginTest extends GroovyTestCase {
     void testStripMarginOnSingleLineString() {
         def expected = "the quick brown fox jumps over the lazy dog"
@@ -55,7 +57,7 @@ class StripMarginTest extends GroovyTestCase {
             def method() {
                 return 'bar'
             }
-        """.stripIndent()
+        """.stripIndent(true)
 
         def expected = """
     return 'foo'
@@ -77,7 +79,7 @@ def method() {
             def method() {
                 return 'bar'
             }
-        """.stripIndent()
+        """.stripIndent(true)
         
         def expected = """\
     return 'foo'

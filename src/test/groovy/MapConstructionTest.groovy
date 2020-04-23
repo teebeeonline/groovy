@@ -18,10 +18,10 @@
  */
 package groovy
 
+import groovy.test.GroovyTestCase
+
 /** 
  * Tests creating Maps in Groovy
- * 
- * @author <a href="mailto:james@coredevelopers.net">James Strachan</a>
  */
 class MapConstructionTest extends GroovyTestCase {
 

@@ -18,12 +18,11 @@
  */
 package groovy.util
 
+import groovy.test.GroovyTestCase
+
 import java.beans.PropertyChangeEvent
 import java.beans.PropertyChangeListener
 
-/**
- * @author <a href="mailto:aalmiray@users.sourceforge.net">Andres Almiray</a>
- */
 class ObservableSetTests extends GroovyTestCase {
     void testFireEvent_add_withoutTest() {
         def set = new ObservableSet()
@@ -290,7 +289,7 @@ class ObservableSetTests extends GroovyTestCase {
 class SampleSetPropertyChangeListener implements PropertyChangeListener {
     PropertyChangeEvent event
 
-    public void propertyChange(PropertyChangeEvent evt) {
+    void propertyChange(PropertyChangeEvent evt) {
         event = evt
     }
 }

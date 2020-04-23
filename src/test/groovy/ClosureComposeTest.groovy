@@ -18,8 +18,13 @@
  */
 package groovy
 
+import groovy.test.GroovyTestCase
+import groovy.transform.CompileStatic
+
+import java.util.function.Function
+
 /**
- * @author Paul King
+ * Tests for Closure composition
  */
 class ClosureComposeTest extends GroovyTestCase {
 
@@ -98,6 +103,70 @@ class ClosureComposeTest extends GroovyTestCase {
             ab.delegate = new O()
             ab()
         """
+    }
+
+    @CompileStatic
+    void testAndThenCS() {
+        Function<String, String> lower = String::toLowerCase
+        Function<String, String> upper = String::toUpperCase
+        Function<String, String> lu = lower.andThen(upper)
+        Function<? super String, String> ul = upper.andThen(lower)
+        assert lower('Hi') == ul('Hi')
+        assert upper('Hi') == lu('Hi')
+    }
+
+    void testAndThen() {
+        def lower = String::toLowerCase
+        def upper = String::toUpperCase
+        def lu1 = lower.rightShift(upper)
+        def ul1 = upper.rightShift(lower)
+        assert lower('Hi') == ul1('Hi')
+        assert upper('Hi') == lu1('Hi')
+        def lu2 = lower.andThen(upper)
+        def ul2 = upper.andThen(lower)
+        assert lower('Hi') == ul2('Hi')
+        assert upper('Hi') == lu2('Hi')
+    }
+
+    void testAndThenSelf() {
+        def inc = String::next
+        def inc2 = inc.andThenSelf()
+        def inc4 = inc.andThenSelf(3)
+        assert inc('abc') == 'abd'
+        assert inc2('abc') == 'abe'
+        assert inc4('abc') == 'abg'
+    }
+
+    @CompileStatic
+    void testComposeCS() {
+        Function<String, String> lower = String::toLowerCase
+        Function<String, String> upper = String::toUpperCase
+        Function<String, String> ul = lower.compose(upper)
+        Function<String, ? extends String> lu = upper.compose(lower)
+        assert lower('Hi') == ul('Hi')
+        assert upper('Hi') == lu('Hi')
+    }
+
+    void testCompose() {
+        def lower = String::toLowerCase
+        def upper = String::toUpperCase
+        def ul1 = lower.leftShift(upper)
+        def lu1 = upper.leftShift(lower)
+        assert lower('Hi') == ul1('Hi')
+        assert upper('Hi') == lu1('Hi')
+        def ul2 = lower.compose(upper)
+        def lu2 = upper.compose(lower)
+        assert lower('Hi') == ul2('Hi')
+        assert upper('Hi') == lu2('Hi')
+    }
+
+    void testComposeSelf() {
+        def inc = String::next
+        def inc2 = inc.composeSelf()
+        def inc4 = inc.composeSelf(3)
+        assert inc('abc') == 'abd'
+        assert inc2('abc') == 'abe'
+        assert inc4('abc') == 'abg'
     }
 
     class ComposeTestHelper {

@@ -18,8 +18,8 @@
  */
 package groovy.json;
 
-import groovy.json.internal.CharBuf;
-import groovy.json.internal.Chr;
+import org.apache.groovy.json.internal.CharBuf;
+import org.apache.groovy.json.internal.Chr;
 import groovy.lang.Closure;
 import groovy.util.Expando;
 import org.codehaus.groovy.runtime.DefaultGroovyMethods;
@@ -224,13 +224,7 @@ public class DefaultJsonGenerator implements JsonGenerator {
         } else if (File.class.isAssignableFrom(objectClass)) {
             Map<?, ?> properties = getObjectProperties(object);
             //Clean up all recursive references to File objects
-            Iterator<? extends Map.Entry<?, ?>> iterator = properties.entrySet().iterator();
-            while(iterator.hasNext()) {
-                Map.Entry<?,?> entry = iterator.next();
-                if(entry.getValue() instanceof File) {
-                    iterator.remove();
-                }
-            }
+            properties.entrySet().removeIf(entry -> entry.getValue() instanceof File);
             writeMap(properties, buffer);
         } else {
             Map<?, ?> properties = getObjectProperties(object);

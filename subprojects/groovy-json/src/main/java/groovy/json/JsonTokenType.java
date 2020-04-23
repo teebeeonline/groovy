@@ -28,7 +28,6 @@ import java.util.regex.Pattern;
  * This is kept around in case someone needs its exact behavior.
  * Enum listing all the possible JSON tokens that should be recognized by the lexer.
  *
- * @author Guillaume Laforge
  * @since 1.8.0
  */
 public enum JsonTokenType {
@@ -53,7 +52,7 @@ public enum JsonTokenType {
     STRING          ( "a string",                           new Closure(null) {
         private Pattern replacePattern = Pattern.compile("(?:\\\\[\"\\\\bfnrt\\/]|\\\\u[0-9a-fA-F]{4})");
         private Pattern validatePattern = Pattern.compile("\"[^\"\\\\]*\"");
-        boolean doCall(String it) {
+        public boolean doCall(String it) {
             return validatePattern.matcher(replacePattern.matcher(it).replaceAll("@")).matches();
         }
     });

@@ -19,23 +19,22 @@
 package org.codehaus.groovy.ant;
 
 import groovy.lang.GroovyClassLoader;
-
+import org.apache.groovy.io.StringBuilderWriter;
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.taskdefs.MatchingTask;
 import org.apache.tools.ant.types.Path;
 import org.apache.tools.ant.types.Reference;
-
 import org.codehaus.groovy.control.CompilerConfiguration;
 import org.codehaus.groovy.tools.ErrorReporter;
 
 import java.io.File;
-import java.io.StringWriter;
 import java.io.PrintWriter;
+import java.io.Writer;
+import java.security.AccessController;
+import java.security.PrivilegedAction;
 
 /**
  * Support for compilation related tasks.
- *
- * @author <a href="mailto:jason@planet57.com">Jason Dillon</a>
  */
 public abstract class CompileTaskSupport
     extends MatchingTask
@@ -136,8 +135,9 @@ public abstract class CompileTaskSupport
     }
 
     protected GroovyClassLoader createClassLoader() {
-        ClassLoader parent = ClassLoader.getSystemClassLoader();
-        GroovyClassLoader gcl = new GroovyClassLoader(parent, config);
+        GroovyClassLoader gcl =
+                AccessController.doPrivileged(
+                        (PrivilegedAction<GroovyClassLoader>) () -> new GroovyClassLoader(ClassLoader.getSystemClassLoader(), config));
 
         Path path = getClasspath();
         if (path != null) {
@@ -154,7 +154,7 @@ public abstract class CompileTaskSupport
     protected void handleException(final Exception e) throws BuildException {
         assert e != null;
         
-        StringWriter writer = new StringWriter();
+        Writer writer = new StringBuilderWriter();
         new ErrorReporter(e, false).write(new PrintWriter(writer));
         String message = writer.toString();
 

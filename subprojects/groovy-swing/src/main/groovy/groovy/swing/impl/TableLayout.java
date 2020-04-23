@@ -18,16 +18,11 @@
  */
 package groovy.swing.impl;
 
-import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
-import java.awt.Insets;
-
-import javax.swing.JPanel;
+import javax.swing.*;
+import java.awt.*;
 
 /** 
  * Represents a HTML style table layout
- *
- * @author <a href="mailto:james@coredevelopers.net">James Strachan</a>
  */
 public class TableLayout extends JPanel {
 

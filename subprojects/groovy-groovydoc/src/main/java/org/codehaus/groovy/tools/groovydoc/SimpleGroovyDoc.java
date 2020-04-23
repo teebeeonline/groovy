@@ -18,18 +18,28 @@
  */
 package org.codehaus.groovy.tools.groovydoc;
 
-import org.codehaus.groovy.antlr.parser.GroovyTokenTypes;
 import org.codehaus.groovy.groovydoc.GroovyDoc;
 import org.codehaus.groovy.groovydoc.GroovyTag;
 
 import java.text.BreakIterator;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class SimpleGroovyDoc implements GroovyDoc, GroovyTokenTypes {
+public class SimpleGroovyDoc implements GroovyDoc/*, GroovyTokenTypes*/ {
+    public static final int CLASS_DEF = 13;
+    public static final int TRAIT_DEF = 15;
+    public static final int INTERFACE_DEF = 14;
+    public static final int ANNOTATION_DEF = 64;
+    public static final int ENUM_DEF = 61;
     private static final Pattern TAG2_PATTERN = Pattern.compile("(?s)([a-z]+)\\s+(.*)");
     private static final Pattern TAG3_PATTERN = Pattern.compile("(?s)([a-z]+)\\s+(\\S*)\\s+(.*)");
+    private static final Pattern RAW_COMMENT_PATTERN = Pattern.compile("\"(?s).*?\\\\*\\\\s*@\"");
+    private static final Pattern TRIMMED_COMMENT_PATTERN = Pattern.compile("(?m)^\\s*\\*\\s*([^*]*)$");
+    private static final GroovyTag[] EMPTY_GROOVYTAG_ARRAY = new GroovyTag[0];
     private final String name;
     private String commentText = null;
     private String rawCommentText = "";
@@ -82,9 +92,9 @@ public class SimpleGroovyDoc implements GroovyDoc, GroovyTokenTypes {
     }
 
     private void calculateTags(String rawCommentText) {
-        String trimmed = rawCommentText.replaceFirst("(?s).*?\\*\\s*@", "@");
+        String trimmed = RAW_COMMENT_PATTERN.matcher(rawCommentText).replaceFirst("@");
         if (trimmed.equals(rawCommentText)) return;
-        String cleaned = trimmed.replaceAll("(?m)^\\s*\\*\\s*([^*]*)$", "$1").trim();
+        String cleaned = TRIMMED_COMMENT_PATTERN.matcher(trimmed).replaceAll("$1").trim();
         String[] split = cleaned.split("(?m)^@");
         List<GroovyTag> result = new ArrayList<GroovyTag>();
         for (String s : split) {
@@ -106,7 +116,7 @@ public class SimpleGroovyDoc implements GroovyDoc, GroovyTokenTypes {
                 setDeprecated(true);
             }
         }
-        tags = result.toArray(new GroovyTag[result.size()]);
+        tags = result.toArray(EMPTY_GROOVYTAG_ARRAY);
     }
 
     public static String calculateFirstSentence(String raw) {
@@ -236,7 +246,7 @@ public class SimpleGroovyDoc implements GroovyDoc, GroovyTokenTypes {
 //    public GroovySeeTag[] seeTags() {/*todo*/return null;}
 
     public GroovyTag[] tags() {
-        return tags;
+        return tags == null ? null : Arrays.copyOf(tags, tags.length);
     }
 
 //    public GroovyTag[] tags(String arg0) {/*todo*/return null;}

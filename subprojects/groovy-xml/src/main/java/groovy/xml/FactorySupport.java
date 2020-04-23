@@ -18,12 +18,12 @@
  */
 package groovy.xml;
 
-import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParserFactory;
-import java.security.PrivilegedExceptionAction;
 import java.security.AccessController;
 import java.security.PrivilegedActionException;
+import java.security.PrivilegedExceptionAction;
 
 /**
  * Support class for creating XML Factories
@@ -45,18 +45,10 @@ public class FactorySupport {
     }
 
     public static DocumentBuilderFactory createDocumentBuilderFactory() throws ParserConfigurationException {
-        return (DocumentBuilderFactory) createFactory(new PrivilegedExceptionAction() {
-            public Object run() throws ParserConfigurationException {
-                return DocumentBuilderFactory.newInstance();
-            }
-        });
+        return (DocumentBuilderFactory) createFactory(DocumentBuilderFactory::newInstance);
     }
 
     public static SAXParserFactory createSaxParserFactory() throws ParserConfigurationException {
-        return (SAXParserFactory) createFactory(new PrivilegedExceptionAction() {
-                public Object run() throws ParserConfigurationException {
-                    return SAXParserFactory.newInstance();
-                }
-            });
+        return (SAXParserFactory) createFactory(SAXParserFactory::newInstance);
     }
 }

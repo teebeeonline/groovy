@@ -28,13 +28,20 @@ import java.util.regex.Pattern;
 /**
  * Utilities for handling strings
  *
- * @author  <a href="mailto:realbluesun@hotmail.com">Daniel.Sun</a>
- * Created on    2016/08/20
  */
 public class StringUtils {
+	private static final String BACKSLASH = "\\";
+	private static final Pattern HEX_ESCAPES_PATTERN = Pattern.compile("(\\\\*)\\\\u([0-9abcdefABCDEF]{4})");
+	private static final Pattern OCTAL_ESCAPES_PATTERN = Pattern.compile("(\\\\*)\\\\([0-3]?[0-7]?[0-7])");
+	private static final Pattern STANDARD_ESCAPES_PATTERN = Pattern.compile("(\\\\*)\\\\([btnfrs\"'])");
+	private static final Pattern LINE_ESCAPE_PATTERN = Pattern.compile("(\\\\*)\\\\\r?\n");
+
 	public static String replaceHexEscapes(String text) {
-		Pattern p = Pattern.compile("(\\\\*)\\\\u([0-9abcdefABCDEF]{4})");
-		return StringGroovyMethods.replaceAll((CharSequence) text, p, new Closure<Void>(null, null) {
+		if (!text.contains(BACKSLASH)) {
+			return text;
+		}
+
+		return StringGroovyMethods.replaceAll((CharSequence) text, HEX_ESCAPES_PATTERN, new Closure<Void>(null, null) {
 			Object doCall(String _0, String _1, String _2) {
 				if (isLengthOdd(_1)) {
 					return _0;
@@ -46,8 +53,11 @@ public class StringUtils {
 	}
 
 	public static String replaceOctalEscapes(String text) {
-		Pattern p = Pattern.compile("(\\\\*)\\\\([0-3]?[0-7]?[0-7])");
-		return StringGroovyMethods.replaceAll((CharSequence) text, p, new Closure<Void>(null, null) {
+		if (!text.contains(BACKSLASH)) {
+			return text;
+		}
+
+		return StringGroovyMethods.replaceAll((CharSequence) text, OCTAL_ESCAPES_PATTERN, new Closure<Void>(null, null) {
 			Object doCall(String _0, String _1, String _2) {
 				if (isLengthOdd(_1)) {
 					return _0;
@@ -63,13 +73,16 @@ public class StringUtils {
 			't', '\t',
 			'n', '\n',
 			'f', '\f',
-			'r', '\r'
+			'r', '\r',
+			's', ' '
 	);
 
 	public static String replaceStandardEscapes(String text) {
-		Pattern p = Pattern.compile("(\\\\*)\\\\([btnfr\"'])");
+		if (!text.contains(BACKSLASH)) {
+			return text;
+		}
 
-		String result = StringGroovyMethods.replaceAll((CharSequence) text, p, new Closure<Void>(null, null) {
+		String result = StringGroovyMethods.replaceAll((CharSequence) text, STANDARD_ESCAPES_PATTERN, new Closure<Void>(null, null) {
 			Object doCall(String _0, String _1, String _2) {
 				if (isLengthOdd(_1)) {
 					return _0;
@@ -97,8 +110,8 @@ public class StringUtils {
 			}
 
 			if (slashyType == DOLLAR_SLASHY) {
-				text = replace(text,"$$", "$");
 				text = replace(text,"$/", "/");
+				text = replace(text,"$$", "$");
 			}
 
 		} else if (slashyType == NONE_SLASHY) {
@@ -111,6 +124,10 @@ public class StringUtils {
 	}
 
 	private static String replaceEscapes(String text) {
+		if (!text.contains(BACKSLASH)) {
+			return text;
+		}
+
 		text = replace(text,"\\$", "$");
 
 		text = StringUtils.replaceLineEscape(text);
@@ -119,8 +136,11 @@ public class StringUtils {
 	}
 
 	private static String replaceLineEscape(String text) {
-		Pattern p = Pattern.compile("(\\\\*)\\\\\r?\n");
-		text = StringGroovyMethods.replaceAll((CharSequence) text, p, new Closure<Void>(null, null) {
+		if (!text.contains(BACKSLASH)) {
+			return text;
+		}
+
+		text = StringGroovyMethods.replaceAll((CharSequence) text, LINE_ESCAPE_PATTERN, new Closure<Void>(null, null) {
 			Object doCall(String _0, String _1) {
 				if (isLengthOdd(_1)) {
 					return _0;
@@ -149,6 +169,10 @@ public class StringUtils {
 		int length = text.length();
 
 		return length == quotationLength << 1 ? "" : text.substring(quotationLength, length - quotationLength);
+	}
+
+	public static boolean matches(String text, Pattern pattern) {
+		return pattern.matcher(text).matches();
 	}
 
 	/**
@@ -189,11 +213,11 @@ public class StringUtils {
 		increase = (increase < 0 ? 0 : increase) * 16;
 		final StringBuilder buf = new StringBuilder(text.length() + increase);
 		while (end != INDEX_NOT_FOUND) {
-			buf.append(text.substring(start, end)).append(replacement);
+			buf.append(text, start, end).append(replacement);
 			start = end + replLength;
 			end = text.indexOf(searchString, start);
 		}
-		buf.append(text.substring(start));
+		buf.append(text, start, text.length());
 		return buf.toString();
 	}
 
@@ -216,7 +240,6 @@ public class StringUtils {
 	 *
 	 * @param cs  the CharSequence to check, may be null
 	 * @return {@code true} if the CharSequence is empty or null
-	 * @since 3.0 Changed signature from isEmpty(String) to isEmpty(CharSequence)
 	 */
 	public static boolean isEmpty(final CharSequence cs) {
 		return cs == null || cs.length() == 0;

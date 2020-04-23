@@ -30,12 +30,9 @@ import org.codehaus.groovy.runtime.InvokerHelper;
 import java.util.Vector;
 
 /**
- * A BSF Engine for the <a href="http://groovy-lang.org/">Groovy</a>
- * scripting language.
+ * A BSF Engine for the <a href="http://groovy-lang.org/">Groovy</a> scripting language.
  * <p>
- * It's derived from the Jython / JPython engine
- *
- * @author James Strachan
+ * It's inspired from the Jython engine
  */
 public class GroovyEngine extends BSFEngineImpl {
     protected GroovyShell shell;
@@ -51,7 +48,7 @@ public class GroovyEngine extends BSFEngineImpl {
     private static String convertToValidJavaClassname(String inName) {
         if (inName == null) return "_";
         if (inName.startsWith("scriptdef_")) inName = inName.substring(10);
-        if (inName.equals("")) return "_";
+        if (inName.isEmpty()) return "_";
 
         StringBuilder output = new StringBuilder(inName.length());
         boolean firstChar = true;

@@ -19,8 +19,8 @@
 package groovy.xml
 
 import groovy.xml.streamingmarkupsupport.AbstractStreamingBuilder
-import groovy.xml.streamingmarkupsupport.StreamingMarkupWriter
 import groovy.xml.streamingmarkupsupport.BaseMarkupBuilder
+import groovy.xml.streamingmarkupsupport.StreamingMarkupWriter
 
 /**
  * A builder class for creating XML markup.  This implementation uses a
@@ -75,12 +75,9 @@ class StreamingMarkupBuilder extends AbstractStreamingBuilder {
             out.unescaped() << "<?"
             if (instruction instanceof Map) {
                 out.unescaped() << target
-                instruction.each {name, value ->
-                    if (value.toString().contains('\'') || (useDoubleQuotes && !value.toString().contains('"'))) {
-                        out.unescaped() << " $name=\"$value\""
-                    } else {
-                        out.unescaped() << " $name='$value'"
-                    }
+                out.unescaped() << toMapStringClosure(instruction) { value ->
+                    def valueStr = value.toString()
+                    valueStr.contains('\'') || (useDoubleQuotes && !valueStr.contains('"'))
                 }
             } else {
                 out.unescaped() << "$target $instruction"

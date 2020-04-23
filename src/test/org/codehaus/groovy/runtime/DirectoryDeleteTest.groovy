@@ -16,12 +16,12 @@
  *  specific language governing permissions and limitations
  *  under the License.
  */
-package org.codehaus.groovy.runtime;
+package org.codehaus.groovy.runtime
+
+import groovy.test.GroovyTestCase;
 
 /**
  * Test File.deleteDir() method in Groovy
- *
- * @author <a href="mailto:j.heldmann@web.de">Joachim Heldmann</a>
  */
 class DirectoryDeleteTest extends GroovyTestCase {
 

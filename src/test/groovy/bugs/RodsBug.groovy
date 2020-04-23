@@ -18,11 +18,10 @@
  */
 package groovy.bugs
 
-/**
- * @author Rod Cope
- */
+import groovy.test.GroovyTestCase
+
 class RodsBug extends GroovyTestCase {
-    
+
     void testBug() {
         doTest(true)
         /*
@@ -33,7 +32,7 @@ class RodsBug extends GroovyTestCase {
          }
          */
     }
-    
+
     void testBug2() {
         def x = 1
         if (x > 0) {
@@ -41,7 +40,7 @@ class RodsBug extends GroovyTestCase {
             def name = "Rod"
         }
     }
-    
+
     void doTest(flag) {
         if (flag) {
             String name = "Rod"
@@ -49,12 +48,12 @@ class RodsBug extends GroovyTestCase {
             doAssert(name)
         }
     }
-    
+
     void doTest() {
         String name = "Rod"
         doAssert(name)
     }
-    
+
     void doAssert(text) {
         assert text != null
     }

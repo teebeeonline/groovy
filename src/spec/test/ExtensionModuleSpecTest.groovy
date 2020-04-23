@@ -1,3 +1,5 @@
+import groovy.test.GroovyTestCase
+
 /*
  *  Licensed to the Apache Software Foundation (ASF) under one
  *  or more contributor license agreements.  See the NOTICE file
@@ -27,6 +29,7 @@ assert i == 1
 i=0
 try {
     5.maxRetries {
+        i++
         throw new RuntimeException("oops")
     }
 } catch (RuntimeException e) {

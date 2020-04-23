@@ -18,20 +18,18 @@
  */
 package org.codehaus.groovy.jsr223
 
+import groovy.test.GroovyTestCase
+
 import javax.script.Invocable
 import javax.script.ScriptContext
-import javax.script.ScriptEngineManager
 import javax.script.ScriptEngine
 import javax.script.ScriptEngineFactory
+import javax.script.ScriptEngineManager
 import javax.script.ScriptException
-
 import javax.script.SimpleScriptContext
 
 /**
  * Tests JSR-223 Groovy engine implementation.
- *
- * @author Jim White
- * @author Guillaume Laforge
  */
 class JSR223Test extends GroovyTestCase {
     protected ScriptEngineManager manager
@@ -220,4 +218,36 @@ class JSR223Test extends GroovyTestCase {
         assert engine.getFactory() == factory
     }
 
+    void testGetInterfaceScenarios() {
+        assertScript '''
+        interface Test { def foo(); def bar(); def baz() }
+        def engine = new javax.script.ScriptEngineManager().getEngineByName("groovy")
+        engine.eval("def foo() { 42 }")
+        engine.eval("def bar() { throw new Exception('Boom!') }")
+        def test = engine.getInterface(Test)
+        assert test.foo() == 42
+
+        try {
+            test.bar()
+            assert false
+        } catch(RuntimeException re) {
+            assert re.message.endsWith('Boom!')
+        }
+
+        try {
+            test.baz()
+            assert false
+        } catch(RuntimeException re) {
+            assert re.cause.class.name.endsWith('MissingMethodException')
+        }
+        '''
+    }
+
+    void testGroovy9430() {
+        ScriptEngineFactory factory = new GroovyScriptEngineFactory()
+        ScriptEngine engine = factory.getScriptEngine()
+        ScriptContext context = new SimpleScriptContext()
+        context.setAttribute(ScriptEngine.FILENAME, "testGroovy9430.groovy", ScriptContext.ENGINE_SCOPE)
+        assert 'testGroovy9430.groovy' == engine.generateScriptName(context)
+    }
 }

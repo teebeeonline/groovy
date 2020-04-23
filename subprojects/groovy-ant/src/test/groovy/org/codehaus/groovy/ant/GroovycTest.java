@@ -18,12 +18,20 @@
  */
 package org.codehaus.groovy.ant;
 
-import groovy.util.GroovyTestCase;
+import groovy.test.GroovyTestCase;
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.Project;
 import org.apache.tools.ant.ProjectHelper;
 
-import java.io.*;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.IOException;
+import java.io.PrintStream;
+import java.net.URISyntaxException;
+import java.nio.file.Paths;
 import java.util.regex.Pattern;
 
 /**
@@ -31,23 +39,19 @@ import java.util.regex.Pattern;
  * <p>
  * NB the *.groovy files in this directory should not get compiled with the rest of the test classes
  * since that would ruin the whole point of testing compilation by the Ant tasks.  In fact it doesn't
- * matter as the tests remove all class files that should not pre-exist from this directory at each
- * step
- *
- * @author Russel Winder
+ * matter as the tests remove all class files that should not pre-exist from this directory at each step.
  */
 public class GroovycTest extends GroovyTestCase {
-    private final String classDirectory = "target/classes/test/org/codehaus/groovy/ant/";
     private final File antFile = new File("src/test-resources/org/codehaus/groovy/ant/GroovycTest.xml");
     private Project project;
     private static boolean warned = false;
 
-    protected void setUp() throws Exception {
-        super.setUp(); //  Potentially throws Exception.
+    protected void setUp() {
         project = new Project();
         project.init();
         ProjectHelper.getProjectHelper().parse(project, antFile);
         project.executeTarget("clean");
+
         String altJavaHome = System.getProperty("java.home");
         if (altJavaHome.lastIndexOf("jre") >= 0) {
             altJavaHome = altJavaHome.substring(0, altJavaHome.lastIndexOf("jre"));
@@ -59,40 +63,58 @@ public class GroovycTest extends GroovyTestCase {
             if (altFile.exists()) {
                 project.setProperty("alt.java.home", altJavaHome);
             }
-        } catch (Exception e) {
-            // could be security, io, etc.  Ignore it.
+        } catch (Exception ignore) {
+            // could be security, io, etc.
             // End result is as if .exists() returned null
         }
     }
 
+    private String getTargetDirectory() {
+        try {
+            return Paths.get(getClass().getResource(".").toURI()).toString() + File.separator;
+        } catch (URISyntaxException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     private void ensureNotPresent(final String classname) {
-        if (!(new File(classDirectory + "GroovycTest.class")).exists()) {
+        if (!(new File(getTargetDirectory() + getClass().getSimpleName() + ".class")).exists()) {
             fail("Class file for GroovycTest does not exist and should.");
         }
-        if ((new File(classDirectory + classname + ".class")).exists()) {
+        if ((new File(getTargetDirectory() + classname + ".class")).exists()) {
             fail("Class file for " + classname + " already exists and shouldn't.");
         }
     }
 
     private void ensurePresent(final String classname) {
-        if (!(new File(classDirectory + classname + ".class")).exists()) {
+        if (!(new File(getTargetDirectory() + classname + ".class")).exists()) {
             fail("Class file for " + classname + " does not exist and should.");
         }
     }
 
     private void ensureResultOK(final String classname) {
-        if (!(new File(classDirectory + classname + ".class")).exists()) {
+        if (!(new File(getTargetDirectory() + classname + ".class")).exists()) {
             fail("Class file for " + classname + " does not exist and should.");
         }
-        final File result = new File(classDirectory + classname + "_Result.txt");
+        final File result = new File(getTargetDirectory() + classname + "_Result.txt");
         final char[] buffer = new char[10];
+        FileReader fr = null;
         try {
-            (new FileReader(result)).read(buffer);
+            fr = new FileReader(result);
+            fr.read(buffer);
             assertEquals("OK.", new String(buffer).trim());
         } catch (final FileNotFoundException fnfe) {
             fail("File " + result.getName() + " should have been created but wasn't.");
         } catch (final IOException ioe) {
             fail("Error reading file " + result.getName() + ".");
+        } finally {
+            if (null != fr) {
+                try {
+                    fr.close();
+                } catch (IOException e) {
+                    fail("Error close file reader " + result.getName() + ".");
+                }
+            }
         }
     }
 
@@ -140,23 +162,23 @@ public class GroovycTest extends GroovyTestCase {
     public void testGroovyc_Joint_NoFork_NestedCompilerArg_WithGroovyClasspath() {
         // capture ant's output so we can verify the effect of passing compilerarg to javac
         ByteArrayOutputStream allOutput = new ByteArrayOutputStream();
-        PrintStream out = new PrintStream(allOutput);
-        PrintStream origOut = System.out;
-        System.setOut(out);
 
-        ensureNotPresent("IncorrectGenericsUsage");
-        project.executeTarget("Groovyc_Joint_NoFork_NestedCompilerArg_WithGroovyClasspath");
-        ensurePresent("IncorrectGenericsUsage");
+        PrintStream out = System.out;
+        System.setOut(new PrintStream(allOutput));
+        try {
+            ensureNotPresent("IncorrectGenericsUsage");
+            project.executeTarget("Groovyc_Joint_NoFork_NestedCompilerArg_WithGroovyClasspath");
+            ensurePresent("IncorrectGenericsUsage");
 
-        String antOutput = allOutput.toString();
-        antOutput = adjustOutputToHandleOpenJDKJavacOutputDifference(antOutput);
-        System.setOut(origOut);
-
-        // verify if passing -Xlint in compilerarg had its effect
-        Pattern p = Pattern.compile(".*?found[ ]*:[ ]*java.util.ArrayList.*", Pattern.DOTALL);
-        assertTrue("Expected line 1 not found in ant output", p.matcher(antOutput).matches());
-        p = Pattern.compile(".*?required[ ]*:[ ]*java.util.ArrayList<java.lang.String>.*", Pattern.DOTALL);
-        assertTrue("Expected line 2 not found in ant output", p.matcher(antOutput).matches());
+            String antOutput = adjustOutputToHandleOpenJDKJavacOutputDifference(allOutput.toString());
+            // verify if passing -Xlint in compilerarg had its effect
+            Pattern p = Pattern.compile(".*?found[ ]*:[ ]*java.util.ArrayList.*", Pattern.DOTALL);
+            assertTrue("Expected line 1 not found in ant output", p.matcher(antOutput).matches());
+            p = Pattern.compile(".*?required[ ]*:[ ]*java.util.ArrayList<java.lang.String>.*", Pattern.DOTALL);
+            assertTrue("Expected line 2 not found in ant output", p.matcher(antOutput).matches());
+        } finally {
+            System.setOut(out);
+        }
     }
 
     /**
@@ -230,6 +252,13 @@ public class GroovycTest extends GroovyTestCase {
         ensureFails("noForkNoAntRuntime");
     }
 
+    // GROOVY-9197
+    public void testJointCompilationPropagatesClasspath() {
+        ensureNotPresent("MakesExternalReference");
+        project.executeTarget("jointForkedCompilation_ExternalJarOnClasspath");
+        ensureResultOK("MakesExternalReference");
+    }
+
     private void ensureExecutes(String target) {
         ensureNotPresent("GroovycTest1");
         project.executeTarget(target);
@@ -268,5 +297,4 @@ public class GroovycTest extends GroovyTestCase {
             badGroovy.delete();
         }
     }
-
 }

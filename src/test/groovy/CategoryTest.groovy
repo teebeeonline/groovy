@@ -18,7 +18,9 @@
  */
 package groovy
 
-class CategoryTest extends GroovyTestCase {
+import groovy.test.GroovyTestCase
+
+final class CategoryTest extends GroovyTestCase {
 
     void setUp() {
         def dummy = null
@@ -65,7 +67,7 @@ class CategoryTest extends GroovyTestCase {
             assert something == "nihao"
         }
     }
-  
+
     void testCategoryReplacedPropertyAccessMethod() {
         def cth = new CategoryTestHelper()
         cth.aProperty = "aValue"
@@ -77,7 +79,7 @@ class CategoryTest extends GroovyTestCase {
         }
         assert cth.aProperty == "aValue"
     }
-    
+
     void testCategoryHiddenByClassMethod() {
       assertScript """
          class A{}
@@ -89,7 +91,7 @@ class CategoryTest extends GroovyTestCase {
          }
       """
     }
-    
+
     void testCategoryOverridingClassMethod() {
       assertScript """
          class A {def m(){1}}
@@ -109,7 +111,7 @@ class CategoryTest extends GroovyTestCase {
          }
       """
     }
-    
+
     void testCategoryWithMixedOverriding() {
       assertScript """
          class A{def m(){0}}
@@ -121,7 +123,7 @@ class CategoryTest extends GroovyTestCase {
          }
       """
     }
-    
+
     void testCategoryInheritance() {
       assertScript """
         public class Foo {
@@ -129,19 +131,19 @@ class CategoryTest extends GroovyTestCase {
             "Foo.foo()"
           }
         }
-        
+
         public class Bar extends Foo{
           static Object bar(Object obj) {
             "Bar.bar()"
           }
         }
-        
+
         def obj = new Object()
-        
+
         use(Foo){
           assert obj.foo() == "Foo.foo()"
         }
-        
+
         use(Bar){
           assert obj.bar() == "Bar.bar()"
           assert obj.foo() == "Foo.foo()"
@@ -155,17 +157,17 @@ class CategoryTest extends GroovyTestCase {
         // in call site caching this triggers the usage of POJOMetaClassSite,
         // which was missing a null check for the receiver. The last foo call
         // uses null to exaclty check that path. I use multiple calls with foo(1)
-        // before to ensure for example indy will do the right things as well, 
+        // before to ensure for example indy will do the right things as well,
         // since indy may need more than one call here.
         assertScript """
             class Cat {
-              public static findAll(Integer x, Closure cl) {1}   
+              public static findAll(Integer x, Closure cl) {1}
             }
 
              def foo(x) {
                  x.findAll {}
              }
-             
+
              use (Cat) {
                  assert foo(1) == 1
                  assert foo(1) == 1
@@ -211,8 +213,25 @@ class CategoryTest extends GroovyTestCase {
         assert foo(x) == 1
     }
 
-    //GROOVY-6263
-    void testCallToPrivateMethod() {
+    void testCallToPrivateMethod1() {
+        assertScript '''
+            class A {
+                private foo() { 1 }
+                def baz() { foo() }
+            }
+
+            class B extends A {}
+
+            class C {}
+
+            use(C) {
+                assert new B().baz() == 1
+            }
+        '''
+    }
+
+    // GROOVY-6263
+    void testCallToPrivateMethod2() {
         assertScript '''
             class A {
                 private foo(a) { 1 }
@@ -229,11 +248,57 @@ class CategoryTest extends GroovyTestCase {
         '''
     }
 
+    // GROOVY-3867
+    void testPropertyMissing() {
+        def x = new X()
+
+        shouldFail(MissingPropertyException) {
+            assert x.baz != "works" // accessing x.baz should throw MPE
+        }
+
+        use(XCat4) {
+            assert x.baz == "works"
+        }
+
+        shouldFail(MissingPropertyException) {
+            assert x.baz != "works" // accessing x.baz should throw MPE
+        }
+    }
+
+    // GROOVY-3867
+    void testMethodMissing() {
+        def x = new X()
+        assert foo(x) == 1
+        use (XCat3) {
+            assert foo(x) == 1 // regular foo() is not affected by methodMissing in category
+            assert x.baz() == 4 // XCat3.methodMissing is called
+        }
+        assert foo(x) == 1
+        def t = Thread.start {use (XCat3){assert x.baz()==4}}
+        t.join()
+        assert foo(x) == 1
+        shouldFail(MissingMethodException) {
+            x.baz()
+        }
+    }
+
+    // GROOVY-3867
+    void testMethodMissingNoStatic() {
+        def x = new X()
+        use (XCat3) {
+            assert x.baz() == 4 // XCat3.methodMissing is called for instance
+            shouldFail(MissingMethodException) {
+                assert X.baz() != 4 // XCat3.methodMissing should not be called for static method of X
+            }
+        }
+    }
 }
 
 class X{ def bar(){1}}
 class XCat{ static bar(X x){2}}
 class XCat2{ static bar(X x){3}}
+class XCat3{ static methodMissing(X x, String name, args) {4}}
+class XCat4{ static propertyMissing(X x, String name) {"works"}}
 
 class StringCategory {
     static String lower(String string) {

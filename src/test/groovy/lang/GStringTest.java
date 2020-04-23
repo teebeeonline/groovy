@@ -18,13 +18,11 @@
  */
 package groovy.lang;
 
-import groovy.util.GroovyTestCase;
+import groovy.test.GroovyTestCase;
 import org.codehaus.groovy.runtime.InvokerHelper;
 
 /**
  * Tests the use of the structured Attribute type
- *
- * @author <a href="mailto:james@coredevelopers.net">James Strachan</a>
  */
 public class GStringTest extends GroovyTestCase {
 
@@ -66,8 +64,8 @@ public class GStringTest extends GroovyTestCase {
     }
 
     public void testEqualsAndHashCode() {
-        DummyGString a = new DummyGString(new Object[]{new Integer(1)});
-        DummyGString b = new DummyGString(new Object[]{new Long(1)});
+        DummyGString a = new DummyGString(new Object[]{Integer.valueOf(1)});
+        DummyGString b = new DummyGString(new Object[]{Long.valueOf(1)});
         Comparable c = new DummyGString(new Object[]{new Double(2.3)});
 
         assertTrue("a == b", a.equals(b));

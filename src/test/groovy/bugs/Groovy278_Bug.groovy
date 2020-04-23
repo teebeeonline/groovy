@@ -18,9 +18,8 @@
  */
 package groovy.bugs
 
-/**
- * @author John Wilson
- */
+import groovy.test.GroovyTestCase
+
 class Groovy278_Bug extends GroovyTestCase {
     
     void testBug() {

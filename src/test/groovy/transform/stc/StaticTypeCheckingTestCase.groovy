@@ -18,18 +18,19 @@
  */
 package groovy.transform.stc
 
-import org.codehaus.groovy.control.CompilerConfiguration
-import org.codehaus.groovy.control.customizers.ASTTransformationCustomizer
+import groovy.test.GroovyTestCase
+import groovy.transform.CompileStatic
 import groovy.transform.TypeChecked
+import org.codehaus.groovy.control.CompilerConfiguration
 import org.codehaus.groovy.control.MultipleCompilationErrorsException
-import org.codehaus.groovy.control.messages.SyntaxErrorMessage
+import org.codehaus.groovy.control.customizers.ASTTransformationCustomizer
 import org.codehaus.groovy.control.customizers.ImportCustomizer
+import org.codehaus.groovy.control.messages.SyntaxErrorMessage
 
 /**
  * Support class for static type checking test cases.
- *
- * @author Cedric Champeau
  */
+@CompileStatic
 abstract class StaticTypeCheckingTestCase extends GroovyTestCase {
     protected CompilerConfiguration config
     protected GroovyShell shell
@@ -86,8 +87,11 @@ abstract class StaticTypeCheckingTestCase extends GroovyTestCase {
             if (success && mce.errorCollector.errorCount!=messages.length) {
                 throw new AssertionError("Expected error messages were found, but compiler threw additional errors : " + mce.toString())
             }
+            if (!success) {
+                throw new AssertionError("Not all expected error messages were found, compiler threw these errors : " + mce.toString())
+            }
         }
-        if (!success) throw new AssertionError("Test should have failed with messages [$messages]")
+        if (!success) throw new AssertionError("Test passed but should have failed with messages [$messages]")
     }
 
 }

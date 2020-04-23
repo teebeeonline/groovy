@@ -18,6 +18,8 @@
  */
 package groovy
 
+import groovy.test.GroovyTestCase
+
 class ThisAndSuperTest extends GroovyTestCase {
     void testOverwrittenSuperMethod() {
         def helper = new TestForSuperHelper2()
@@ -123,14 +125,13 @@ class ThisAndSuperTest extends GroovyTestCase {
             new TestForSuperHelper6().theMethod()
         }
     }
-}
 
-class A {
-    static {
-        A.metaClass.static.empty << {-> '123' }
+    static class A {
+        static {
+            A.metaClass.static.empty << {-> '123' }
+        }
     }
 }
-
 
 class TestForSuperEach {
     def res = []

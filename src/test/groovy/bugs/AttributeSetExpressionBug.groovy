@@ -16,11 +16,9 @@
  *  specific language governing permissions and limitations
  *  under the License.
  */
-/**
- * @author Pilho Kim
- */
-
 package groovy.bugs
+
+import groovy.test.GroovyTestCase
 
 class AttributeSetExpressionBug extends GroovyTestCase {
     void testAttributeSetAccess() {

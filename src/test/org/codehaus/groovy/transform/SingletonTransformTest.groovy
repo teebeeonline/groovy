@@ -18,14 +18,11 @@
  */
 package org.codehaus.groovy.transform
 
+import groovy.test.GroovyShellTestCase
 import org.codehaus.groovy.control.MultipleCompilationErrorsException
 
 import java.lang.reflect.Modifier
 
-/**
- * @author Alex Tkachman
- * @author Paul King
- */
 class SingletonTransformTest extends GroovyShellTestCase {
 
     void testSingleton() {

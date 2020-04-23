@@ -23,7 +23,7 @@ import gls.CompilableTestSupport
 /**
  * Tests various properties of annotation definitions.
  */
-class AnnotationTest extends CompilableTestSupport {
+final class AnnotationTest extends CompilableTestSupport {
 
     /**
      * Check that it is possible to annotate an annotation definition with field and method target elements.
@@ -278,7 +278,7 @@ class AnnotationTest extends CompilableTestSupport {
         assertScript """
             import java.lang.annotation.*
 
-            // a random annnotation type
+            // a random annotation type
             @Retention(RetentionPolicy.RUNTIME)
             @interface MyAnnotation {
                 String stringValue()
@@ -641,7 +641,9 @@ class AnnotationTest extends CompilableTestSupport {
             def string = getClass().getMethod('method').getAnnotation(Foo).toString()[5..-2].tokenize(', ').sort().join('|')
             assert string == 'b=6|c1=A|c2=B|c3=C|c4=D|d1=2.0|d2=2.1|d3=2.2|d4=2.3|f1=1.0|f2=1.1|f3=1.2|f4=1.3|i1=0|i2=1|s1=2|s2=3|s3=4|s4=5' ||
                     // changed in some jdk9 versions
-                   string == "b=6|c1='A'|c2='B'|c3='C'|c4='D'|d1=2.0|d2=2.1|d3=2.2|d4=2.3|f1=1.0f|f2=1.1f|f3=1.2f|f4=1.3f|i1=0|i2=1|s1=2|s2=3|s3=4|s4=5"
+                   string == "b=6|c1='A'|c2='B'|c3='C'|c4='D'|d1=2.0|d2=2.1|d3=2.2|d4=2.3|f1=1.0f|f2=1.1f|f3=1.2f|f4=1.3f|i1=0|i2=1|s1=2|s2=3|s3=4|s4=5" ||
+                   // changed in some jdk14 versions
+                   string == "b=(byte)0x06|c1='A'|c2='B'|c3='C'|c4='D'|d1=2.0|d2=2.1|d3=2.2|d4=2.3|f1=1.0f|f2=1.1f|f3=1.2f|f4=1.3f|i1=0|i2=1|s1=2|s2=3|s3=4|s4=5"
 
         '''
     }
@@ -691,7 +693,7 @@ class AnnotationTest extends CompilableTestSupport {
 
             class Foo {
               @NonNull public Integer foo
-              @NonNull public Integer bar(@NonNull String baz) {}
+              @NonNull Integer bar(@NonNull String baz) {}
             }
 
             def expected = '@NonNull()'
@@ -710,7 +712,12 @@ class AnnotationTest extends CompilableTestSupport {
             import java.lang.annotation.*
 
             class MyClass {
-                private static final expected = '@MyAnnotationArray(value=[@MyAnnotation(value=val1), @MyAnnotation(value=val2)])'
+                // TODO confirm the JDK9 behavior is what we expect
+                private static final List<String> expected = [
+                    '@MyAnnotationArray(value=[@MyAnnotation(value=val1), @MyAnnotation(value=val2)])',    // JDK5-8
+                    '@MyAnnotationArray(value={@MyAnnotation(value="val1"), @MyAnnotation(value="val2")})', // JDK9
+                    '@MyAnnotationArray({@MyAnnotation("val1"), @MyAnnotation("val2")})' // JDK14
+                ]
 
                 // control
                 @MyAnnotationArray([@MyAnnotation("val1"), @MyAnnotation("val2")])
@@ -721,12 +728,20 @@ class AnnotationTest extends CompilableTestSupport {
                 @MyAnnotation(value = "val2")
                 String method2() { 'method2' }
 
+                // another control (okay to mix one uncontained with one explicit container)
+                @MyAnnotationArray([@MyAnnotation("val1"), @MyAnnotation("val2")])
+                @MyAnnotation(value = "val3")
+                String method3() { 'method3' }
+
                 static void main(String... args) {
                     MyClass myc = new MyClass()
                     assert 'method1' == myc.method1()
                     assert 'method2' == myc.method2()
-                    assert checkAnnos(myc, "method1") == expected
-                    assert checkAnnos(myc, "method2") == expected
+                    assert expected.contains(checkAnnos(myc, "method1"))
+                    assert expected.contains(checkAnnos(myc, "method2"))
+                    assert 'method3' == myc.method3()
+                    def m3 = myc.getClass().getMethod('method3')
+                    assert m3.getAnnotationsByType(MyAnnotation).size() == 3
                 }
 
                 private static String checkAnnos(MyClass myc, String name) {
@@ -747,6 +762,215 @@ class AnnotationTest extends CompilableTestSupport {
             @Retention(RetentionPolicy.RUNTIME)
             @interface MyAnnotationArray {
                 MyAnnotation[] value()
+            }
+        '''
+    }
+
+    // GROOVY-9452
+    void testDuplicationAnnotationOnClassWithParams() {
+        def err = shouldFail '''
+            import java.lang.annotation.*
+
+            @Target(ElementType.TYPE)
+            @Retention(RetentionPolicy.RUNTIME)
+            @Repeatable(As)
+            @interface A {
+                String value()
+            }
+
+            @Retention(RetentionPolicy.RUNTIME)
+            @interface As {
+                A[] value()
+            }
+
+            @A("a")
+            @A("b")
+            @As([@A("c")])
+            class Foo {}
+        '''
+
+        assert err =~ /Cannot specify duplicate annotation/
+    }
+
+    void testVariableExpressionsReferencingConstantsSeenForAnnotationAttributes() {
+        shouldCompile '''
+            class C {
+                public static final String VALUE = 'rawtypes'
+                @SuppressWarnings(VALUE)
+                def method() { }
+            }
+        '''
+    }
+
+    void testSimpleBinaryExpressions() {
+        assertScript '''
+            import java.lang.annotation.*
+
+            @Retention(RetentionPolicy.RUNTIME)
+            @Target(ElementType.FIELD)
+            @interface Pattern {
+                String regexp()
+            }
+
+            @Retention(RetentionPolicy.RUNTIME)
+            @Target(ElementType.FIELD)
+            @interface LimitedDouble {
+                double max() default Double.MAX_VALUE
+                double min() default Double.MIN_VALUE
+                double zero() default (1.0 - 1.0d) * 1L
+            }
+
+            @Retention(RetentionPolicy.RUNTIME)
+            @Target(ElementType.FIELD)
+            @interface IntegerConst {
+                int kilo() default 0b1 << 10
+                int two() default 64 >> 5
+                int nine() default 0b1100 ^ 0b101
+                int answer() default 42
+            }
+
+            class MyClass {
+                private static interface Constants {
+                    static final String CONST = 'foo' + 'bar'
+                }
+
+                @Pattern(regexp=Constants.CONST)
+                String myString
+
+                @LimitedDouble(min=0.0d, max=50.0d * 2)
+                double myDouble
+
+                @IntegerConst(answer=(5 ** 2) * (2 << 1))
+                int myInteger
+            }
+
+            assert MyClass.getDeclaredField('myString').annotations[0].regexp() == 'foobar'
+
+            MyClass.getDeclaredField('myDouble').annotations[0].with {
+                assert max() == 100.0d
+                assert min() == 0.0d
+                assert zero() == 0.0d
+            }
+
+            MyClass.getDeclaredField('myInteger').annotations[0].with {
+                assert kilo() == 1024
+                assert two() == 2
+                assert nine() == 9
+                assert answer() == 100
+            }
+        '''
+    }
+
+    void testAnnotationAttributeConstantFromPrecompiledGroovyClass() {
+        // GROOVY-3278
+        assertScript '''
+            import gls.annotations.*
+
+            @ConstAnnotation(ints = 42)
+            class Child1 extends Base3278 {}
+            
+            class OtherConstants {
+                static final Integer CONST3 = 3278
+            }
+
+            @ConstAnnotation(ints = [-1, Base3278.CONST, Base3278.CONST1, Base3278.CONST2, OtherConstants.CONST3, Integer.MIN_VALUE],
+                          strings = ['foo', Base3278.CONST4, Base3278.CONST5, Base3278.CONST5 + 'bing'])
+            class Child3 extends Base3278 {}
+
+            assert new Child1().ints() == [42]
+            assert new Child2().ints() == [2147483647]
+            new Child3().with {
+                assert ints() == [-1, 3278, 2048, 2070, 3278, -2147483648]
+                assert strings() == ['foo', 'foobar', 'foobarbaz', 'foobarbazbing']
+            }
+        '''
+    }
+
+    void testAnnotationAttributeConstantFromEnumConstantField() {
+        // GROOVY-8898
+        assertScript '''
+            import java.lang.annotation.*
+
+            @Retention(RetentionPolicy.RUNTIME)
+            @Target(ElementType.TYPE)
+            @interface MyAnnotation {
+                String[] groups() default []
+                MyEnum alt() default MyEnum.ALT1
+            }
+
+            class Base {
+                static final String CONST = 'bar'
+                def groups() { getClass().annotations[0].groups() }
+                def alt() { getClass().annotations[0].alt() }
+            }
+
+            enum MyEnum {
+                ALT1, ALT2;
+                public static final String CONST = 'baz'
+            }
+
+            @MyAnnotation(groups = ['foo', Base.CONST, MyEnum.CONST], alt = MyEnum.ALT2)
+            class Child extends Base {}
+
+            new Child().with {
+                assert groups() == ['foo', 'bar', 'baz']
+                assert alt() == MyEnum.ALT2
+            }
+        '''
+    }
+
+    void testAnnotationRetentionMirrorsJava() {
+        assertScript '''
+            for (retention in ['', '@Retention(SOURCE)', '@Retention(CLASS)', '@Retention(RUNTIME)']) {
+                def src = """
+                    import java.lang.annotation.Retention;
+                    import static java.lang.annotation.RetentionPolicy.*;
+                    $retention
+                    @interface MyAnnotation {}
+                """
+                def mag = new GroovyClassLoader().parseClass src
+                def maj = new org.apache.groovy.util.JavaShell().compile 'MyAnnotation', src
+                assert mag.annotations == maj.annotations
+            }
+        '''
+    }
+
+    void testAnnotationWithRepeatableSupportedPrecompiledJava() {
+        assertScript '''
+            import java.lang.annotation.*
+            import gls.annotations.*
+
+            class MyClass {
+                // TODO confirm the JDK9 behavior is what we expect
+                private static final List<String> expected = [
+                    '@gls.annotations.Requires(value=[@gls.annotations.Require(value=val1), @gls.annotations.Require(value=val2)])',    // JDK5-8
+                    '@gls.annotations.Requires(value={@gls.annotations.Require(value="val1"), @gls.annotations.Require(value="val2")})', // JDK9
+                    '@gls.annotations.Requires({@gls.annotations.Require("val1"), @gls.annotations.Require("val2")})' // JDK14
+                ]
+
+                // control
+                @Requires([@Require("val1"), @Require("val2")])
+                String method1() { 'method1' }
+
+                // duplicate candidate for auto collection
+                @Require(value = "val1")
+                @Require(value = "val2")
+                String method2() { 'method2' }
+
+                static void main(String... args) {
+                    MyClass myc = new MyClass()
+                    assert 'method1' == myc.method1()
+                    assert 'method2' == myc.method2()
+                    assert expected.contains(checkAnnos(myc, "method1"))
+                    assert expected.contains(checkAnnos(myc, "method2"))
+                }
+
+                private static String checkAnnos(MyClass myc, String name) {
+                    def m = myc.getClass().getMethod(name)
+                    List annos = m.getAnnotations()
+                    assert annos.size() == 1
+                    annos[0].toString()
+                }
             }
         '''
     }

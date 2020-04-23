@@ -18,35 +18,19 @@
  */
 package org.codehaus.groovy.ast.builder
 
-import org.codehaus.groovy.ast.ASTNode
-import org.codehaus.groovy.ast.ClassNode
 import org.junit.Assert
-import org.codehaus.groovy.ast.stmt.BlockStatement
-import org.codehaus.groovy.ast.stmt.ExpressionStatement
-import org.codehaus.groovy.ast.expr.ConstantExpression
-import org.codehaus.groovy.ast.expr.DeclarationExpression
-import org.codehaus.groovy.ast.expr.VariableExpression
-import org.codehaus.groovy.ast.stmt.ReturnStatement
-import org.codehaus.groovy.ast.expr.MethodCallExpression
-import org.codehaus.groovy.ast.expr.ArgumentListExpression
-import org.codehaus.groovy.ast.expr.AnnotationConstantExpression
-import org.codehaus.groovy.ast.AnnotationNode
-import org.codehaus.groovy.ast.expr.AttributeExpression
-
 
 /**
- *
  * Some useful AST assertion methods.
- * @author Hamlet D'Arcy
  */
 class AstAssert {
 
     /**
-    * Support for new assertion types can be added by adding a Map<String, Closure> entry. 
-    */ 
+     * Support for new assertion types can be added by adding a Map<String, Closure> entry.
+     */
     private static Map<Object, Closure> ASSERTION_MAP = [
             BlockStatement : { expected, actual ->
-                assertSyntaxTree(expected.statements, actual.statements) 
+                assertSyntaxTree(expected.statements, actual.statements)
             },
             AttributeExpression : { expected, actual ->
                 assertSyntaxTree([expected.objectExpression], [actual.objectExpression])
@@ -149,7 +133,6 @@ class AstAssert {
                 assertSyntaxTree([expected.defaultValue], [actual.defaultValue])
                 Assert.assertEquals("Wrong parameter name", expected.name, actual.name)
                 Assert.assertEquals("Wrong 'hasDefaultValue'", expected.hasDefaultValue, actual.hasDefaultValue)
-                
             },
             ConstructorCallExpression : { expected, actual ->
                 assertSyntaxTree([expected.arguments], [actual.arguments])
@@ -371,7 +354,7 @@ class AstAssert {
      */
     static void assertSyntaxTree(expected, actual) {
         if (expected == null && actual == null) return
-        
+
         if (actual == null || expected == null || expected.size() != actual?.size()) {
             Assert.fail("AST comparison failure. \nExpected $expected \nReceived $actual")
         }
@@ -381,11 +364,15 @@ class AstAssert {
             } else {
                 Assert.assertEquals("Wrong type in AST Node", item.getClass(), actual[index].getClass())
 
-                if (ASSERTION_MAP.containsKey(item.getClass().getSimpleName())) {
-                    Closure assertion = ASSERTION_MAP.get(item.getClass().getSimpleName())
+                Class itemType = item.getClass()
+                if (itemType.isAnonymousClass()) {
+                    itemType = itemType.getSuperclass()
+                }
+                if (ASSERTION_MAP.containsKey(itemType.getSimpleName())) {
+                    Closure assertion = ASSERTION_MAP.get(itemType.getSimpleName())
                     assertion(item, actual[index])
                 } else {
-                    Assert.fail("Unexpected type: ${item.getClass()} Update the unit test!")
+                    Assert.fail("Unexpected type: ${itemType} Update the unit test!")
                 }
             }
         }

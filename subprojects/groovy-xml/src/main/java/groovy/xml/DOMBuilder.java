@@ -18,29 +18,25 @@
  */
 package groovy.xml;
 
+import groovy.namespace.QName;
 import groovy.util.BuilderSupport;
-
-import java.io.IOException;
-import java.io.Reader;
-import java.io.StringReader;
-import java.util.Iterator;
-import java.util.Map;
-
-import javax.xml.XMLConstants;
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.ParserConfigurationException;
-
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 
+import javax.xml.XMLConstants;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import java.io.IOException;
+import java.io.Reader;
+import java.io.StringReader;
+import java.util.Map;
+
 /**
  * A helper class for creating a W3C DOM tree
- *
- * @author <a href="mailto:james@coredevelopers.net">James Strachan</a>
  */
 public class DOMBuilder extends BuilderSupport {
 
@@ -193,8 +189,8 @@ public class DOMBuilder extends BuilderSupport {
 
     protected Object createNode(Object name, Map attributes) {
         Element element = (Element) createNode(name);
-        for (Iterator iter = attributes.entrySet().iterator(); iter.hasNext();) {
-            Map.Entry entry = (Map.Entry) iter.next();
+        for (Object o : attributes.entrySet()) {
+            Map.Entry entry = (Map.Entry) o;
             String attrName = entry.getKey().toString();
             Object value = entry.getValue();
             if ("xmlns".equals(attrName)) {

@@ -18,10 +18,10 @@
  */
 package org.codehaus.groovy.runtime.trampoline
 
+import groovy.test.GroovyTestCase
+
 /**
  * Test for the trampoline capabilities of closures.
- *
- * @author Vaclav Pech
  */
 class TrampolineTest extends GroovyTestCase {
     public void testFactorial() {

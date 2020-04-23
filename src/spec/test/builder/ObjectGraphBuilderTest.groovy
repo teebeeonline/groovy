@@ -19,13 +19,12 @@
 package builder
 
 import asciidoctor.Utils
+import groovy.test.GroovyTestCase
 
 /**
 * Tests for ObjectGraphBuilder. The tests directly in this file are specific
 * to ObjectGraphBuilder. Functionality in common with other Builders
 * is tested in the parent class.
-*
-* @author Groovy Documentation Community
 */
 class ObjectGraphBuilderTest  extends GroovyTestCase {
 
@@ -125,7 +124,7 @@ builder.classNameResolver = "com.acme"
 
 // tag::newinstanceresolver[]
 builder.newInstanceResolver = { Class klazz, Map attributes ->
-    if (klazz.isAnnotationPresent(Immutable)) {
+    if (klazz.getConstructor(Map)) {
         def o = klazz.newInstance(attributes)
         attributes.clear()
         return o

@@ -16,7 +16,9 @@
  *  specific language governing permissions and limitations
  *  under the License.
  */
-package groovy.lang;
+package groovy.lang
+
+import groovy.test.GroovyTestCase;
 
 /**
  * Provides unit tests for the <code>IntRange</code> class.
@@ -147,6 +149,12 @@ class IntRangeTest extends GroovyTestCase {
         assertEquals(rangeWithName.get(dupRange), "maxRange")
     }
 
-
+    // GROOVY-8704
+    void testSerialization() {
+        def baos = new ByteArrayOutputStream()
+        baos.withObjectOutputStream { oos -> oos.writeObject([4..1, 2..<5]) }
+        def bais = new ByteArrayInputStream(baos.toByteArray())
+        bais.withObjectInputStream { ois -> assert ois.readObject() == [4..1, 2..<5] }
+    }
 
 }

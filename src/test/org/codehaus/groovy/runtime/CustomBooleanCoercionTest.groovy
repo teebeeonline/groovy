@@ -18,6 +18,8 @@
  */
 package org.codehaus.groovy.runtime
 
+import groovy.test.GroovyTestCase
+
 /**
  * Test the customization of the Groovy truth, aka. boolean coercion.
  * It is possible to customize how instances of a type are coerced into boolean
@@ -25,8 +27,6 @@ package org.codehaus.groovy.runtime
  * <code>boolean asBoolean()</code>
  * <p>
  * The test also checks it's possible to override the behaviour of pre-existing boolean coercion.
- *
- * @author Guillaume Laforge
  */
 class CustomBooleanCoercionTest extends GroovyTestCase {
 

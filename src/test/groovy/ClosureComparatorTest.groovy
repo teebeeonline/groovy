@@ -18,14 +18,14 @@
  */
 package groovy
 
+import groovy.test.GroovyTestCase
+
 /**
  * Tests for ClosureComparator
- *
- * @author Alexey Verkhovsky
  */
 class ClosureComparatorTest extends GroovyTestCase {
 
-    public void testClosureComparatorForGroovyObjects() {
+    void testClosureComparatorForGroovyObjects() {
 
         def comparator = new ClosureComparator({ one, another ->
             one.greaterThan(another)
@@ -40,7 +40,7 @@ class ClosureComparatorTest extends GroovyTestCase {
 
     }
 
-    public void testClosureComparatorForNumericTypes() {
+    void testClosureComparatorForNumericTypes() {
 
         def comparator = new ClosureComparator({ one, another ->
             one - another
@@ -56,7 +56,7 @@ class ClosureComparatorTest extends GroovyTestCase {
 class ComparableFoo {
     long value
 
-    public ComparableFoo(long theValue) {
+    ComparableFoo(long theValue) {
         this.value = theValue
     }
 

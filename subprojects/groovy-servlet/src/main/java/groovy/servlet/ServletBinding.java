@@ -20,6 +20,8 @@ package groovy.servlet;
 
 import groovy.lang.Binding;
 import groovy.xml.MarkupBuilder;
+import org.codehaus.groovy.GroovyBugError;
+import org.codehaus.groovy.runtime.MethodClosure;
 
 import javax.servlet.RequestDispatcher;
 import javax.servlet.ServletContext;
@@ -27,11 +29,11 @@ import javax.servlet.ServletException;
 import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-
-import org.codehaus.groovy.GroovyBugError;
-import org.codehaus.groovy.runtime.MethodClosure;
-
-import java.io.*;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.PrintWriter;
+import java.io.Writer;
 import java.lang.reflect.Constructor;
 import java.util.Enumeration;
 import java.util.LinkedHashMap;
@@ -90,18 +92,12 @@ import java.util.Map;
  * <li><tt>"include(String path)"</tt> : <code>request.getRequestDispatcher(path).include(request, response)</code></li>
  * <li><tt>"redirect(String location)"</tt> : <code>response.sendRedirect(location)</code></li>
  * </ul>
- *
- * @author Guillaume Laforge
- * @author Christian Stein
- * @author Jochen Theodorou
  */
 public class ServletBinding extends Binding {
     
     /**
      * A OutputStream dummy that will throw a GroovyBugError for any
      * write method call to it. 
-     * 
-     * @author Jochen Theodorou
      */
     private static class InvalidOutputStream extends OutputStream {
         /**
@@ -119,8 +115,6 @@ public class ServletBinding extends Binding {
      * using the stream will cause a IllegalStateException. 'used' means
      * any write method has been called. Simply requesting the objects will
      * not cause an exception. 
-     * 
-     * @author Jochen Theodorou
      */
     private static class ServletOutput {
         private final HttpServletResponse response;
@@ -309,8 +303,9 @@ public class ServletBinding extends Binding {
         super.setVariable("html", builder);
 
         try {
+            // load using reflection to avoid needing a hard requirement on groovy-json for those not needing JSON support
             Class jsonBuilderClass = this.getClass().getClassLoader().loadClass("groovy.json.StreamingJsonBuilder");
-            Constructor writerConstructor = jsonBuilderClass.getConstructor(Writer.class);
+            Constructor writerConstructor = getWriterConstructor(jsonBuilderClass);
             super.setVariable("json", writerConstructor.newInstance(output.getWriter()));
         } catch (Throwable t) {
             t.printStackTrace();
@@ -327,6 +322,11 @@ public class ServletBinding extends Binding {
         // bind redirect method
         c = new MethodClosure(this, "redirect");
         super.setVariable("redirect", c);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Constructor getWriterConstructor(Class jsonBuilderClass) throws NoSuchMethodException {
+        return jsonBuilderClass.getConstructor(Writer.class);
     }
 
     private static void validateArgs(String name, String message) {

@@ -18,8 +18,7 @@
  */
 package groovy.swing
 
-import javax.swing.LookAndFeel
-import javax.swing.UIManager
+import javax.swing.*
 import javax.swing.plaf.metal.DefaultMetalTheme
 import javax.swing.plaf.metal.MetalLookAndFeel
 import javax.swing.plaf.metal.MetalTheme
@@ -30,10 +29,10 @@ class LookAndFeelHelper {
     protected static LookAndFeelHelper instance;
     private LookAndFeelHelper() {
         // linux GTK bug : http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6389282
-        UIManager.getInstalledLookAndFeels();
+        UIManager.getInstalledLookAndFeels()
     }
 
-    public static LookAndFeelHelper getInstance() {
+    static LookAndFeelHelper getInstance() {
         return instance ?: (instance = new LookAndFeelHelper())
     }
 
@@ -64,7 +63,7 @@ class LookAndFeelHelper {
         napkin : 'net.sourceforge.napkinlaf.NapkinLookAndFeel'
     ]
 
-    public String addLookAndFeelAlias(String alias, String className) {
+    String addLookAndFeelAlias(String alias, String className) {
         lafCodeNames[alias] = className
     }
 
@@ -93,7 +92,7 @@ class LookAndFeelHelper {
         ],
     ]
 
-    public String addLookAndFeelAttributeHandler(String className, String attr, Closure handler) {
+    String addLookAndFeelAttributeHandler(String className, String attr, Closure handler) {
         Map attrs = extendedAttributes[className]
         if (attrs == null) {
             attrs = [:]
@@ -103,11 +102,11 @@ class LookAndFeelHelper {
     }
 
 
-    public boolean isLeaf() {
+    boolean isLeaf() {
         return true
     }
 
-    public LookAndFeel lookAndFeel(Object value, Map attributes, Closure initClosure) {
+    LookAndFeel lookAndFeel(Object value, Map attributes, Closure initClosure) {
         LookAndFeel lafInstance
         String lafClassName
 
@@ -163,7 +162,7 @@ class LookAndFeelHelper {
                 // ignore it, try the next on the list
             }
         }
-        return null;
+        return null
     }
 
     static String getAquaLAFName() {
@@ -177,7 +176,7 @@ class LookAndFeelHelper {
                 // ignore it, try the next on the list
             }
         }
-        return null;
+        return null
     }
 
     static String getSubstanceLAFName() {
@@ -191,6 +190,6 @@ class LookAndFeelHelper {
                 // ignore it, try the next on the list
             }
         }
-        return null;
+        return null
    }
 }

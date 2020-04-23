@@ -19,21 +19,17 @@
 package org.codehaus.groovy.ant;
 
 import groovy.lang.GroovyClassLoader;
-
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.DirectoryScanner;
 import org.apache.tools.ant.types.Path;
 import org.apache.tools.ant.util.GlobPatternMapper;
 import org.apache.tools.ant.util.SourceFileScanner;
-
 import org.codehaus.groovy.control.CompilationUnit;
 
 import java.io.File;
 
 /**
  * Compiles Groovy source files.
- *
- * @author <a href="mailto:jason@planet57.com">Jason Dillon</a>
  */
 public class GroovycTask
     extends CompileTaskSupport

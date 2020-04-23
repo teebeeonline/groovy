@@ -22,15 +22,13 @@ import java.util.Locale;
 
 /**
  * Configuration options for the {@link groovy.text.markup.MarkupTemplateEngine markup template engine}.
- *
- * @author Cedric Champeau
  */
 public class TemplateConfiguration {
 
     private String declarationEncoding;
     private boolean expandEmptyElements;
     private boolean useDoubleQuotes;
-    private String newLineString = System.getProperty("line.separator");
+    private String newLineString = System.lineSeparator();
     private boolean autoEscape = false;
     private boolean autoIndent = false;
     private String autoIndentString = DelegatingIndentWriter.SPACES;

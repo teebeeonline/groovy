@@ -18,12 +18,8 @@
  */
 package groovy.transform.stc
 
-import org.codehaus.groovy.ast.ASTNode
-
 /**
  * Unit tests for static type checking : fields and properties.
- *
- * @author Cedric Champeau
  */
 class FieldsAndPropertiesSTCTest extends StaticTypeCheckingTestCase {
 
@@ -546,29 +542,30 @@ new FooWorker().doSomething()'''
     }
 
     void testShouldFailWithIncompatibleGenericTypes() {
-        shouldFailWithMessages '''public class Foo {
+        shouldFailWithMessages '''\
+            public class Foo {
+                private List<String> names;
 
-    private List<String> names;
+                public List<String> getNames() {
+                    return names;
+                }
 
-    public List<String> getNames() {
-        return names;
-    }
+                public void setNames(List<String> names) {
+                    this.names = names;
+                }
+            }
 
-    public void setNames(List<String> names) {
-        this.names = names;
-    }
-}
+            class FooWorker {
+                public void doSomething() {
+                    new Foo().with {
+                        names = new ArrayList<Integer>()
+                    }
+                }
+            }
 
-class FooWorker {
-
-    public void doSomething() {
-        new Foo().with {
-            names = new ArrayList<Integer>()
-        }
-    }
-}
-
-new FooWorker().doSomething()''', 'Cannot assign value of type java.util.ArrayList <Integer> to variable of type java.util.List <String>'
+            new FooWorker().doSomething()
+        ''',
+        'Cannot assign value of type java.util.ArrayList <Integer> to variable of type java.util.List <String>'
     }
 
     void testAICAsStaticProperty() {
@@ -580,7 +577,7 @@ new FooWorker().doSomething()''', 'Cannot assign value of type java.util.ArrayLi
         '''
     }
 
-    public void testPropertyWithMultipleSetters() {
+    void testPropertyWithMultipleSetters() {
         assertScript '''import org.codehaus.groovy.ast.expr.BinaryExpression
 import org.codehaus.groovy.ast.expr.BooleanExpression
 import org.codehaus.groovy.ast.stmt.AssertStatement
@@ -637,7 +634,7 @@ import org.codehaus.groovy.ast.stmt.AssertStatement
 
     void testPropertyAssignmentInSubClassAndMultiSetter() {
         10.times {
-            assertScript '''import org.codehaus.groovy.ast.PropertyNode
+            assertScript '''
 
             public class Activity {
                 int debug
@@ -665,7 +662,7 @@ import org.codehaus.groovy.ast.stmt.AssertStatement
 
     void testPropertyAssignmentInSubClassAndMultiSetterThroughDelegation() {
         10.times {
-            assertScript '''import org.codehaus.groovy.ast.PropertyNode
+            assertScript '''
 
             public class Activity {
                 int debug
@@ -734,7 +731,7 @@ import org.codehaus.groovy.ast.stmt.AssertStatement
     void testImplicitPropertyOfDelegateShouldNotPreferField() {
         assertScript '''
             Calendar.instance.with {
-                Date d1 = time
+                Date d1 = time // Date getTime() vs. long time
             }
         '''
     }
@@ -813,15 +810,14 @@ import org.codehaus.groovy.ast.stmt.AssertStatement
         '''
     }
 
-    public static interface InterfaceWithField {
+    static interface InterfaceWithField {
         String boo = "I don't fancy fields in interfaces"
     }
 
-    public static class BaseClass {
+    static class BaseClass {
         int x
     }
 
-    public static class BaseClass2 extends BaseClass {
+    static class BaseClass2 extends BaseClass {
     }
 }
-

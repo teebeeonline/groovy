@@ -18,15 +18,13 @@
  */
 package groovy.lang;
 
-import groovy.util.GroovyTestCase;
+import groovy.test.GroovyTestCase;
 import org.codehaus.groovy.runtime.InvokerHelper;
 
 import java.util.List;
 
 /**
  * Tests the use of the structured Attribute type
- *
- * @author <a href="mailto:james@coredevelopers.net">James Strachan</a>
  */
 public class SequenceTest extends GroovyTestCase {
 

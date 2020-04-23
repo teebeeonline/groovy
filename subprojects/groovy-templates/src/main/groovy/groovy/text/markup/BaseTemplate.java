@@ -22,12 +22,12 @@ import groovy.lang.Closure;
 import groovy.lang.Writable;
 import groovy.text.Template;
 import org.apache.groovy.internal.util.UncheckedThrow;
+import org.apache.groovy.io.StringBuilderWriter;
 import org.codehaus.groovy.control.io.NullWriter;
 import org.codehaus.groovy.runtime.ResourceGroovyMethods;
 
 import java.io.IOException;
 import java.io.StringReader;
-import java.io.StringWriter;
 import java.io.Writer;
 import java.net.URL;
 import java.util.Collections;
@@ -49,8 +49,6 @@ import static groovy.xml.XmlUtil.escapeXml;
  * <p>For the application needs, it is possible to provide more helper methods by extending this class and
  * configuring the base template class using the {@link groovy.text.markup.TemplateConfiguration#setBaseTemplateClass(Class)}
  * method.</p>
- *
- * @author Cedric Champeau
  */
 public abstract class BaseTemplate implements Writable {
     private static final Map EMPTY_MODEL = Collections.emptyMap();
@@ -107,7 +105,7 @@ public abstract class BaseTemplate implements Writable {
 
     public String stringOf(Closure cl) throws IOException {
         Writer old = out;
-        StringWriter stringWriter = new StringWriter(32);
+        Writer stringWriter = new StringBuilderWriter(32);
         out = stringWriter;
         Object result = cl.call();
         if (result!=null && result!=this) {
@@ -213,7 +211,7 @@ public abstract class BaseTemplate implements Writable {
 
     private String escapeQuotes(String str) {
         String quote = configuration.isUseDoubleQuotes() ? "\"" : "'";
-        String escape = configuration.isUseDoubleQuotes() ? "&quote;" : "&apos;";
+        String escape = configuration.isUseDoubleQuotes() ? "&quot;" : "&apos;";
         return str.replace(quote, escape);
     }
 
@@ -435,6 +433,8 @@ public abstract class BaseTemplate implements Writable {
      */
     public Closure contents(final Closure cl) {
         return new Closure(cl.getOwner(), cl.getThisObject()) {
+            private static final long serialVersionUID = -5733727697043906478L;
+
             @Override
             public Object call() {
                 cl.call();
@@ -482,7 +482,7 @@ public abstract class BaseTemplate implements Writable {
         return configuration.isAutoIndent() && !(out instanceof DelegatingIndentWriter)?new DelegatingIndentWriter(out, configuration.getAutoIndentString()):out;
     }
 
-    private class TagData {
+    private static class TagData {
         private final Object[] array;
         private Map attributes;
         private Object body;
@@ -514,7 +514,7 @@ public abstract class BaseTemplate implements Writable {
     }
 
     public String toString() {
-        StringWriter wrt = new StringWriter(512);
+        Writer wrt = new StringBuilderWriter(512);
         try {
             writeTo(wrt);
         } catch (IOException e) {

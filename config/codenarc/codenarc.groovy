@@ -109,7 +109,7 @@ ruleset {
         'UnusedVariable' {
             doNotApplyToClassNames = 'SourceBaseTestCase,SAXTest,groovy.ForLoopTest,groovy.bugs.Groovy3894Bug,' +
                 'ExpandoMetaClassTest,ExceptionTest,JSR223Test,' +
-                'groovy.util.GroovyShellTestCase,org.codehaus.groovy.tools.shell.ShellRunner,' +
+                'groovy.test.GroovyShellTestCase,org.codehaus.groovy.tools.shell.ShellRunner,' +
                 'groovy.bugs.Bytecode7Bug,groovy.mock.interceptor.HalfMockTest,' +
                 'groovy.mock.interceptor.MockSingleCallTest,groovy.mock.interceptor.StubSingleCallTest,' +
                 'groovy.operator.TernaryOperatorsTest,groovy.swing.SwingBuilderTableTest,' +
@@ -168,7 +168,10 @@ ruleset {
 
     ruleset('rulesets/logging.xml') {
         exclude 'SystemOutPrint'  // too many to worry about, review later
-        exclude 'SystemErrPrint'    // too many to worry about, review later
+        exclude 'SystemErrPrint'  // too many to worry about, review later
+        'Println' {
+            doNotApplyToFileNames='genArrayAccess.groovy,genArrayUtil.groovy,genDgmMath.groovy,genMathModification.groovy,'
+        }
     }
     ruleset('rulesets/braces.xml') {
         exclude 'ForStatementBraces' // for statements without braces seems acceptable in our coding standards
@@ -221,7 +224,6 @@ ruleset {
     }
     ruleset('rulesets/dry.xml') {
         exclude 'DuplicateNumberLiteral'    // too many to worry about, review later
-        exclude 'DuplicateStringLiteralRule'    // too many to worry about, review later
         exclude 'DuplicateStringLiteral'    // too many to worry about, review later
     }
     ruleset('rulesets/design.xml') {

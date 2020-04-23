@@ -18,11 +18,12 @@
  */
 package org.codehaus.groovy.tools.groovydoc
 
+import groovy.cli.internal.CliBuilderInternal
+import groovy.io.FileType
+import org.codehaus.groovy.tools.groovydoc.gstringTemplates.GroovyDocTemplateInfo
+import org.codehaus.groovy.tools.shell.IO
 import org.codehaus.groovy.tools.shell.util.Logger
 import org.codehaus.groovy.tools.shell.util.MessageSource
-import org.codehaus.groovy.tools.shell.IO
-import org.codehaus.groovy.tools.groovydoc.gstringTemplates.GroovyDocTemplateInfo
-import groovy.io.FileType
 
 /**
  * Main CLI entry-point for <tt>groovydoc</tt>.
@@ -57,9 +58,10 @@ class Main {
         IO io = new IO()
         Logger.io = io
 
-        def cli = new CliBuilder(usage : 'groovydoc [options] [packagenames] [sourcefiles]', writer: io.out, posix:false)
+        def cli = new CliBuilderInternal(usage: 'groovydoc [options] [packagenames] [sourcefiles]', writer: io.out, posix: false,
+                header: messages['cli.option.header'])
 
-        cli.help(longOpt: 'help', messages['cli.option.help.description'])
+        cli._(names: ['-h', '-help', '--help'], messages['cli.option.help.description'])
         cli._(longOpt: 'version', messages['cli.option.version.description'])
         cli.verbose(messages['cli.option.verbose.description'])
         cli.quiet(messages['cli.option.quiet.description'])

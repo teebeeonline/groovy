@@ -18,11 +18,10 @@
  */
 package groovy
 
+import groovy.test.GroovyTestCase
+
 /**
  * Check that Object.identity(Closure) method works as expected
- *
- * @author Jeremy Rayner
- * @author Guillaume Laforge
  */
 class IdentityClosureTest extends GroovyTestCase {
     

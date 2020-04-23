@@ -18,6 +18,7 @@
  */
 package org.codehaus.groovy.ast
 
+import groovy.test.GroovyTestCase
 import org.codehaus.groovy.classgen.GeneratorContext
 import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.control.CompilePhase
@@ -27,8 +28,6 @@ import org.codehaus.groovy.ast.expr.VariableExpression
 
 /**
  * Adds several utility methods which are used in tests on generics.
- *
- * @author Cedric Champeau
  */
 abstract class GenericsTestCase extends GroovyTestCase {
 

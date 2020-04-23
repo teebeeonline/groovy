@@ -140,6 +140,12 @@ The following operators are available:
 
 | `>=`
 | greater than or equal
+
+| `===`
+| identical (Since Groovy 3.0.0)
+
+| `!==`
+| not identical (Since Groovy 3.0.0)
 |====
 
 Here are some examples of simple number comparisons using these operators:
@@ -148,6 +154,28 @@ Here are some examples of simple number comparisons using these operators:
 ----
 include::{projectdir}/src/spec/test/OperatorsTest.groovy[tags=simple_relational_op,indent=0]
 ----
+
+Both `===` and `!==` are supported which are the same as calling the `is()` method,
+and negating a call to the `is()` method respectively.
+
+[source,groovy]
+--------------------------------------
+import groovy.transform.EqualsAndHashCode
+
+@EqualsAndHashCode
+class Creature { String type }
+
+def cat = new Creature(type: 'cat')
+def copyCat = cat
+def lion = new Creature(type: 'cat')
+
+assert cat.equals(lion) // Java logical equality
+assert cat == lion      // Groovy shorthand operator
+
+assert cat.is(copyCat)  // Groovy identity
+assert cat === copyCat  // operator shorthand
+assert cat !== lion     // negated operator shorthand
+--------------------------------------
 
 == Logical operators
 
@@ -286,6 +314,28 @@ include::{projectdir}/src/spec/test/OperatorsTest.groovy[tags=conditional_op_elv
 Usage of the Elvis operator reduces the verbosity of your code and reduces the risks of errors in case of refactorings,
 by removing the need to duplicate the expression which is tested in both the condition and the positive return value.
 
+=== Elvis assignment operator
+
+Groovy 3.0.0 introduces the Elvis operator, for example:
+
+[source,groovy]
+--------------------------------------
+import groovy.transform.ToString
+
+@ToString
+class Element {
+    String name
+    int atomicNumber
+}
+
+def he = new Element(name: 'Helium')
+he.with {
+    name = name ?: 'Hydrogen'   // existing Elvis operator
+    atomicNumber ?= 2           // new Elvis assignment shorthand
+}
+assert he.toString() == 'Element(Helium, 2)'
+--------------------------------------
+
 == Object operators
 
 === Safe navigation operator
@@ -326,12 +376,12 @@ include::{projectdir}/src/spec/test/OperatorsTest.groovy[tags=direct_field_op,in
 [[method-pointer-operator]]
 === Method pointer operator
 
-The method pointer operator (`.&`) call be used to store a reference to a method in a variable, in order to call it
-later:
+The method pointer operator (`.&`) can be used to store a reference to a method in a variable,
+in order to call it later:
 
 [source,groovy]
 ----
-include::{projectdir}/src/spec/test/OperatorsTest.groovy[tags=method_reference,indent=0]
+include::{projectdir}/src/spec/test/OperatorsTest.groovy[tags=method_pointer,indent=0]
 ----
 <1> the `str` variable contains a `String`
 <2> we store a reference to the `toUpperCase` method on the `str` instance inside a variable named `fun`
@@ -344,7 +394,7 @@ convert an existing method for the needs of the strategy pattern:
 
 [source,groovy]
 ----
-include::{projectdir}/src/spec/test/OperatorsTest.groovy[tags=method_reference_strategy,indent=0]
+include::{projectdir}/src/spec/test/OperatorsTest.groovy[tags=method_pointer_strategy,indent=0]
 ----
 <1> the `transform` method takes each element of the list and calls the `action` closure on them, returning a new list
 <2> we define a function that takes a `Person` and returns a `String`
@@ -358,13 +408,61 @@ will be done at runtime:
 
 [source,groovy]
 ----
-include::{projectdir}/src/spec/test/OperatorsTest.groovy[tags=method_reference_dispatch,indent=0]
+include::{projectdir}/src/spec/test/OperatorsTest.groovy[tags=method_pointer_dispatch,indent=0]
 ----
 <1> define an overloaded `doSomething` method accepting a `String` as an argument
 <2> define an overloaded `doSomething` method accepting an `Integer` as an argument
 <3> create a single method pointer on `doSomething`, without specifying argument types
 <4> using the method pointer with a `String` calls the `String` version of `doSomething`
 <5> using the method pointer with an `Integer` calls the `Integer` version of `doSomething`
+
+To align with Java 8 method reference expectations, in Groovy 3 and above, you can use `new` as the
+method name to obtain a method pointer to the constructor:
+[source,groovy]
+----
+include::{projectdir}/src/spec/test/OperatorsTest.groovy[tags=method_pointer_new,indent=0]
+----
+
+Also in Groovy 3 and above, you can obtain a method pointer to an instance method of a class.
+This method pointer takes an additional parameter being the receiver instance to
+invoke the method on:
+[source,groovy]
+----
+include::{projectdir}/src/spec/test/OperatorsTest.groovy[tags=method_pointer_class_instance,indent=0]
+----
+For backwards compatibility, any static methods that happen to have the correct
+parameters for the call will be given precedence over instance methods for this case.
+
+[[method-reference-operator]]
+=== Method reference operator
+
+The Parrot parser in Groovy 3+ supports the Java 8+ method reference operator.
+The method reference operator (`::`) can be used to reference a method or constructor
+in contexts expecting a functional interface. This overlaps somewhat with the functionality
+provided by Groovy's method pointer operator. Indeed, for dynamic Groovy, the method
+reference operator is just an alias for the method pointer operator.
+For static Groovy, the operator results in bytecode similar to the bytecode
+that Java would produce for the same context.
+
+Some examples highlighting various supported method reference cases are shown in the following script:
+
+[source,groovy]
+----
+include::{projectdir}/src/spec/test/OperatorsTest.groovy[tags=method_refs,indent=0]
+----
+<1> class instance method reference: add(BigInteger val) is an instance method in BigInteger
+<2> object instance method reference: add(BigInteger val) is an instance method for object 3G
+<3> class static method reference: valueOf(long val) is a static method for class BigInteger
+<4> object static method reference: valueOf(long val) is a static method for object 3G (some consider this bad style in normal circumstances)
+
+Some examples highlighting various supported constructor reference cases are shown in the following script:
+
+[source,groovy]
+----
+include::{projectdir}/src/spec/test/OperatorsTest.groovy[tags=constructor_refs,indent=0]
+----
+<1> class constructor reference
+<2> array constructor reference
 
 == Regular expression operators
 
@@ -391,8 +489,7 @@ include::{projectdir}/src/spec/test/OperatorsTest.groovy[tags=pattern_op_variant
 
 === Find operator
 
-Alternatively to building a pattern, you can directly use the find operator `=~` to build a `java.util.regex.Matcher`
-instance:
+Alternatively to building a pattern, you can use the find operator `=~` to directly create a `java.util.regex.Matcher` instance:
 
 [source,groovy]
 ----
@@ -400,10 +497,11 @@ include::{projectdir}/src/spec/test/OperatorsTest.groovy[tags=pattern_matcher_op
 ----
 <1> `=~` creates a matcher against the `text` variable, using the pattern on the right hand side
 <2> the return type of `=~` is a `Matcher`
-<3> equivalent to calling `if (!m.find())`
+<3> equivalent to calling `if (!m.find(0))`
 
 Since a `Matcher` coerces to a `boolean` by calling its `find` method, the `=~` operator is consistent with the simple
-use of Perl's `=~` operator, when it appears as a predicate (in `if`, `while`, etc.).
+use of Perl's `=~` operator, when it appears as a predicate (in `if`, `?:`, etc.). When the intent is to iterate over
+matches of the specified pattern (in `while`, etc.) call `find()` directly on the matcher or use the `iterator` DGM.
 
 === Match operator
 
@@ -422,8 +520,8 @@ include::{projectdir}/src/spec/test/OperatorsTest.groovy[tags=pattern_matcher_st
 
 === Spread operator
 
-The Spread Operator (`*.`) is used to invoke an action on all items of an aggregate object. It is equivalent to calling the action on each item
-and collecting the result into a list:
+The Spread-dot Operator (`*.`), often abbreviated to just Spread Operator, is used to invoke an action on all items
+of an aggregate object. It is equivalent to calling the action on each item and collecting the result into a list:
 
 [source,groovy]
 ----
@@ -433,7 +531,14 @@ include::{projectdir}/src/spec/test/OperatorsTest.groovy[tags=spreaddot,indent=0
 <2> call the spread operator on the list, accessing the `make` property of each item
 <3> returns a list of strings corresponding to the collection of `make` items
 
-The spread operator is null-safe, meaning that if an element of the collection is null, it will return null instead of throwing a `NullPointerException`:
+The expression `cars*.make` is equivalent to `cars.collect{ it.make }`.
+Groovy's GPath notation allows a short-cut when the referenced property
+isn't a property of the containing list, in that case it is automatically
+spread. In the previously mentioned case, the expression `cars.make` can
+be used, though retaining the explicit spread-dot operator is often recommended.
+
+The spread operator is null-safe, meaning that if an element of the collection is null,
+it will return null instead of throwing a `NullPointerException`:
 
 [source,groovy]
 ----
@@ -448,6 +553,21 @@ The spread operator can be used on any class which implements the `Iterable` int
 [source,groovy]
 ----
 include::{projectdir}/src/spec/test/OperatorsTest.groovy[tags=spreaddot_iterable,indent=0]
+----
+
+Use multiple invocations of the spread-dot operator (here `cars*.models*.name`) when
+working with aggregates of data structures which themselves contain aggregates:
+
+[source,groovy]
+----
+include::{projectdir}/src/spec/test/OperatorsTest.groovy[tags=spreaddot_multilevel,indent=0]
+----
+
+Consider using the `collectNested` DGM method instead of the spread-dot operator for collections of collections:
+
+[source,groovy]
+----
+include::{projectdir}/src/spec/test/OperatorsTest.groovy[tags=spreaddot_alternative,indent=0]
 ----
 
 ==== Spreading method arguments
@@ -581,6 +701,34 @@ include::{projectdir}/src/spec/test/OperatorsTest.groovy[tags=subscript_destruct
 <6> we can use the subscript operator to write to a property thanks to the delegation to `putAt`
 <7> and check that it's really the property `name` which was changed
 
+=== Safe index operator
+
+Groovy 3.0.0 introduces safe indexing operator, i.e. `?[]`, which is similar to `?.`. For example:
+
+[source,groovy]
+--------------------------------------
+String[] array = ['a', 'b']
+assert 'b' == array?[1]      // get using normal array index
+array?[1] = 'c'              // set using normal array index
+assert 'c' == array?[1]
+
+array = null
+assert null == array?[1]     // return null for all index values
+array?[1] = 'c'              // quietly ignore attempt to set value
+assert null == array?[1]
+
+def personInfo = [name: 'Daniel.Sun', location: 'Shanghai']
+assert 'Daniel.Sun' == personInfo?['name']      // get using normal map index
+personInfo?['name'] = 'sunlan'                  // set using normal map index
+assert 'sunlan' == personInfo?['name']
+
+personInfo = null
+assert null == personInfo?['name']              // return null for all map values
+personInfo?['name'] = 'sunlan'                  // quietly ignore attempt to set value
+assert null == personInfo?['name']
+--------------------------------------
+
+
 === Membership operator
 
 The membership operator (`in`) is equivalent to calling the `isCase` method. In the context of a `List`, it is equivalent
@@ -676,14 +824,14 @@ The table below lists all groovy operators in order of precedence.
 |   | `.` &#160; `.&` &#160; `.@` | member access, method closure, field/attribute access
 |   | `?.` &#160; `\*` &#160; `*.` &#160; `*:` | safe dereferencing, spread, spread-dot, spread-map
 |   | `~` &#160; `!` &#160; `(type)` | bitwise negate/pattern, not, typecast
-|   | `[]` &#160; `++` &#160; `--` | list/map/array index, post inc/decrement
+|   | `[]` &#160; `?[]` &#160; `++` &#160; `--` | list/map/array (safe) index, post inc/decrement
 | 2 | `**` | power
 | 3 | `++` &#160; `--` &#160; `+` &#160; `-` | pre inc/decrement, unary plus, unary minus
 | 4 | `*` &#160; `/` &#160; `%` | multiply, div, remainder
 | 5 | `+` &#160; `-` | addition, subtraction
 | 6 | `<<` &#160; `>>` &#160; `>>>` &#160; `..` &#160; `..<` | left/right (unsigned) shift, inclusive/exclusive range
-| 7 | `<` &#160; `\<=` &#160; `>` &#160; `>=` &#160; `in` &#160; `instanceof` &#160; `as` | less/greater than/or equal, in, instanceof, type coercion
-| 8 | `==` &#160; `!=` &#160; `pass:[<=>]` | equals, not equals, compare to
+| 7 | `<` &#160; `\<=` &#160; `>` &#160; `>=` &#160; `in` &#160; `!in` &#160; `instanceof` &#160; `!instanceof` &#160; `as` | less/greater than/or equal, in, not in, instanceof, not instanceof, type coercion
+| 8 | `==` &#160; `!=` &#160; `pass:[<=>]` &#160; `===` &#160; `!==` | equals, not equals, compare to, identical to, not identical to
 |   | `=~` &#160; `==~` | regex find, regex match
 | 9 | `&` | binary/bitwise and
 | 10 | `^` | binary/bitwise xor
@@ -693,7 +841,7 @@ The table below lists all groovy operators in order of precedence.
 | 14 | `? :` | ternary conditional
 |    | `?:` | elvis operator
 | 15 | `=` &#160; `\**=` &#160; `*=` &#160; `/=` &#160; `%=` &#160; `+=` &#160; `-=` &#160; +
-`pass:[<<=]` &#160; `>>=` &#160; `>>>=` &#160; `&=` &#160; `^=` &#160; `\|=` | various assignments
+`pass:[<<=]` &#160; `>>=` &#160; `>>>=` &#160; `&=` &#160; `^=` &#160; `\|=` &#160; &#160; `?=` | various assignments
 |======================
 
 [[Operator-Overloading]]

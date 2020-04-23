@@ -1,3 +1,5 @@
+import groovy.test.GroovyTestCase
+
 /*
  *  Licensed to the Apache Software Foundation (ASF) under one
  *  or more contributor license agreements.  See the NOTICE file
@@ -36,6 +38,24 @@ class ClassTest extends GroovyTestCase {
             def p = new Person()
             // end::class_instantiation[]
 
+        '''
+    }
+
+    void testInnerInstantiation() {
+        assertScript '''
+            // tag::inner_instantiation[]
+            class Computer {
+                class Cpu {
+                    int coreNumber
+            
+                    Cpu(int coreNumber) {
+                        this.coreNumber = coreNumber
+                    }
+                }
+            }
+
+            assert 4 == new Computer().new Cpu(4).coreNumber
+            // end::inner_instantiation[]
         '''
     }
 

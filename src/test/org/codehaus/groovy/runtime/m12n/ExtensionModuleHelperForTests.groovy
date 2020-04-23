@@ -16,18 +16,20 @@
  *  specific language governing permissions and limitations
  *  under the License.
  */
-
 package org.codehaus.groovy.runtime.m12n
 
-import org.codehaus.groovy.tools.FileSystemCompiler;
+import groovy.ant.AntBuilder
+import org.codehaus.groovy.runtime.DefaultGroovyStaticMethods
 
-public class ExtensionModuleHelperForTests {
+import static groovy.test.GroovyAssert.isAtLeastJdk
+
+class ExtensionModuleHelperForTests {
     static void doInFork(String code) {
-        doInFork("GroovyTestCase", code)
+        doInFork("groovy.test.GroovyTestCase", code)
     }
 
     static void doInFork(String baseTestClass, String code) {
-        File baseDir = FileSystemCompiler.createTempDir()
+        File baseDir = DefaultGroovyStaticMethods.createTempDir(null)
         File source = new File(baseDir, 'Temp.groovy')
         source << """import org.codehaus.groovy.runtime.m12n.*
     class TempTest extends $baseTestClass {
@@ -41,42 +43,37 @@ public class ExtensionModuleHelperForTests {
         Set<String> cp = System.getProperty("java.class.path").split(File.pathSeparator) as Set
         cp << baseDir.absolutePath
 
-        boolean jdk9 = false;
-        try {
-            jdk9 = this.classLoader.loadClass("java.lang.reflect.Module") != null
-        } catch (e) {
-            // ignore
-        }
+        boolean jdk9 = isAtLeastJdk('9.0')
 
         def ant = new AntBuilder()
+        def allowed = [
+                'Picked up JAVA_TOOL_OPTIONS: .*',
+                'Picked up _JAVA_OPTIONS: .*'
+        ]
         try {
             ant.with {
                 taskdef(name:'groovyc', classname:"org.codehaus.groovy.ant.Groovyc")
                 groovyc(srcdir: baseDir.absolutePath, destdir:baseDir.absolutePath, includes:'Temp.groovy', fork:true)
-                java(   classname:'Temp',
-                        fork:'true',
-                        outputproperty: 'out',
-                        errorproperty: 'err',
-                        {
-                            classpath {
-                                cp.each {
-                                    pathelement location: it
-                                }
-                            }
-                            if (jdk9) {
-                                jvmarg(value: '--add-modules')
-                                jvmarg(value: 'java.xml.bind')
-                            }
+                java(classname: 'Temp', fork: 'true', outputproperty: 'out', errorproperty: 'err') {
+                    classpath {
+                        cp.each {
+                            pathelement location: it
                         }
-                )
+                    }
+                }
             }
         } finally {
             String out = ant.project.properties.out
             String err = ant.project.properties.err
             baseDir.deleteDir()
-            if (err && err.trim() != 'Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8') {
+            // FIX_JDK9: remove once we have no warnings when running Groovy
+            if (jdk9) {
+                err = err?.replaceAll(/WARNING: .*/, "")?.trim()
+            }
+            if (err && !allowed.any{ err.trim().matches(it) }) {
                 throw new RuntimeException("$err\nClasspath: ${cp.join('\n')}")
-            } else if ( out.contains('FAILURES') || ! out.contains("OK")) {
+            }
+            if (out && (out.contains('FAILURES') || !out.contains("OK"))) {
                 throw new RuntimeException("$out\nClasspath: ${cp.join('\n')}")
             }
         }

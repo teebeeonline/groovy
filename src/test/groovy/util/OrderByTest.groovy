@@ -18,13 +18,11 @@
  */
 package groovy.util
 
+import groovy.test.GroovyTestCase
 import org.codehaus.groovy.runtime.DefaultGroovyMethods
 
 /** 
  * Tests OrderBy
- *
- * @author <a href="mailto:james@coredevelopers.net">James Strachan</a>
- * @author Rod Code
  */
 class OrderByTest extends GroovyTestCase {
 

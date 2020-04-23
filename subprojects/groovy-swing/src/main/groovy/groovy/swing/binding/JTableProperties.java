@@ -18,8 +18,11 @@
  */
 package groovy.swing.binding;
 
-
-import org.codehaus.groovy.binding.*;
+import org.apache.groovy.swing.binding.FullBinding;
+import org.apache.groovy.swing.binding.PropertyBinding;
+import org.apache.groovy.swing.binding.SourceBinding;
+import org.apache.groovy.swing.binding.TargetBinding;
+import org.apache.groovy.swing.binding.TriggerBinding;
 
 import javax.swing.*;
 import javax.swing.event.ListSelectionEvent;

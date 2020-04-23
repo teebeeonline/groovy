@@ -18,34 +18,36 @@
  */
 package org.codehaus.groovy.transform.classloading
 
+import groovy.test.GroovyTestCase
 import junit.framework.TestCase
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ModuleNode
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.control.CompilationUnit
+import org.codehaus.groovy.control.MultipleCompilationErrorsException
 import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.control.CompilePhase
 import org.codehaus.groovy.transform.GroovyASTTransformationClass
 import org.codehaus.groovy.transform.ASTTransformation
 import org.codehaus.groovy.transform.GroovyASTTransformation
 import org.codehaus.groovy.transform.GlobalTestTransformClassLoader
+import org.codehaus.groovy.vmplugin.VMPluginFactory
 import org.objectweb.asm.ClassVisitor
 
 import java.lang.annotation.Retention
 import java.lang.annotation.RetentionPolicy
 import java.lang.annotation.Target
 import java.lang.annotation.ElementType
+import java.nio.file.FileSystemNotFoundException
 
 /**
  * Tests whether local and global transforms are successfully detected, loaded,
  * and run if separate class loaders are used for loading compile dependencies
  * and AST transforms.
- *
- * @author Peter Niederwieser
  */
 class TransformsAndCustomClassLoadersTest extends GroovyTestCase {
     URL[] urls = collectUrls(getClass().classLoader) + addGroovyUrls()
-    GroovyClassLoader dependencyLoader = new GroovyClassLoader(new URLClassLoader(urls, (ClassLoader)null))
+    GroovyClassLoader dependencyLoader = new GroovyClassLoader(new URLClassLoader(urls, (ClassLoader) ( VMPluginFactory.getPlugin().getVersion() >= 9 ? ClassLoader.getPlatformClassLoader() : null )))
     GroovyClassLoader transformLoader = new GroovyClassLoader(new URLClassLoader(urls, new GroovyOnlyClassLoader()))
 
     private static addGroovyUrls() {
@@ -68,8 +70,8 @@ class TransformsAndCustomClassLoadersTest extends GroovyTestCase {
     }
 
     void testBuiltInLocalTransform() {
-        def clazz = compileAndLoadClass("@groovy.transform.Immutable class Foo { String bar }", dependencyLoader, transformLoader)
-        checkIsImmutable(clazz)
+        def clazz = compileAndLoadClass("@groovy.transform.TupleConstructor class Foo { String bar }", dependencyLoader, transformLoader)
+        checkHasTupleConstructor(clazz)
     }
 
     void testThirdPartyLocalTransform() {
@@ -90,6 +92,18 @@ class TransformsAndCustomClassLoadersTest extends GroovyTestCase {
         assert clazz.name == "FOO"
     }
 
+    void testShouldKeepOriginalExceptionDuringGlobalTransformApplyingGroovy9469Bug() {
+        try {
+            transformLoader = new GlobalTestTransformClassLoader(transformLoader, FailingWithMeaningfulMessageTransformation)
+            compileAndLoadClass("class Foo {}", dependencyLoader, transformLoader)
+            fail("Excepted MultipleCompilationErrorsException not thrown")
+        } catch(MultipleCompilationErrorsException e) {
+            assert e.message.contains("FailingWithMeaningfulMessageTransformation")
+            assert e.message.contains("FileSystemNotFoundException")
+            assert e.message.contains("meaningful error message")
+        }
+    }
+
     private compileAndLoadClass(String source, GroovyClassLoader dependencyLoader, GroovyClassLoader transformLoader) {
         def unit = new CompilationUnit(null, null, dependencyLoader, transformLoader)
         unit.addSource("Foo.groovy", source)
@@ -102,12 +116,9 @@ class TransformsAndCustomClassLoadersTest extends GroovyTestCase {
         return loader.defineClass(classInfo.name, classInfo.bytes)
     }
 
-    private checkIsImmutable(Class clazz) {
-        try {
-            def foo = clazz.newInstance(["setting property"] as Object[])
-            foo.bar = "updating property"
-            fail()
-        } catch (ReadOnlyPropertyException expected) {}
+    private checkHasTupleConstructor(Class clazz) {
+        def foo = clazz.newInstance(["some property"] as Object[])
+        assert foo.bar == 'some property'
     }
 
     private Set<URL> collectUrls(ClassLoader classLoader) {
@@ -124,7 +135,8 @@ class TransformsAndCustomClassLoadersTest extends GroovyTestCase {
             if (name.startsWith(getClass().getPackage().name)) {
                 throw new ClassNotFoundException(name)
             }
-            if (name.startsWith("java.") || name.startsWith("groovy.") || name.startsWith("org.codehaus.groovy.")) {
+            if (name.startsWith("java.") || name.startsWith("groovy.")
+                    || name.startsWith("org.codehaus.groovy.") || name.startsWith("org.apache.groovy.")) {
                 return getClass().classLoader.loadClass(name, resolve)
             }
             throw new ClassNotFoundException(name)
@@ -161,5 +173,15 @@ class ToUpperCaseGlobalTransform implements ASTTransformation {
         for (clazz in module.classes) {
             clazz.name = clazz.name.toUpperCase()
         }
+    }
+}
+
+@GroovyASTTransformation(phase = CompilePhase.SEMANTIC_ANALYSIS)
+class FailingWithMeaningfulMessageTransformation implements ASTTransformation {
+    FailingWithMeaningfulMessageTransformation() {
+        throw new FileSystemNotFoundException("Custom exception with meaningful error message")
+    }
+    @Override
+    void visit(ASTNode[] nodes, SourceUnit source) {
     }
 }

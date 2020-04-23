@@ -18,9 +18,8 @@
  */
 package groovy.lang
 
-/**
- * @author Merlyn Albery-Speyer
- */
+import groovy.test.GroovyTestCase
+
 class GroovyCodeSourceTest extends GroovyTestCase {
     void testValidEncoding() {
         new GroovyCodeSource(createTemporaryGroovyClassFile(), "UTF-8")
@@ -37,7 +36,7 @@ class GroovyCodeSourceTest extends GroovyTestCase {
 
     void testInvalidFile() {
         try {
-            new GroovyCodeSource(new File("SomeFileThatDoesNotExist"+System.currentTimeMillis()), "UTF-8")
+            new GroovyCodeSource(new File("SomeFileThatDoesNotExist" + System.currentTimeMillis()), "UTF-8")
             fail("expected IOException")
         } catch (IOException) {
             assert true
@@ -54,7 +53,7 @@ class GroovyCodeSourceTest extends GroovyTestCase {
     }
 
     File createTemporaryGroovyClassFile() {
-        String testName = "GroovyCodeSourceTest"+System.currentTimeMillis()
+        String testName = "GroovyCodeSourceTest" + System.currentTimeMillis()
         File groovyCode = new File(System.getProperty("java.io.tmpdir"), testName)
         groovyCode.write("class SomeClass { }")
         groovyCode.deleteOnExit()

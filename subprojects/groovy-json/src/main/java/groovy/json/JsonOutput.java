@@ -18,14 +18,19 @@
  */
 package groovy.json;
 
-import groovy.json.internal.CharBuf;
-import groovy.json.internal.Chr;
+import org.apache.groovy.json.internal.CharBuf;
+import org.apache.groovy.json.internal.Chr;
 import groovy.lang.Closure;
 import groovy.util.Expando;
 
 import java.io.StringReader;
 import java.net.URL;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
 
 /**
  * Class responsible for the actual String serialization of the possible values of a JSON structure.
@@ -33,12 +38,6 @@ import java.util.*;
  * <p>
  * This class does not provide the ability to customize the resulting output.  A {@link JsonGenerator}
  * can be used if the ability to alter the resulting output is required.
- *
- * @author Guillaume Laforge
- * @author Roshan Dawrani
- * @author Andrey Bloschetsov
- * @author Rick Hightower
- * @author Graeme Rocher
  *
  * @see JsonGenerator
  * @since 1.8.0

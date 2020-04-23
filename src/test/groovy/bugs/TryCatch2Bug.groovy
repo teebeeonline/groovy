@@ -18,9 +18,8 @@
  */
 package groovy.bugs
 
-/**
- * @author Morgan Hankins 
- */
+import groovy.test.GroovyTestCase
+
 class TryCatch2Bug extends GroovyTestCase {
     
     void testBug() {

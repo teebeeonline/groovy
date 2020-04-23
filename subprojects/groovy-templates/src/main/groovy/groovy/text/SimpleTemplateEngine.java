@@ -18,18 +18,22 @@
  */
 package groovy.text;
 
-import groovy.lang.*;
+import groovy.lang.Binding;
+import groovy.lang.GroovyRuntimeException;
+import groovy.lang.GroovyShell;
+import groovy.lang.Script;
+import groovy.lang.Writable;
+import org.apache.groovy.io.StringBuilderWriter;
+import org.codehaus.groovy.control.CompilationFailedException;
+import org.codehaus.groovy.runtime.InvokerHelper;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.Reader;
-import java.io.StringWriter;
 import java.io.Writer;
 import java.util.Map;
-
-import org.codehaus.groovy.control.CompilationFailedException;
-import org.codehaus.groovy.runtime.InvokerHelper;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Processes template source files substituting variables and expressions into
@@ -85,17 +89,12 @@ import org.codehaus.groovy.runtime.InvokerHelper;
  * &lt;/servlet&gt;
  * </pre>
  * In this case, your template source file should be HTML with the appropriate embedded placeholders.
- *
- * @author sam
- * @author Christian Stein
- * @author Paul King
- * @author Alex Tkachman
  */
 public class SimpleTemplateEngine extends TemplateEngine {
     private boolean verbose;
-    private static int counter = 1;
-
+    private static AtomicInteger counter = new AtomicInteger(0);
     private GroovyShell groovyShell;
+    private boolean escapeBackslash;
 
     public SimpleTemplateEngine() {
         this(GroovyShell.class.getClassLoader());
@@ -115,7 +114,7 @@ public class SimpleTemplateEngine extends TemplateEngine {
     }
 
     public Template createTemplate(Reader reader) throws CompilationFailedException, IOException {
-        SimpleTemplate template = new SimpleTemplate();
+        SimpleTemplate template = new SimpleTemplate(escapeBackslash);
         String script = template.parse(reader);
         if (verbose) {
             System.out.println("\n-- script source --");
@@ -123,7 +122,7 @@ public class SimpleTemplateEngine extends TemplateEngine {
             System.out.println("\n-- script end --\n");
         }
         try {
-            template.script = groovyShell.parse(script, "SimpleTemplateScript" + counter++ + ".groovy");
+            template.script = groovyShell.parse(script, "SimpleTemplateScript" + counter.incrementAndGet() + ".groovy");
         } catch (Exception e) {
             throw new GroovyRuntimeException("Failed to parse template script (your template may contain an error or be trying to use expressions not currently supported): " + e.getMessage());
         }
@@ -144,6 +143,16 @@ public class SimpleTemplateEngine extends TemplateEngine {
     private static class SimpleTemplate implements Template {
 
         protected Script script;
+        private boolean escapeBackslash;
+
+        public SimpleTemplate() {
+            this(false);
+        }
+
+        public SimpleTemplate(boolean escapeBackslash) {
+            this.escapeBackslash = escapeBackslash;
+        }
+
 
         public Writable make() {
             return make(null);
@@ -176,7 +185,7 @@ public class SimpleTemplateEngine extends TemplateEngine {
                  * @see java.lang.Object#toString()
                  */
                 public String toString() {
-                    StringWriter sw = new StringWriter();
+                    Writer sw = new StringBuilderWriter();
                     writeTo(sw);
                     return sw.toString();
                 }
@@ -195,7 +204,7 @@ public class SimpleTemplateEngine extends TemplateEngine {
             if (!reader.markSupported()) {
                 reader = new BufferedReader(reader);
             }
-            StringWriter sw = new StringWriter();
+            StringBuilderWriter sw = new StringBuilderWriter();
             startScript(sw);
             int c;
             while ((c = reader.read()) != -1) {
@@ -233,6 +242,25 @@ public class SimpleTemplateEngine extends TemplateEngine {
                 if (c == '\"') {
                     sw.write('\\');
                 }
+
+                /*
+                 *  GROOVY-4585
+                 *  Handle backslash characters.
+                 */
+                if (escapeBackslash) {
+                    if (c == '\\') {
+                        reader.mark(1);
+                        c = reader.read();
+                        if (c != '$') {
+                            sw.write("\\\\");
+                            reader.reset();
+                        } else {
+                            sw.write("\\$");
+                        }
+
+                        continue;
+                    }
+                }
                 /*
                  * Handle raw new line characters.
                  */
@@ -253,16 +281,16 @@ public class SimpleTemplateEngine extends TemplateEngine {
             return sw.toString();
         }
 
-        private void startScript(StringWriter sw) {
+        private void startScript(StringBuilderWriter sw) {
             sw.write("out.print(\"\"\"");
         }
 
-        private void endScript(StringWriter sw) {
+        private void endScript(StringBuilderWriter sw) {
             sw.write("\"\"\");\n");
             sw.write("\n/* Generated by SimpleTemplateEngine */");
         }
 
-        private void processGSstring(Reader reader, StringWriter sw) throws IOException {
+        private void processGSstring(Reader reader, StringBuilderWriter sw) throws IOException {
             int c;
             while ((c = reader.read()) != -1) {
                 if (c != '\n' && c != '\r') {
@@ -278,10 +306,10 @@ public class SimpleTemplateEngine extends TemplateEngine {
          * Closes the currently open write and writes out the following text as a GString expression until it reaches an end %>.
          *
          * @param reader a reader for the template text
-         * @param sw     a StringWriter to write expression content
+         * @param sw     a StringBuilderWriter to write expression content
          * @throws IOException if something goes wrong
          */
-        private void groovyExpression(Reader reader, StringWriter sw) throws IOException {
+        private void groovyExpression(Reader reader, StringBuilderWriter sw) throws IOException {
             sw.write("${");
             int c;
             while ((c = reader.read()) != -1) {
@@ -304,10 +332,10 @@ public class SimpleTemplateEngine extends TemplateEngine {
          * Closes the currently open write and writes the following text as normal Groovy script code until it reaches an end %>.
          *
          * @param reader a reader for the template text
-         * @param sw     a StringWriter to write expression content
+         * @param sw     a StringBuilderWriter to write expression content
          * @throws IOException if something goes wrong
          */
-        private void groovySection(Reader reader, StringWriter sw) throws IOException {
+        private void groovySection(Reader reader, StringBuilderWriter sw) throws IOException {
             sw.write("\"\"\");");
             int c;
             while ((c = reader.read()) != -1) {
@@ -328,6 +356,13 @@ public class SimpleTemplateEngine extends TemplateEngine {
             }
             sw.write(";\nout.print(\"\"\"");
         }
+    }
 
+    public boolean isEscapeBackslash() {
+        return escapeBackslash;
+    }
+
+    public void setEscapeBackslash(boolean escapeBackslash) {
+        this.escapeBackslash = escapeBackslash;
     }
 }

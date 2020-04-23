@@ -18,12 +18,12 @@
  */
 package groovy.util
 
+import groovy.test.GroovyTestCase
+
 /**
  *   Test for FactoryBuilderSupport based in BuilderSupportTest
  *   as it should comply with the same contract
- *   @author Andres Almiray 
  */
-
 class FactoryBuilderSupportTest extends GroovyTestCase {
     void testSimpleNode() {
         def b = new SpoofFactoryBuilder()

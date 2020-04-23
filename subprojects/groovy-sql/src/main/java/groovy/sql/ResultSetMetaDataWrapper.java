@@ -18,18 +18,18 @@
  */
 package groovy.sql;
 
-import java.sql.ResultSetMetaData;
-
 import groovy.lang.GroovyObjectSupport;
 import groovy.lang.MissingPropertyException;
 import groovy.lang.ReadOnlyPropertyException;
 import org.codehaus.groovy.runtime.InvokerHelper;
 
+import java.sql.ResultSetMetaData;
+
 /**
  * This class defines a wrapper for accessing a specific column in <code>ResultSetMetaData</code>.
  * This allows iteration over columns using idiomatic Groovy, e.g.:
  * <pre>
- * meta.each {col ->
+ * meta.each {col {@code ->}
  *   println col.columnName
  * }
  * </pre>
@@ -38,8 +38,7 @@ import org.codehaus.groovy.runtime.InvokerHelper;
  * <p>
  * This wrapper is created by an iterator invoked for <code>ResultSetMetaData</code>.
  *
- * @author John Hurst
- * @see org.codehaus.groovy.runtime.SqlGroovyMethods
+ * @see org.apache.groovy.sql.extensions.SqlExtensions
  */
 public class ResultSetMetaDataWrapper extends GroovyObjectSupport {
 

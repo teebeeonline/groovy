@@ -18,14 +18,14 @@
  */
 package org.codehaus.groovy.runtime.powerassert
 
+import groovy.test.GroovyTestCase
+
 import static AssertionTestUtil.*
 
 /**
  * Tests rendering of assertions that contain a closure call
  * with the implicit "foo(args)" syntax instead of the explicit
  * "foo.call(args)" syntax. See GROOVY-4344.
- *
- * @author Peter Niederwieser
  */
 class ImplicitClosureCallRenderingTest extends GroovyTestCase {
     void testWithLocalVariable() {

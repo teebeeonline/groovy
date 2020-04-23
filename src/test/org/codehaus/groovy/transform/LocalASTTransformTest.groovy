@@ -18,11 +18,9 @@
  */
 package org.codehaus.groovy.transform
 
+import groovy.test.GroovyShellTestCase
 import org.codehaus.groovy.control.CompilationFailedException
 
-/**
- * @author Andre Steingress
- */
 class LocalASTTransformTest extends GroovyShellTestCase {
 
     void testVerifyCompilePhaseBeforeSemanticAnalysisWithStringClassName()  {

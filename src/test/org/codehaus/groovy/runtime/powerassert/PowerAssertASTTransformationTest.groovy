@@ -18,9 +18,8 @@
  */
 package org.codehaus.groovy.runtime.powerassert
 
-/**
- * @author Andre Steingress
- */
+import groovy.test.GroovyShellTestCase
+
 class PowerAssertASTTransformationTest extends GroovyShellTestCase {
 
     void testAddPowerAssertWithoutProperSourcePosition() {

@@ -18,12 +18,10 @@
  */
 package org.codehaus.groovy.transform.tailrec
 
+import groovy.test.GroovyShellTestCase
 import org.codehaus.groovy.control.CompilationFailedException
 import org.codehaus.groovy.control.MultipleCompilationErrorsException
 
-/**
- * @author Johannes Link
- */
 class TailRecursiveCompilationFailuresTest extends GroovyShellTestCase {
 
     void testMethodsWithoutRecursiveCallsFailCompilation() {
@@ -117,6 +115,5 @@ class TailRecursiveCompilationFailuresTest extends GroovyShellTestCase {
         """)
         }
     }
-
 
 }

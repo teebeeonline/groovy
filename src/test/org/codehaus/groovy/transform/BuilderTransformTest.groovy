@@ -39,6 +39,10 @@ class BuilderTransformTest extends CompilableTestSupport {
             assert person.firstName == "Robert"
             assert person.lastName == "Lewandowski"
             assert person.age == 21
+
+            def methods = Person.methods.findAll{ it.name.startsWith('set') && it.name.endsWith('e') }
+            assert methods*.name.toSet() == ['setLastName', 'setAge', 'setFirstName'] as Set
+            assert methods.every{ it.getAnnotation(groovy.transform.Generated) }
          """
     }
 
@@ -195,6 +199,9 @@ class BuilderTransformTest extends CompilableTestSupport {
             assert person.firstName == "Robert"
             assert person.lastName == "Lewandowski"
             assert person.age == 21
+
+            def methods = Person.builder().getClass().methods.findAll{ it.name in ['firstName', 'lastName', 'age'] }
+            assert methods.every{ it.getAnnotation(groovy.transform.Generated) }
         """
     }
 
@@ -354,6 +361,9 @@ class BuilderTransformTest extends CompilableTestSupport {
             def person = new PersonBuilder().firstName("Robert").lastName("Lewandowski").build()
             assert person.firstName == "Robert"
             assert person.lastName == "Lewandowski"
+
+            def methods = PersonBuilder.methods.findAll{ it.name in ['firstName', 'lastName', 'age'] }
+            assert methods.every{ it.getAnnotation(groovy.transform.Generated) }
         """
     }
 
@@ -511,6 +521,9 @@ class BuilderTransformTest extends CompilableTestSupport {
             firstLastAge()
             // dynamic case
             assert new Person(Person.createInitializer().firstName("John").lastName("Smith").age(21)).toString() == 'Person(John, Smith, 21)'
+
+            def methods = Person.createInitializer().getClass().methods.findAll{ it.name in ['firstName', 'lastName', 'age'] }
+            assert methods.every{ it.getAnnotation(groovy.transform.Generated) }
         '''
         def message = shouldNotCompile '''
             import groovy.transform.builder.*
@@ -603,8 +616,26 @@ class BuilderTransformTest extends CompilableTestSupport {
             import groovy.transform.builder.*
             import groovy.transform.*
 
+            @Canonical(useSetters=true)
+            @Builder(builderStrategy=InitializerStrategy)
+            class Person {
+                String name
+                void setName(String name) { this.name = name?.toUpperCase() }
+            }
+
+            @CompileStatic
+            def make() {
+                assert new Person(Person.createInitializer().name("John")).toString() == 'Person(JOHN)'
+            }
+            make()
+        '''
+        assertScript '''
+            import groovy.transform.builder.*
+            import groovy.transform.*
+
             @Canonical
-            @Builder(builderStrategy=InitializerStrategy, useSetters=true)
+            @TupleConstructor(includes='')
+            @Builder(builderStrategy=InitializerStrategy, useSetters=true, force=true)
             class Person {
                 String name
                 void setName(String name) { this.name = name?.toUpperCase() }
@@ -743,7 +774,7 @@ class BuilderTransformTest extends CompilableTestSupport {
          '''
     }
 
-    void testInternalFieldsAreIncludedIfRequestedForInitializerStrategyStrategy_GROOVY6454() {
+    void testInternalFieldsAreIncludedIfRequestedForInitializerStrategy_GROOVY6454() {
         assertScript '''
             import groovy.transform.builder.*
 
@@ -775,5 +806,4 @@ class BuilderTransformTest extends CompilableTestSupport {
             assert new FooBuilder().name('Mary').build().name == 'John'
          '''
     }
-
 }

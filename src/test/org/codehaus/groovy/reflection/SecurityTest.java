@@ -19,16 +19,19 @@
 package org.codehaus.groovy.reflection;
 
 import groovy.lang.GroovyObjectSupport;
-import groovy.util.GroovyTestCase;
+import groovy.test.GroovyTestCase;
 import org.codehaus.groovy.runtime.InvokerInvocationException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.ReflectPermission;
+import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.security.AccessControlException;
 import java.security.Permission;
 import java.security.Permissions;
 import java.security.ProtectionDomain;
+
+import static groovy.test.GroovyAssert.isAtLeastJdk;
 
 public class SecurityTest extends GroovyTestCase {
 
@@ -127,7 +130,7 @@ public class SecurityTest extends GroovyTestCase {
         cachedMethodUnderTest = createCachedMethod("publicMethod");
         System.setSecurityManager(restrictiveSecurityManager);
         assertEquals("publicMethod", cachedMethodUnderTest.setAccessible().getName());
-        assertEquals("publicMethod", cachedMethodUnderTest.getCachedMethod().getName());
+        assertEquals("publicMethod", cachedMethodUnderTest.getName());
     }
 
     public void testAccessesPublicFieldsWithoutChecks() throws Exception {
@@ -155,7 +158,7 @@ public class SecurityTest extends GroovyTestCase {
         cachedMethodUnderTest = createCachedMethod("privateMethod");
         System.setSecurityManager(null);
         assertEquals("privateMethod", cachedMethodUnderTest.setAccessible().getName());
-        assertEquals("privateMethod", cachedMethodUnderTest.getCachedMethod().getName());
+        assertEquals("privateMethod", cachedMethodUnderTest.getName());
     }
 
     public void testChecksReflectPermissionForInvokeOnPrivateMethods() throws Exception {
@@ -214,6 +217,10 @@ public class SecurityTest extends GroovyTestCase {
     }
 
     public void testChecksReflectPermissionForInvokeOnPackagePrivateMethodsInRestrictedJavaPackages() throws Exception {
+        // FIX_JDK9 remove this exemption for JDK9
+        if (isAtLeastJdk("9.0")) {
+            return;
+        }
         cachedMethodUnderTest = createCachedMethod(ClassLoader.class, "getBootstrapClassPath", new Class[0]);
         System.setSecurityManager(restrictiveSecurityManager);
 

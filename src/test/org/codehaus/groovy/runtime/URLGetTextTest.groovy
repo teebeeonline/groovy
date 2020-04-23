@@ -18,10 +18,10 @@
  */
 package org.codehaus.groovy.runtime
 
+import groovy.test.GroovyTestCase
+
 /**
  * Tests for {@link DefaultGroovyMethods} URL.getText() methods.
- *
- * @author Cedric Champeau
  */
 class URLGetTextTest extends GroovyTestCase {
     void testGetTextFromURLWithParameters() {

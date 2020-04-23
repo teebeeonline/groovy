@@ -18,7 +18,7 @@
  */
 package groovy.lang;
 
-import groovy.util.GroovyTestCase;
+import groovy.test.GroovyTestCase;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -28,8 +28,6 @@ import java.util.NoSuchElementException;
 
 /**
  * Provides unit tests for the {@link EmptyRange} class.
- *
- * @author Edwin Tellman
  */
 public class EmptyRangeTest extends GroovyTestCase {
 

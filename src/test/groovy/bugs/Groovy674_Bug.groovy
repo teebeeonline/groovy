@@ -18,11 +18,11 @@
  */
 package groovy.bugs
 
+import groovy.test.GroovyTestCase
+
 /**
  *  Test to ensure all the right exceptions are thrown for all the right/wrong combinations of
  *  parentheses and no parameters for print and println.
- *
- *  @author Russel Winder
  */
 class Groovy674_Bug extends GroovyTestCase {
   void testTopLevelPrintParenthesesNoParameter ( ) {

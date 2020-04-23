@@ -32,9 +32,11 @@ import org.codehaus.groovy.tools.groovydoc.LinkArgument;
 import org.codehaus.groovy.tools.groovydoc.gstringTemplates.GroovyDocTemplateInfo;
 
 import java.io.File;
-import java.io.FilenameFilter;
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Properties;
+import java.util.StringTokenizer;
 
 /**
  * Access to the GroovyDoc tool from Ant.
@@ -63,7 +65,7 @@ public class Groovydoc extends Task {
     private Boolean noVersionStamp;
     private final List<DirSet> packageSets;
     private final List<String> sourceFilesToDoc;
-    private final List<LinkArgument> links = new ArrayList<LinkArgument>();
+    private final List<LinkArgument> links = new ArrayList<>();
     private File overviewFile;
     private File styleSheetFile;
     // dev note: update javadoc comment for #setExtensions(String) if updating below
@@ -73,10 +75,10 @@ public class Groovydoc extends Task {
     private String fileEncoding;
 
     public Groovydoc() {
-        packageNames = new ArrayList<String>();
-        excludePackageNames = new ArrayList<String>();
+        packageNames = new ArrayList<>();
+        excludePackageNames = new ArrayList<>();
         packageSets = new ArrayList<DirSet>();
-        sourceFilesToDoc = new ArrayList<String>();
+        sourceFilesToDoc = new ArrayList<>();
         privateScope = false;
         protectedScope = false;
         publicScope = false;
@@ -328,11 +330,11 @@ public class Groovydoc extends Task {
      * elements.
      *
      * @param resultantPackages a list to which we add the packages found
-     * @param sourcePath a path to which we add each basedir found
+     * @param sourcePath        a path to which we add each basedir found
      * @since 1.5
      */
     private void parsePackages(List<String> resultantPackages, Path sourcePath) {
-        List<String> addedPackages = new ArrayList<String>();
+        List<String> addedPackages = new ArrayList<>();
         List<DirSet> dirSets = new ArrayList<DirSet>(packageSets);
 
         // for each sourcePath entry, add a directoryset with includes
@@ -385,34 +387,33 @@ public class Groovydoc extends Task {
             for (String dir : dirs) {
                 // are there any groovy or java files in this directory?
                 File pd = new File(baseDir, dir);
-                String[] files = pd.list(new FilenameFilter() {
-                    public boolean accept(File dir1, String name) {
-                        if (!includeNoSourcePackages
-                                && name.equals("package.html")) return true;
-                        final StringTokenizer tokenizer = new StringTokenizer(extensions, ":");
-                        while (tokenizer.hasMoreTokens()) {
-                            String ext = tokenizer.nextToken();
-                            if (name.endsWith(ext)) return true;
-                        }
-                        return false;
+                String[] files = pd.list((dir1, name) -> {
+                    if (!includeNoSourcePackages
+                            && name.equals("package.html")) return true;
+                    final StringTokenizer tokenizer = new StringTokenizer(extensions, ":");
+                    while (tokenizer.hasMoreTokens()) {
+                        String ext = tokenizer.nextToken();
+                        if (name.endsWith(ext)) return true;
                     }
+                    return false;
                 });
 
-                for (String filename : Arrays.asList(files)) {
-                    sourceFilesToDoc.add(dir + File.separator + filename);
-                }
-
-                if (files.length > 0) {
-                    if ("".equals(dir)) {
-                        log.warn(baseDir
-                                + " contains source files in the default package,"
-                                + " you must specify them as source files not packages.");
-                    } else {
-                        containsPackages = true;
-                        String pn = dir.replace(File.separatorChar, '.');
-                        if (!addedPackages.contains(pn)) {
-                            addedPackages.add(pn);
-                            resultantPackages.add(pn);
+                if (files != null) {
+                    for (String filename : files) {
+                        sourceFilesToDoc.add(dir + File.separator + filename);
+                    }
+                    if (files.length > 0) {
+                        if (dir.isEmpty()) {
+                            log.warn(baseDir
+                                    + " contains source files in the default package,"
+                                    + " you must specify them as source files not packages.");
+                        } else {
+                            containsPackages = true;
+                            String pn = dir.replace(File.separatorChar, '.');
+                            if (!addedPackages.contains(pn)) {
+                                addedPackages.add(pn);
+                                resultantPackages.add(pn);
+                            }
                         }
                     }
                 }
@@ -428,7 +429,7 @@ public class Groovydoc extends Task {
     }
 
     public void execute() throws BuildException {
-        List<String> packagesToDoc = new ArrayList<String>();
+        List<String> packagesToDoc = new ArrayList<>();
         Path sourceDirs = new Path(getProject());
         Properties properties = new Properties();
         properties.setProperty("windowTitle", windowTitle);
@@ -508,12 +509,12 @@ public class Groovydoc extends Task {
         links.add(result);
         return result;
     }
-    
+
     /**
      * Creates and returns an array of package template classpath entries.
      * <p>
      * This method is meant to be overridden by custom GroovyDoc implementations, using custom package templates.
-     * 
+     *
      * @return an array of package templates, whereas each entry is resolved as classpath entry, defaults to
      * {@link GroovyDocTemplateInfo#DEFAULT_PACKAGE_TEMPLATES}.
      */
@@ -525,7 +526,7 @@ public class Groovydoc extends Task {
      * Creates and returns an array of doc template classpath entries.
      * <p>
      * This method is meant to be overridden by custom GroovyDoc implementations, using custom doc templates.
-     * 
+     *
      * @return an array of doc templates, whereas each entry is resolved as classpath entry, defaults to
      * {@link GroovyDocTemplateInfo#DEFAULT_DOC_TEMPLATES}.
      */
@@ -537,7 +538,7 @@ public class Groovydoc extends Task {
      * Creates and returns an array of class template classpath entries.
      * <p>
      * This method is meant to be overridden by custom GroovyDoc implementations, using custom class templates.
-     * 
+     *
      * @return an array of class templates, whereas each entry is resolved as classpath entry, defaults to
      * {@link GroovyDocTemplateInfo#DEFAULT_CLASS_TEMPLATES}.
      */

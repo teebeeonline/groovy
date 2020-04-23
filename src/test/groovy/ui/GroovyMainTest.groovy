@@ -18,6 +18,10 @@
  */
 package groovy.ui
 
+import groovy.test.GroovyTestCase
+
+import static groovy.test.GroovyAssert.isAtLeastJdk
+
 class GroovyMainTest extends GroovyTestCase {
     private baos = new ByteArrayOutputStream()
     private ps = new PrintStream(baos)
@@ -26,7 +30,7 @@ class GroovyMainTest extends GroovyTestCase {
         String[] args = ['-h']
         GroovyMain.processArgs(args, ps)
         def out = baos.toString()
-        assert out.contains('usage: groovy')
+        assert out.contains('Usage: groovy')
         ['-a', '-c', '-d', '-e', '-h', '-i', '-l', '-n', '-p', '-v'].each{
             assert out.contains(it)
         }
@@ -51,7 +55,7 @@ class GroovyMainTest extends GroovyTestCase {
         String[] args = ['abc.java']
         GroovyMain.processArgs(args, ps)
         def out = baos.toString()
-        assert out.contains('error: error: cannot compile file with .java extension: abc.java')
+        assert out.contains('error: cannot compile file with .java extension: abc.java')
     }
 
     /**
@@ -138,6 +142,8 @@ assert new MyConcreteClass() != null"""
     }
 
     void testGroovyASTDump() {
+        // current xstream causes illegal access errors on JDK9+ - skip on those JDK versions, get coverage on older versions
+        if (isAtLeastJdk('9.0')) return
 
         def temporaryDirectory = new File("target/tmp/testGroovyXMLAstGeneration/")
         temporaryDirectory.mkdirs()

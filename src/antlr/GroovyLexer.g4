@@ -38,7 +38,6 @@ options {
 }
 
 @header {
-    import static org.apache.groovy.parser.antlr4.SemanticPredicates.*;
     import java.util.Deque;
     import java.util.ArrayDeque;
     import java.util.Map;
@@ -47,9 +46,16 @@ options {
     import java.util.HashSet;
     import java.util.Collections;
     import java.util.Arrays;
+    import java.util.stream.IntStream;
+    import java.util.logging.Logger;
+    import java.util.logging.Level;
+    import java.util.EmptyStackException;
+    import org.apache.groovy.util.Maps;
+    import static org.apache.groovy.parser.antlr4.SemanticPredicates.*;
 }
 
 @members {
+    private static final Logger LOGGER = Logger.getLogger(GroovyLexer.class.getName());
     private long tokenIndex     = 0;
     private int  lastTokenType  = 0;
     private int  invalidDigitCount = 0;
@@ -73,11 +79,14 @@ options {
         super.emit(token);
     }
 
-    private static final Set<Integer> REGEX_CHECK_SET =
-                                            Collections.unmodifiableSet(
-                                                new HashSet<>(Arrays.asList(Identifier, CapitalizedIdentifier, NullLiteral, BooleanLiteral, THIS, RPAREN, RBRACK, RBRACE, IntegerLiteral, FloatingPointLiteral, StringLiteral, GStringEnd, INC, DEC)));
+    private static final int[] REGEX_CHECK_ARRAY =
+                                    IntStream.of(
+                                        Identifier, CapitalizedIdentifier, NullLiteral, BooleanLiteral, THIS, RPAREN, RBRACK, RBRACE,
+                                        IntegerLiteral, FloatingPointLiteral, StringLiteral, GStringEnd, INC, DEC
+                                    ).sorted().toArray();
+
     private boolean isRegexAllowed() {
-        if (REGEX_CHECK_SET.contains(this.lastTokenType)) {
+        if (Arrays.binarySearch(REGEX_CHECK_ARRAY, this.lastTokenType) >= 0) {
             return false;
         }
 
@@ -135,26 +144,25 @@ options {
         }
     }
 
-    private static final Map<String, String> PAREN_MAP = Collections.unmodifiableMap(new HashMap<String, String>() {
-        {
-            put("(", ")");
-            put("[", "]");
-            put("{", "}");
-        }
-    });
+    protected void enterParenCallback(String text) {}
+
+    protected void exitParenCallback(String text) {}
 
     private final Deque<Paren> parenStack = new ArrayDeque<>(32);
+
     private void enterParen() {
-        parenStack.push(new Paren(getText(), this.lastTokenType, getLine(), getCharPositionInLine()));
-    }
-    private void exitParen() {
-        Paren paren = parenStack.peek();
         String text = getText();
+        enterParenCallback(text);
 
-        require(null != paren, "Too many '" + text + "'");
-        require(text.equals(PAREN_MAP.get(paren.getText())),
-                "'" + paren.getText() + "'" + new PositionInfo(paren.getLine(), paren.getColumn()) + " can not match '" + text + "'", -1);
+        parenStack.push(new Paren(text, this.lastTokenType, getLine(), getCharPositionInLine()));
+    }
 
+    private void exitParen() {
+        String text = getText();
+        exitParenCallback(text);
+
+        Paren paren = parenStack.peek();
+        if (null == paren) return;
         parenStack.pop();
     }
     private boolean isInsideParens() {
@@ -165,6 +173,7 @@ options {
         if (null == paren) {
             return false;
         }
+
         return ("(".equals(paren.getText()) && TRY != paren.getLastTokenType()) // we don't treat try-paren(i.e. try (....)) as parenthesis
                     || "[".equals(paren.getText());
     }
@@ -197,34 +206,47 @@ options {
     public int getErrorColumn() {
         return getCharPositionInLine() + 1;
     }
+
+    @Override
+    public int popMode() {
+        try {
+            return super.popMode();
+        } catch (EmptyStackException ignored) { // raised when parens are unmatched: too many ), ], or }
+            if (LOGGER.isLoggable(Level.FINEST)) {
+                LOGGER.finest(org.codehaus.groovy.runtime.DefaultGroovyMethods.asString(ignored));
+            }
+        }
+
+        return Integer.MIN_VALUE;
+    }
 }
 
 
 // §3.10.5 String Literals
 StringLiteral
-    :   GStringQuotationMark    DqStringCharacter*? GStringQuotationMark
-    |   SqStringQuotationMark   SqStringCharacter*? SqStringQuotationMark
+    :   GStringQuotationMark    DqStringCharacter* GStringQuotationMark
+    |   SqStringQuotationMark   SqStringCharacter* SqStringQuotationMark
 
     |   Slash      { this.isRegexAllowed() && _input.LA(1) != '*' }?
-                 SlashyStringCharacter+?       Slash
+                 SlashyStringCharacter+       Slash
 
-    |   TdqStringQuotationMark  TdqStringCharacter*?    TdqStringQuotationMark
-    |   TsqStringQuotationMark  TsqStringCharacter*?    TsqStringQuotationMark
-    |   DollarSlashyGStringQuotationMarkBegin   DollarSlashyStringCharacter+?   DollarSlashyGStringQuotationMarkEnd
+    |   TdqStringQuotationMark  TdqStringCharacter*    TdqStringQuotationMark
+    |   TsqStringQuotationMark  TsqStringCharacter*    TsqStringQuotationMark
+    |   DollarSlashyGStringQuotationMarkBegin   DollarSlashyStringCharacter+   DollarSlashyGStringQuotationMarkEnd
     ;
 
 // Groovy gstring
 GStringBegin
-    :   GStringQuotationMark DqStringCharacter*? Dollar -> pushMode(DQ_GSTRING_MODE), pushMode(GSTRING_TYPE_SELECTOR_MODE)
+    :   GStringQuotationMark DqStringCharacter* Dollar -> pushMode(DQ_GSTRING_MODE), pushMode(GSTRING_TYPE_SELECTOR_MODE)
     ;
 TdqGStringBegin
-    :   TdqStringQuotationMark   TdqStringCharacter*? Dollar -> type(GStringBegin), pushMode(TDQ_GSTRING_MODE), pushMode(GSTRING_TYPE_SELECTOR_MODE)
+    :   TdqStringQuotationMark   TdqStringCharacter* Dollar -> type(GStringBegin), pushMode(TDQ_GSTRING_MODE), pushMode(GSTRING_TYPE_SELECTOR_MODE)
     ;
 SlashyGStringBegin
-    :   Slash { this.isRegexAllowed() && _input.LA(1) != '*' }? SlashyStringCharacter*? Dollar { isFollowedByJavaLetterInGString(_input) }? -> type(GStringBegin), pushMode(SLASHY_GSTRING_MODE), pushMode(GSTRING_TYPE_SELECTOR_MODE)
+    :   Slash { this.isRegexAllowed() && _input.LA(1) != '*' }? SlashyStringCharacter* Dollar { isFollowedByJavaLetterInGString(_input) }? -> type(GStringBegin), pushMode(SLASHY_GSTRING_MODE), pushMode(GSTRING_TYPE_SELECTOR_MODE)
     ;
 DollarSlashyGStringBegin
-    :   DollarSlashyGStringQuotationMarkBegin DollarSlashyStringCharacter*? Dollar { isFollowedByJavaLetterInGString(_input) }? -> type(GStringBegin), pushMode(DOLLAR_SLASHY_GSTRING_MODE), pushMode(GSTRING_TYPE_SELECTOR_MODE)
+    :   DollarSlashyGStringQuotationMarkBegin DollarSlashyStringCharacter* Dollar { isFollowedByJavaLetterInGString(_input) }? -> type(GStringBegin), pushMode(DOLLAR_SLASHY_GSTRING_MODE), pushMode(GSTRING_TYPE_SELECTOR_MODE)
     ;
 
 mode DQ_GSTRING_MODE;
@@ -287,7 +309,8 @@ GStringPathPart
 RollBackOne
     :   . {
             // a trick to handle GStrings followed by EOF properly
-            if (EOF == _input.LA(1) && ('"' == _input.LA(-1) || '/' == _input.LA(-1))) {
+            int readChar = _input.LA(-1);
+            if (EOF == _input.LA(1) && ('"' == readChar || '/' == readChar)) {
                 setType(GStringEnd);
             } else {
                 setChannel(HIDDEN);
@@ -300,28 +323,28 @@ mode DEFAULT_MODE;
 // character in the double quotation string. e.g. "a"
 fragment
 DqStringCharacter
-    :   ~["\\$]
+    :   ~["\r\n\\$]
     |   EscapeSequence
     ;
 
 // character in the single quotation string. e.g. 'a'
 fragment
 SqStringCharacter
-    :   ~['\\]
+    :   ~['\r\n\\]
     |   EscapeSequence
     ;
 
 // character in the triple double quotation string. e.g. """a"""
 fragment TdqStringCharacter
     :   ~["\\$]
-    |   GStringQuotationMark { !(_input.LA(1) == '"' && _input.LA(2) == '"') }?
+    |   GStringQuotationMark { _input.LA(1) != '"' || _input.LA(2) != '"' || _input.LA(3) == '"' && (_input.LA(4) != '"' || _input.LA(5) != '"') }?
     |   EscapeSequence
     ;
 
 // character in the triple single quotation string. e.g. '''a'''
 fragment TsqStringCharacter
     :   ~['\\]
-    |   SqStringQuotationMark { !(_input.LA(1) == '\'' && _input.LA(2) == '\'') }?
+    |   SqStringQuotationMark { _input.LA(1) != '\'' || _input.LA(2) != '\'' || _input.LA(3) == '\'' && (_input.LA(4) != '\'' || _input.LA(5) != '\'') }?
     |   EscapeSequence
     ;
 
@@ -347,6 +370,8 @@ IN              : 'in';
 TRAIT           : 'trait';
 THREADSAFE      : 'threadsafe'; // reserved keyword
 
+// the reserved type name of Java10
+VAR             : 'var';
 
 // §3.9 Keywords
 BuiltInPrimitiveType
@@ -659,7 +684,7 @@ BooleanLiteral
 
 fragment
 EscapeSequence
-    :   Backslash [btnfr"'\\]
+    :   Backslash [btnfrs"'\\]
     |   OctalEscape
     |   UnicodeEscape
     |   DollarEscape
@@ -694,7 +719,12 @@ DollarEscape
 
 fragment
 LineEscape
-    :   Backslash '\r'? '\n'
+    :   Backslash LineTerminator
+    ;
+
+fragment
+LineTerminator
+    :   '\r'? '\n' | '\r'
     ;
 
 fragment
@@ -768,6 +798,7 @@ RANGE_INCLUSIVE     : '..';
 RANGE_EXCLUSIVE     : '..<';
 SPREAD_DOT          : '*.';
 SAFE_DOT            : '?.';
+SAFE_CHAIN_DOT      : '??.';
 ELVIS               : '?:';
 METHOD_POINTER      : '.&';
 METHOD_REFERENCE    : '::';
@@ -789,8 +820,10 @@ NOT_IN              : '!in'         { isFollowedBy(_input, ' ', '\t', '\r', '\n'
 
 LPAREN          : '('  { this.enterParen();     } -> pushMode(DEFAULT_MODE);
 RPAREN          : ')'  { this.exitParen();      } -> popMode;
+
 LBRACE          : '{'  { this.enterParen();     } -> pushMode(DEFAULT_MODE);
 RBRACE          : '}'  { this.exitParen();      } -> popMode;
+
 LBRACK          : '['  { this.enterParen();     } -> pushMode(DEFAULT_MODE);
 RBRACK          : ']'  { this.exitParen();      } -> popMode;
 
@@ -854,37 +887,19 @@ IdentifierInGString
     ;
 
 fragment
-JavaLetterInGString
-    :   [a-zA-Z_] // these are the "java letters" below 0x7F, except for $
-    |   // covers all characters above 0x7F which are not a surrogate
-        ~[\u0000-\u007F\uD800-\uDBFF]
-        {Character.isJavaIdentifierStart(_input.LA(-1))}?
-    |   // covers UTF-16 surrogate pairs encodings for U+10000 to U+10FFFF
-        [\uD800-\uDBFF] [\uDC00-\uDFFF]
-        {Character.isJavaIdentifierStart(Character.toCodePoint((char)_input.LA(-2), (char)_input.LA(-1)))}?
-    ;
-
-fragment
-JavaLetterOrDigitInGString
-    :   [a-zA-Z0-9_] // these are the "java letters or digits" below 0x7F, except for $
-    |   // covers all characters above 0x7F which are not a surrogate
-        ~[\u0000-\u007F\uD800-\uDBFF]
-        {Character.isJavaIdentifierPart(_input.LA(-1))}?
-    |   // covers UTF-16 surrogate pairs encodings for U+10000 to U+10FFFF
-        [\uD800-\uDBFF] [\uDC00-\uDFFF]
-        {Character.isJavaIdentifierPart(Character.toCodePoint((char)_input.LA(-2), (char)_input.LA(-1)))}?
-    ;
-
-
-fragment
 JavaLetter
     :   [a-zA-Z$_] // these are the "java letters" below 0x7F
     |   // covers all characters above 0x7F which are not a surrogate
         ~[\u0000-\u007F\uD800-\uDBFF]
-        {Character.isJavaIdentifierStart(_input.LA(-1))}?
+        { Character.isJavaIdentifierStart(_input.LA(-1)) && !Character.isIdentifierIgnorable(_input.LA(-1)) }?
     |   // covers UTF-16 surrogate pairs encodings for U+10000 to U+10FFFF
         [\uD800-\uDBFF] [\uDC00-\uDFFF]
-        {Character.isJavaIdentifierStart(Character.toCodePoint((char)_input.LA(-2), (char)_input.LA(-1)))}?
+        { Character.isJavaIdentifierStart(Character.toCodePoint((char) _input.LA(-2), (char) _input.LA(-1))) }?
+    ;
+
+fragment
+JavaLetterInGString
+    :   JavaLetter { _input.LA(-1) != '$' }?
     ;
 
 fragment
@@ -892,10 +907,20 @@ JavaLetterOrDigit
     :   [a-zA-Z0-9$_] // these are the "java letters or digits" below 0x7F
     |   // covers all characters above 0x7F which are not a surrogate
         ~[\u0000-\u007F\uD800-\uDBFF]
-        {Character.isJavaIdentifierPart(_input.LA(-1))}?
+        { Character.isJavaIdentifierPart(_input.LA(-1)) && !Character.isIdentifierIgnorable(_input.LA(-1)) }?
     |   // covers UTF-16 surrogate pairs encodings for U+10000 to U+10FFFF
         [\uD800-\uDBFF] [\uDC00-\uDFFF]
-        {Character.isJavaIdentifierPart(Character.toCodePoint((char)_input.LA(-2), (char)_input.LA(-1)))}?
+        { Character.isJavaIdentifierPart(Character.toCodePoint((char) _input.LA(-2), (char) _input.LA(-1))) }?
+    ;
+
+fragment
+JavaLetterOrDigitInGString
+    :   JavaLetterOrDigit  { _input.LA(-1) != '$' }?
+    ;
+
+fragment
+ShCommand
+    :   ~[\r\n\uFFFF]*
     ;
 
 //
@@ -908,15 +933,14 @@ ELLIPSIS : '...';
 //
 // Whitespace, line escape and comments
 //
-WS  :  ([ \t\u000C]+ | LineEscape+)     -> skip
+WS  : ([ \t]+ | LineEscape+) -> skip
     ;
-
 
 // Inside (...) and [...] but not {...}, ignore newlines.
-NL  : '\r'? '\n'            { this.ignoreTokenInsideParens(); }
+NL  : LineTerminator   { this.ignoreTokenInsideParens(); }
     ;
 
-// Multiple-line comments(including groovydoc comments)
+// Multiple-line comments (including groovydoc comments)
 ML_COMMENT
     :   '/*' .*? '*/'       { this.ignoreMultiLineCommentConditionally(); } -> type(NL)
     ;
@@ -929,7 +953,7 @@ SL_COMMENT
 // Script-header comments.
 // The very first characters of the file may be "#!".  If so, ignore the first line.
 SH_COMMENT
-    :   '#!' { require(0 == this.tokenIndex, "Shebang comment should appear at the first line", -2, true); } ~[\r\n\uFFFF]* -> skip
+    :   '#!' { require(0 == this.tokenIndex, "Shebang comment should appear at the first line", -2, true); } ShCommand (LineTerminator '#!' ShCommand)* -> skip
     ;
 
 // Unexpected characters will be handled by groovy parser later.

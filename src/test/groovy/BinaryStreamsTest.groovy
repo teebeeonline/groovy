@@ -16,12 +16,14 @@
  *  specific language governing permissions and limitations
  *  under the License.
  */
+package groovy
+
+import groovy.test.GroovyTestCase
+
 /**
  * Test case for DefaultGroovyMethods involving Object streams and data streams.
- *
- * @author Martin C. Martin
  */
-class BinaryStreamsTest extends GroovyTestCase {
+final class BinaryStreamsTest extends GroovyTestCase {
 
     void testNewObjectStream() {
         def temp1 = tempFile

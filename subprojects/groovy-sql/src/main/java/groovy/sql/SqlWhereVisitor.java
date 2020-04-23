@@ -18,9 +18,6 @@
  */
 package groovy.sql;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import groovy.lang.GroovyRuntimeException;
 import org.codehaus.groovy.ast.CodeVisitorSupport;
 import org.codehaus.groovy.ast.expr.BinaryExpression;
@@ -33,9 +30,9 @@ import org.codehaus.groovy.ast.stmt.ReturnStatement;
 import org.codehaus.groovy.syntax.Token;
 import org.codehaus.groovy.syntax.Types;
 
-/**
- * @author James Strachan
- */
+import java.util.ArrayList;
+import java.util.List;
+
 public class SqlWhereVisitor extends CodeVisitorSupport {
 
     private final StringBuffer buffer = new StringBuffer();

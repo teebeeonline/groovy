@@ -18,15 +18,13 @@
  */
 package org.codehaus.groovy.tools;
 
-import groovy.util.GroovyTestCase;
+import groovy.test.GroovyTestCase;
 import org.codehaus.groovy.control.CompilerConfiguration;
 
 import java.io.File;
 
 /**
  * A handy unit test case for dumping the output of the compiler
- *
- * @author <a href="mailto:james@coredevelopers.net">James Strachan</a>
  */
 public class CompilerTest extends GroovyTestCase {
 

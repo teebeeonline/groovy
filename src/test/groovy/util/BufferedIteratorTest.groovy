@@ -18,13 +18,12 @@
  */
 package groovy.util
 
+import groovy.test.GroovyTestCase
 import org.codehaus.groovy.util.ListBufferedIterator;
 import org.codehaus.groovy.util.IteratorBufferedIterator;
 
 /**
  * Test class for BufferedIterators.
- *
- * @author Andrew Taylor
  */
 class BufferedIteratorTest extends GroovyTestCase {
 

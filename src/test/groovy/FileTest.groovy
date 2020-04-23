@@ -18,14 +18,13 @@
  */
 package groovy
 
+import groovy.test.GroovyTestCase
+
 import static groovy.io.FileType.*
 import static groovy.io.FileVisitResult.*
 
 /**
  * Unit test for File GDK methods
- *
- * @author Marc Guillemot
- * @author Paul King
  */
 class FileTest extends GroovyTestCase {
 

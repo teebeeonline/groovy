@@ -17,12 +17,12 @@
  *  under the License.
  */
 package groovy
+
+import groovy.test.GroovyTestCase
+
 /**
  * to prove GROOVY-467 is no longer an issue    
- * 
- * @author <a href="mailto:jeremy.rayner@bigfoot.com">Jeremy Rayner</a>
  */
-
 class AmbiguousInvocationTest extends GroovyTestCase {
     def dummy1, dummy2
 

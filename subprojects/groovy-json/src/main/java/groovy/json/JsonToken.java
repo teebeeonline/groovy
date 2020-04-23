@@ -21,12 +21,15 @@ package groovy.json;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 
-import static groovy.json.JsonTokenType.*;
+import static groovy.json.JsonTokenType.FALSE;
+import static groovy.json.JsonTokenType.NULL;
+import static groovy.json.JsonTokenType.NUMBER;
+import static groovy.json.JsonTokenType.STRING;
+import static groovy.json.JsonTokenType.TRUE;
 
 /**
  * A JSON token, with a type, line / column information, and the text of that token.
  *
- * @author Guillaume Laforge
  * @since 1.8.0
  */
 public class JsonToken {

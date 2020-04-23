@@ -18,14 +18,14 @@
  */
 package org.codehaus.groovy.runtime.powerassert
 
+import groovy.test.GroovyTestCase
+
 import static AssertionTestUtil.*
 
 /**
  * Tests that certain kinds of assertions are not transformed.
- *
- * @author Peter Niederwieser
  */
-public class NotTransformedAssertionsTest extends GroovyTestCase {
+class NotTransformedAssertionsTest extends GroovyTestCase {
     void testAssertsWithMessage() {
         // no way to check whether this assertion has been transformed or not,
         // but at least make sure it doesn't fail

@@ -18,10 +18,10 @@
  */
 package groovy
 
+import groovy.test.GroovyTestCase
+
 /**
  * Test cases for encodeHex methods in DefaultGroovyMethods
- *
- * @author Brian Alexander (balexand@gmail.com)
  */
 class HexTest extends GroovyTestCase {
 

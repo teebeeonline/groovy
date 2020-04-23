@@ -1,3 +1,5 @@
+import groovy.test.GroovyTestCase
+
 /*
  *  Licensed to the Apache Software Foundation (ASF) under one
  *  or more contributor license agreements.  See the NOTICE file
@@ -146,6 +148,26 @@ def bono = new BandMember(name:'Bono', bandName: 'U2').toString()
 assert bono.toString() == 'BandMember(bandName:U2, name:Bono)'
 // end::tostring_example_includeSuperProperties[]
 
+'''
+
+        assertScript '''
+import groovy.transform.*
+
+// tag::tostring_example_includeSuperFields[]
+class Person {
+    protected String name
+}
+
+@ToString(includeSuperFields = true, includeNames = true)
+@MapConstructor(includeSuperFields = true)
+class BandMember extends Person {
+    String bandName
+}
+
+def bono = new BandMember(name:'Bono', bandName: 'U2').toString()
+
+assert bono.toString() == 'BandMember(bandName:U2, name:Bono)'
+// end::tostring_example_includeSuperFields[]
 '''
 
         assertScript '''
@@ -305,12 +327,33 @@ class Person extends Living {
 }
 
 def p1 = new Person(race:'Human', firstName: 'Jack', lastName: 'Nicholson')
-def p2 = new Person(race: 'Human beeing', firstName: 'Jack', lastName: 'Nicholson')
+def p2 = new Person(race: 'Human being', firstName: 'Jack', lastName: 'Nicholson')
 
 assert p1!=p2
 assert p1.hashCode() != p2.hashCode()
 // end::equalshashcode_example_super[]
 
+'''
+
+        assertScript '''
+import groovy.transform.EqualsAndHashCode
+
+// tag::equalshashcode_example_allProperties[]
+@EqualsAndHashCode(allProperties=true, excludes='first, last')
+class Person {
+    String first, last
+    String getInitials() { first[0] + last[0] }
+}
+
+def p1 = new Person(first: 'Jack', last: 'Smith')
+def p2 = new Person(first: 'Jack', last: 'Spratt')
+def p3 = new Person(first: 'Bob', last: 'Smith')
+
+assert p1 == p2
+assert p1.hashCode() == p2.hashCode()
+assert p1 != p3
+assert p1.hashCode() != p3.hashCode()
+// end::equalshashcode_example_allProperties[]
 '''
 
         assertScript '''
@@ -360,8 +403,10 @@ import groovy.transform.Immutable
 
 @Immutable
 class SlowHashCode {
+    static final SLEEP_PERIOD = 500
+
     int hashCode() {
-        sleep 100
+        sleep SLEEP_PERIOD
         127
     }
 }
@@ -377,7 +422,7 @@ p.hashCode()
 
 def start = System.currentTimeMillis()
 p.hashCode()
-assert System.currentTimeMillis() - start < 100
+assert System.currentTimeMillis() - start < SlowHashCode.SLEEP_PERIOD
 // end::equalshashcode_example_cache[]
 '''
     }
@@ -399,7 +444,6 @@ def p1 = new Person(firstName: 'Jack', lastName: 'Nicholson')
 def p2 = new Person('Jack', 'Nicholson')
 // generated tuple constructor with default value for second property
 def p3 = new Person('Jack')
-
 // end::tupleconstructor_simple[]
 
 assert p1.firstName == p2.firstName
@@ -614,6 +658,24 @@ final class Person {
 assert new Person('john smith').toString() == 'Person(john smith)'
 assert new Person('john', 'smith').toString() == 'Person(john smith)'
 // end::tupleconstructor_example_force[]
+'''
+
+        assertScript '''
+import groovy.transform.TupleConstructor
+
+// tag::tupleconstructor_example_allProperties[]
+@TupleConstructor(allProperties=true)
+class Person {
+    String first
+    private String last
+    void setLast(String last) {
+        this.last = last
+    }
+    String getName() { "$first $last" }
+}
+
+assert new Person('john', 'smith').name == 'john smith'
+// end::tupleconstructor_example_allProperties[]
 '''
 
         assertScript '''
@@ -883,7 +945,8 @@ class Base {
 @InheritConstructors(constructorAnnotations=true)
 class Child extends Base {}
 
-assert Child.constructors[0].annotations[0].annotationType().name == 'ConsAnno'
+assert Child.constructors[0].annotations[0].annotationType().name == 'groovy.transform.Generated'
+assert Child.constructors[0].annotations[1].annotationType().name == 'ConsAnno'
 // end::inheritconstructors_constructor_annotations[]
 '''
         assertScript '''
@@ -1154,6 +1217,81 @@ public int compareTo(java.lang.Object obj) {
 // end::sortable_custom_generated_compareTo[]
 */
         '''
+
+        assertScript '''
+import groovy.transform.*
+
+// tag::sortable_example_superProperties[]
+class Person {
+  String name
+}
+
+@Canonical(includeSuperProperties = true)
+@Sortable(includeSuperProperties = true)
+class Citizen extends Person {
+  String country
+}
+
+def people = [
+  new Citizen('Bob', 'Italy'),
+  new Citizen('Cathy', 'Hungary'),
+  new Citizen('Cathy', 'Egypt'),
+  new Citizen('Bob', 'Germany'),
+  new Citizen('Alan', 'France')
+]
+
+assert people.sort()*.name == ['Alan', 'Bob', 'Bob', 'Cathy', 'Cathy']
+assert people.sort()*.country == ['France', 'Germany', 'Italy', 'Egypt', 'Hungary']
+// end::sortable_example_superProperties[]
+        '''
+
+        assertScript '''
+import groovy.transform.*
+
+// tag::sortable_example_allNames[]
+import groovy.transform.*
+
+@Canonical(allNames = true)
+@Sortable(allNames = false)
+class Player {
+  String $country
+  String name
+}
+
+def finalists = [
+  new Player('USA', 'Serena'),
+  new Player('USA', 'Venus'),
+  new Player('USA', 'CoCo'),
+  new Player('Croatian', 'Mirjana')
+]
+
+assert finalists.sort()*.name == ['Mirjana', 'CoCo', 'Serena', 'Venus']
+// end::sortable_example_allNames[]
+        '''
+
+        assertScript '''
+import groovy.transform.*
+
+// tag::sortable_example_allProperties[]
+import groovy.transform.*
+
+@Canonical(includeFields = true)
+@Sortable(allProperties = true, includes = 'nameSize')
+class Player {
+  String name
+  int getNameSize() { name.size() }
+}
+
+def finalists = [
+  new Player('Serena'),
+  new Player('Venus'),
+  new Player('CoCo'),
+  new Player('Mirjana')
+]
+
+assert finalists.sort()*.name == ['CoCo', 'Venus', 'Serena', 'Mirjana']
+// end::sortable_example_allProperties[]
+        '''
     }
 
     void testBuilderSimple() {
@@ -1376,14 +1514,19 @@ firstLastAge()
 // tag::builder_initializer_immutable[]
 import groovy.transform.builder.*
 import groovy.transform.*
+import static groovy.transform.options.Visibility.PRIVATE
 
 @Builder(builderStrategy=InitializerStrategy)
 @Immutable
+@VisibilityOptions(PRIVATE)
 class Person {
     String first
     String last
     int born
 }
+
+def publicCons = Person.constructors
+assert publicCons.size() == 1
 
 @CompileStatic
 def createFirstLastBorn() {
@@ -1534,5 +1677,25 @@ class EmptyIterator implements java.util.Iterator<String> {
 // end::autoimplement_code_equiv[]
 */
         '''
+    }
+
+    void testNullCheck() {
+        assertScript '''
+ import groovy.transform.NullCheck
+ import static groovy.test.GroovyAssert.shouldFail
+
+// tag::nullcheck[]
+@NullCheck
+String longerOf(String first, String second) {
+    first.size() >= second.size() ? first : second
+}
+
+assert longerOf('cat', 'canary') == 'canary'
+def ex = shouldFail(IllegalArgumentException) {
+    longerOf('cat', null)
+}
+assert ex.message == 'second cannot be null'
+// end::nullcheck[]
+'''
     }
 }

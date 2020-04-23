@@ -18,9 +18,11 @@
  */
 package org.codehaus.groovy.runtime
 
+import groovy.test.GroovyTestCase
+
 class FileLeftShiftTest extends GroovyTestCase {
     void testFileLeftShift() {
-        def base = new File("target/classes/test/")
+        def base = new File("target/classes/")
         new File(base, "MyFileLeftShiftTest.txt").delete()
         new File(base, "MyFileLeftShiftTest.txt") << "This is " << "groovy"
         assertEquals(new File(base, "MyFileLeftShiftTest.txt").text, "This is groovy")
