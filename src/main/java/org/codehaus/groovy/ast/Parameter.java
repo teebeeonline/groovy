@@ -51,23 +51,27 @@ public class Parameter extends AnnotatedNode implements Variable {
         this.hasDefaultValue = defaultValue != null;
     }
 
+    @Override
     public String toString() {
         return super.toString() + "[name:" + name + ((type == null) ? "" : " type: " + type.getName()) + ", hasDefaultValue: " + this.hasInitialExpression() + "]";
     }
 
+    @Override
     public String getName() {
         return name;
     }
 
+    @Override
     public ClassNode getType() {
         return type;
     }
 
     public void setType(ClassNode type) {
         this.type = type;
-        dynamicTyped = (dynamicTyped || type == ClassHelper.DYNAMIC_TYPE);
+        dynamicTyped = dynamicTyped || ClassHelper.isDynamicTyped(type);
     }
 
+    @Override
     public boolean hasInitialExpression() {
         return this.hasDefaultValue;
     }
@@ -76,6 +80,7 @@ public class Parameter extends AnnotatedNode implements Variable {
      * @return the default value expression for this parameter or null if
      * no default value is specified
      */
+    @Override
     public Expression getInitialExpression() {
         return defaultValue;
     }
@@ -85,6 +90,7 @@ public class Parameter extends AnnotatedNode implements Variable {
         hasDefaultValue = defaultValue != null;
     }
 
+    @Override
     public boolean isInStaticContext() {
         return inStaticContext;
     }
@@ -93,22 +99,27 @@ public class Parameter extends AnnotatedNode implements Variable {
         this.inStaticContext = inStaticContext;
     }
 
+    @Override
     public boolean isDynamicTyped() {
         return dynamicTyped;
     }
 
+    @Override
     public boolean isClosureSharedVariable() {
         return closureShare;
     }
 
+    @Override
     public void setClosureSharedVariable(boolean inClosure) {
         closureShare = inClosure;
     }
 
+    @Override
     public int getModifiers() {
         return modifiers;
     }
 
+    @Override
     public ClassNode getOriginType() {
         return originType;
     }

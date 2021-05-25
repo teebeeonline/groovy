@@ -155,6 +155,7 @@ public class TemplateServlet extends AbstractHttpServlet {
             return true;
         }
 
+        @Override
         public String toString() {
             if (date == null) {
                 return "Hit #" + hit;
@@ -353,6 +354,7 @@ public class TemplateServlet extends AbstractHttpServlet {
      * @throws ServletException if this method encountered difficulties
      * @see TemplateServlet#initTemplateEngine(ServletConfig)
      */
+    @Override
     public void init(ServletConfig config) throws ServletException {
         super.init(config);
         this.engine = initTemplateEngine(config);
@@ -386,7 +388,7 @@ public class TemplateServlet extends AbstractHttpServlet {
             return new SimpleTemplateEngine();
         }
         try {
-            return (TemplateEngine) Class.forName(name).getDeclaredConstructor().newInstance();
+            return Class.forName(name).asSubclass(TemplateEngine.class).getDeclaredConstructor().newInstance();
         } catch (InstantiationException | InvocationTargetException e) {
             log("Could not instantiate template engine: " + name, e);
         } catch (IllegalAccessException e) {
@@ -408,6 +410,7 @@ public class TemplateServlet extends AbstractHttpServlet {
      * @throws IOException      if an input or output error occurs while the servlet is handling the HTTP request
      * @throws ServletException if the HTTP request cannot be handled
      */
+    @Override
     public void service(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         if (verbose) {
             log("Creating/getting cached template...");

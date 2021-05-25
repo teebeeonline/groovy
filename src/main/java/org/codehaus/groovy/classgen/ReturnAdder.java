@@ -36,10 +36,12 @@ import org.codehaus.groovy.ast.stmt.ThrowStatement;
 import org.codehaus.groovy.ast.stmt.TryCatchStatement;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 
 import static org.codehaus.groovy.ast.tools.GeneralUtils.nullX;
+import static org.codehaus.groovy.runtime.DefaultGroovyMethods.last;
 
 /**
  * Utility class to add return statements.
@@ -100,11 +102,11 @@ public class ReturnAdder {
 
     private Statement addReturnsIfNeeded(final Statement statement, final VariableScope scope) {
         if (statement instanceof ReturnStatement || statement instanceof ThrowStatement
-                || statement instanceof BytecodeSequence) {
+                || statement instanceof EmptyStatement || statement instanceof BytecodeSequence) {
             return statement;
         }
 
-        if (statement instanceof EmptyStatement || statement == null) {
+        if (statement == null) {
             ReturnStatement returnStatement = new ReturnStatement(nullX());
             listener.returnStatementAdded(returnStatement);
             return returnStatement;
@@ -139,11 +141,16 @@ public class ReturnAdder {
 
         if (statement instanceof SwitchStatement) {
             SwitchStatement switchStatement = (SwitchStatement) statement;
-            for (CaseStatement caseStatement : switchStatement.getCaseStatements()) {
-                Statement code = adjustSwitchCaseCode(caseStatement.getCode(), scope, false);
+            Statement defaultStatement = switchStatement.getDefaultStatement();
+            List<CaseStatement> caseStatements = switchStatement.getCaseStatements();
+            for (Iterator<CaseStatement> it = caseStatements.iterator(); it.hasNext(); ) {
+                CaseStatement caseStatement = it.next();
+                Statement code = adjustSwitchCaseCode(caseStatement.getCode(), scope,
+                        // GROOVY-9896: return if no default and last case lacks break
+                        defaultStatement == EmptyStatement.INSTANCE && !it.hasNext());
                 if (doAdd) caseStatement.setCode(code);
             }
-            Statement defaultStatement = adjustSwitchCaseCode(switchStatement.getDefaultStatement(), scope, true);
+            defaultStatement = adjustSwitchCaseCode(defaultStatement, scope, true);
             if (doAdd) switchStatement.setDefaultStatement(defaultStatement);
             return switchStatement;
         }
@@ -178,15 +185,9 @@ public class ReturnAdder {
                 listener.returnStatementAdded(returnStatement);
                 return returnStatement;
             } else {
-                List<Statement> statements = blockStatement.getStatements();
-                int lastIndex = statements.size() - 1;
+                List<Statement> statements = blockStatement.getStatements(); int lastIndex = statements.size() - 1;
                 Statement last = addReturnsIfNeeded(statements.get(lastIndex), blockStatement.getVariableScope());
                 if (doAdd) statements.set(lastIndex, last);
-                if (!returns(last)) {
-                    ReturnStatement returnStatement = new ReturnStatement(nullX());
-                    listener.returnStatementAdded(returnStatement);
-                    if (doAdd) statements.add(returnStatement);
-                }
                 return blockStatement;
             }
         }
@@ -203,40 +204,28 @@ public class ReturnAdder {
         return blockStatement;
     }
 
-    private Statement adjustSwitchCaseCode(final Statement statement, final VariableScope scope, final boolean defaultCase) {
-        if (statement instanceof BlockStatement) {
-            List<Statement> statements = ((BlockStatement) statement).getStatements();
-            if (!statements.isEmpty()) {
-                int lastIndex = statements.size() - 1;
-                Statement last = statements.get(lastIndex);
-                if (last instanceof BreakStatement) {
-                    if (doAdd) {
-                        statements.remove(lastIndex);
-                        return addReturnsIfNeeded(statement, scope);
-                    } else {
-                        BlockStatement newBlock = new BlockStatement();
-                        for (int i = 0; i < lastIndex; i += 1) {
-                            newBlock.addStatement(statements.get(i));
-                        }
-                        return addReturnsIfNeeded(newBlock, scope);
+    private Statement adjustSwitchCaseCode(final Statement statement, final VariableScope scope, final boolean lastCase) {
+        if (!statement.isEmpty() && statement instanceof BlockStatement) {
+            BlockStatement block = (BlockStatement) statement;
+            int breakIndex = block.getStatements().size() - 1;
+            if (block.getStatements().get(breakIndex) instanceof BreakStatement) {
+                if (doAdd) {
+                    Statement breakStatement = block.getStatements().remove(breakIndex);
+                    if (breakIndex == 0) block.addStatement(EmptyStatement.INSTANCE);
+                    addReturnsIfNeeded(block, scope);
+                    // GROOVY-9880: some code structures will fall through
+                    Statement lastStatement = last(block.getStatements());
+                    if (!(lastStatement instanceof ReturnStatement
+                            || lastStatement instanceof ThrowStatement)) {
+                        block.addStatement(breakStatement);
                     }
-                } else if (defaultCase) {
-                    return addReturnsIfNeeded(statement, scope);
+                } else {
+                    addReturnsIfNeeded(new BlockStatement(block.getStatements().subList(0, breakIndex), null), scope);
                 }
+            } else if (lastCase) {
+                return addReturnsIfNeeded(statement, scope);
             }
         }
         return statement;
-    }
-
-    private static boolean returns(final Statement statement) {
-        return statement instanceof ReturnStatement
-            || statement instanceof BlockStatement
-            || statement instanceof IfStatement
-            || statement instanceof ExpressionStatement
-            || statement instanceof EmptyStatement
-            || statement instanceof TryCatchStatement
-            || statement instanceof ThrowStatement
-            || statement instanceof SynchronizedStatement
-            || statement instanceof BytecodeSequence;
     }
 }

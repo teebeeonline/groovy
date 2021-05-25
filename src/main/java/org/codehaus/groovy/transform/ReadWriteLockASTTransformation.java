@@ -30,7 +30,6 @@ import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.expr.Expression;
 import org.codehaus.groovy.ast.expr.MethodCallExpression;
 import org.codehaus.groovy.ast.stmt.Statement;
-import org.codehaus.groovy.ast.stmt.TryCatchStatement;
 import org.codehaus.groovy.control.CompilePhase;
 import org.codehaus.groovy.control.SourceUnit;
 
@@ -41,8 +40,11 @@ import static org.codehaus.groovy.ast.tools.GeneralUtils.block;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.callX;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.ctorX;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.stmt;
+import static org.codehaus.groovy.ast.tools.GeneralUtils.tryCatchS;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.varX;
-
+import static org.objectweb.asm.Opcodes.ACC_FINAL;
+import static org.objectweb.asm.Opcodes.ACC_PRIVATE;
+import static org.objectweb.asm.Opcodes.ACC_STATIC;
 
 /**
  * Handles generation of code for the {@code @}WithReadLock and {@code @}WithWriteLock annotation.<br>
@@ -60,6 +62,7 @@ public class ReadWriteLockASTTransformation extends AbstractASTTransformation {
     public static final String DEFAULT_STATIC_LOCKNAME = "$REENTRANTLOCK";
     public static final String DEFAULT_INSTANCE_LOCKNAME = "$reentrantlock";
 
+    @Override
     public void visit(ASTNode[] nodes, SourceUnit source) {
         init(nodes, source);
         AnnotatedNode parent = (AnnotatedNode) nodes[1];
@@ -94,10 +97,7 @@ public class ReadWriteLockASTTransformation extends AbstractASTTransformation {
             releaseLock.setImplicitThis(false);
 
             Statement originalCode = mNode.getCode();
-
-            mNode.setCode(block(
-                    stmt(acquireLock),
-                    new TryCatchStatement(originalCode, stmt(releaseLock))));
+            mNode.setCode(block(stmt(acquireLock), tryCatchS(originalCode, stmt(releaseLock))));
         }
     }
 

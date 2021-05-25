@@ -18,6 +18,7 @@
  */
 package groovy.transform.options;
 
+import groovy.transform.stc.POJO;
 import org.codehaus.groovy.ast.AnnotationNode;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.FieldNode;
@@ -27,14 +28,15 @@ import org.codehaus.groovy.ast.expr.ArgumentListExpression;
 import org.codehaus.groovy.ast.expr.Expression;
 import org.codehaus.groovy.ast.expr.MapExpression;
 import org.codehaus.groovy.ast.expr.MethodCallExpression;
+import org.codehaus.groovy.ast.expr.VariableExpression;
 import org.codehaus.groovy.ast.stmt.BlockStatement;
 import org.codehaus.groovy.ast.stmt.Statement;
 import org.codehaus.groovy.transform.AbstractASTTransformation;
-import org.codehaus.groovy.transform.ImmutableASTTransformation;
 import org.codehaus.groovy.transform.MapConstructorASTTransformation;
 
 import java.util.List;
 
+import static org.apache.groovy.ast.tools.ConstructorNodeUtils.checkPropNamesS;
 import static org.codehaus.groovy.ast.ClassHelper.make;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.args;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.assignS;
@@ -49,29 +51,31 @@ import static org.codehaus.groovy.ast.tools.GeneralUtils.stmt;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.varX;
 
 public class DefaultPropertyHandler extends PropertyHandler {
-    private static final ClassNode IMMUTABLE_XFORM_TYPE = make(ImmutableASTTransformation.class);
+    private static final ClassNode POJO_TYPE = make(POJO.class);
 
     @Override
-    public boolean validateAttributes(AbstractASTTransformation xform, AnnotationNode anno) {
+    public boolean validateAttributes(final AbstractASTTransformation xform, final AnnotationNode anno) {
         boolean success = true;
-        //success |= isValidAttribute(xform, anno, "");
+      //success |= isValidAttribute(xform, anno, "");
         return success;
     }
 
     @Override
-    public boolean validateProperties(AbstractASTTransformation xform, BlockStatement body, ClassNode cNode, List<PropertyNode> props) {
+    public boolean validateProperties(final AbstractASTTransformation xform, final BlockStatement body, final ClassNode cNode, final List<PropertyNode> props) {
         if (xform instanceof MapConstructorASTTransformation) {
-            body.addStatement(ifS(equalsNullX(varX("args")), assignS(varX("args"), new MapExpression())));
-            body.addStatement(stmt(callX(IMMUTABLE_XFORM_TYPE, "checkPropNames", args("this", "args"))));
+            VariableExpression namedArgs = varX("args");
+            body.addStatement(ifS(equalsNullX(namedArgs), assignS(namedArgs, new MapExpression())));
+            boolean pojo = !cNode.getAnnotations(POJO_TYPE).isEmpty();
+            body.addStatement(checkPropNamesS(namedArgs, pojo, props));
         }
         return super.validateProperties(xform, body, cNode, props);
     }
 
     @Override
-    public Statement createPropInit(AbstractASTTransformation xform, AnnotationNode anno, ClassNode cNode, PropertyNode pNode, Parameter namedArgsMap) {
+    public Statement createPropInit(final AbstractASTTransformation xform, final AnnotationNode anno, final ClassNode cNode, final PropertyNode pNode, final Parameter namedArgsMap) {
         String name = pNode.getName();
         FieldNode fNode = pNode.getField();
-        boolean useSetters = xform.memberHasValue(anno, "useSetters", true);
+        boolean useSetters = xform.memberHasValue(anno, "useSetters", Boolean.TRUE);
         boolean hasSetter = cNode.getProperty(name) != null && !fNode.isFinal();
         if (namedArgsMap != null) {
             return assignFieldS(useSetters, namedArgsMap, name);
@@ -85,22 +89,20 @@ public class DefaultPropertyHandler extends PropertyHandler {
         }
     }
 
-    private static Statement assignToFieldS(String name, Expression var) {
+    private static Statement assignToFieldS(final String name, final Expression var) {
         return assignS(propX(varX("this"), name), var);
     }
 
-    private static Statement setViaSetterS(String name, Expression var) {
+    private static Statement setViaSetterS(final String name, final Expression var) {
         return stmt(callThisX(getSetterName(name), var));
     }
 
-    private static Statement assignFieldS(boolean useSetters, Parameter map, String name) {
+    private static Statement assignFieldS(final boolean useSetters, final Parameter map, final String name) {
         ArgumentListExpression nameArg = args(constX(name));
         MethodCallExpression var = callX(varX(map), "get", nameArg);
         var.setImplicitThis(false);
         MethodCallExpression containsKey = callX(varX(map), "containsKey", nameArg);
         containsKey.setImplicitThis(false);
-        return ifS(containsKey, useSetters ?
-                setViaSetterS(name, var) :
-                assignToFieldS(name, var));
+        return ifS(containsKey, useSetters ? setViaSetterS(name, var) : assignToFieldS(name, var));
     }
 }

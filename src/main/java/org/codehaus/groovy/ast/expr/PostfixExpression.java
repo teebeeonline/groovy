@@ -35,14 +35,17 @@ public class PostfixExpression extends Expression {
         this.expression = expression;
     }
 
+    @Override
     public String toString() {
         return super.toString() + "[" + expression + operation + "]";
     }
 
+    @Override
     public void visit(GroovyCodeVisitor visitor) {
         visitor.visitPostfixExpression(this);
     }
 
+    @Override
     public Expression transformExpression(ExpressionTransformer transformer) {
         Expression ret = new PostfixExpression(transformer.transform(expression), operation); 
         ret.setSourcePosition(this);
@@ -62,10 +65,12 @@ public class PostfixExpression extends Expression {
         return expression;
     }
 
+    @Override
     public String getText() {
         return "(" + expression.getText() + operation.getText() + ")";
     }
 
+    @Override
     public ClassNode getType() {
         return expression.getType();
     }

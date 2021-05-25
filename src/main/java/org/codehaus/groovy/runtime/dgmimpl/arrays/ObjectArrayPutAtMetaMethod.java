@@ -36,10 +36,12 @@ public class ObjectArrayPutAtMetaMethod extends ArrayPutAtMetaMethod {
         parameterTypes = PARAM_CLASS_ARR;
     }
 
+    @Override
     public final CachedClass getDeclaringClass() {
         return OBJECT_ARR_CLASS;
     }
 
+    @Override
     public Object invoke(Object object, Object[] arguments) {
         final Object[] objects = (Object[]) object;
         final int index = normaliseIndex((Integer) arguments[0], objects.length);
@@ -56,6 +58,8 @@ public class ObjectArrayPutAtMetaMethod extends ArrayPutAtMetaMethod {
             }
         } else if (Character.class.isAssignableFrom(arrayComponentClass)) {
             adjustedNewVal = DefaultTypeTransformation.getCharFromSizeOneString(newValue);
+        } else if (String.class.equals(arrayComponentClass) && newValue instanceof GString) {
+            adjustedNewVal = DefaultTypeTransformation.castToType(newValue, arrayComponentClass);
         } else if (Number.class.isAssignableFrom(arrayComponentClass)) {
             if (newValue instanceof Character || newValue instanceof String || newValue instanceof GString) {
                 Character ch = DefaultTypeTransformation.getCharFromSizeOneString(newValue);
@@ -67,6 +71,7 @@ public class ObjectArrayPutAtMetaMethod extends ArrayPutAtMetaMethod {
         return adjustedNewVal;
     }
 
+    @Override
     public CallSite createPojoCallSite(CallSite site, MetaClassImpl metaClass, MetaMethod metaMethod, Class[] params, Object receiver, Object[] args) {
         if (!(args[0] instanceof Integer))
             return PojoMetaMethodSite.createNonAwareCallSite(site, metaClass, metaMethod, params, args);
@@ -79,6 +84,7 @@ public class ObjectArrayPutAtMetaMethod extends ArrayPutAtMetaMethod {
             super(site, metaClass, metaMethod, params);
         }
 
+        @Override
         public Object call(Object receiver, Object arg1, Object arg2) throws Throwable {
             if (checkPojoMetaClass()) {
                 try {

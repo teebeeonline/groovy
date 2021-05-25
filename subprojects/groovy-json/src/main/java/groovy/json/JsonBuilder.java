@@ -302,6 +302,7 @@ public class JsonBuilder extends GroovyObjectSupport implements Writable {
      * @param args the value associated with the key
      * @return a map with a single key
      */
+    @Override
     public Object invokeMethod(String name, Object args) {
         if (args != null && Object[].class.isAssignableFrom(args.getClass())) {
             Object[] arr = (Object[]) args;
@@ -377,6 +378,7 @@ public class JsonBuilder extends GroovyObjectSupport implements Writable {
      *
      * @return a JSON output
      */
+    @Override
     public String toString() {
         return generator.toJson(content);
     }
@@ -413,6 +415,7 @@ public class JsonBuilder extends GroovyObjectSupport implements Writable {
      * @param out a writer on which to serialize the JSON payload
      * @return the writer
      */
+    @Override
     public Writer writeTo(Writer out) throws IOException {
         return out.append(toString());
     }

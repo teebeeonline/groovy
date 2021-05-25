@@ -39,7 +39,6 @@ import org.codehaus.groovy.ast.tools.GeneralUtils;
 import org.codehaus.groovy.ast.tools.GenericsUtils;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.runtime.StringGroovyMethods;
-import org.objectweb.asm.Opcodes;
 
 import java.lang.annotation.Retention;
 import java.util.ArrayList;
@@ -52,8 +51,9 @@ import java.util.Map;
 import static groovy.transform.Undefined.isUndefined;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.getInstanceNonPropertyFieldNames;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.getSuperNonPropertyFields;
+import static org.codehaus.groovy.ast.ClassHelper.isObjectType;
 
-public abstract class AbstractASTTransformation implements Opcodes, ASTTransformation, ErrorCollecting {
+public abstract class AbstractASTTransformation implements ASTTransformation, ErrorCollecting {
     public static final ClassNode RETENTION_CLASSNODE = ClassHelper.makeWithoutCaching(Retention.class);
 
     protected SourceUnit sourceUnit;
@@ -224,6 +224,7 @@ public abstract class AbstractASTTransformation implements Opcodes, ASTTransform
         return list;
     }
 
+    @Override
     public void addError(String msg, ASTNode expr) {
         sourceUnit.getErrorCollector().addErrorAndContinue(msg + '\n', expr, sourceUnit);
     }
@@ -280,7 +281,7 @@ public abstract class AbstractASTTransformation implements Opcodes, ASTTransform
                 Map updatedGenericsSpec = new HashMap(genericsSpec);
                 while (!remaining.isEmpty()) {
                     ClassNode next = remaining.remove(0);
-                    if (!next.equals(ClassHelper.OBJECT_TYPE)) {
+                    if (!isObjectType(next)) {
                         updatedGenericsSpec = GenericsUtils.createGenericsSpec(next, updatedGenericsSpec);
                         for (MethodNode mn : next.getMethods()) {
                             MethodNode correctedMethodNode = GenericsUtils.correctToGenericsSpec(updatedGenericsSpec, mn);
@@ -304,7 +305,7 @@ public abstract class AbstractASTTransformation implements Opcodes, ASTTransform
             Map updatedGenericsSpec = new HashMap(genericsSpec);
             while (!remaining.isEmpty()) {
                 ClassNode next = remaining.remove(0);
-                if (!next.equals(ClassHelper.OBJECT_TYPE)) {
+                if (!isObjectType(next)) {
                     updatedGenericsSpec = GenericsUtils.createGenericsSpec(next, updatedGenericsSpec);
                     for (MethodNode mn : next.getMethods()) {
                         MethodNode correctedMethodNode = GenericsUtils.correctToGenericsSpec(updatedGenericsSpec, mn);

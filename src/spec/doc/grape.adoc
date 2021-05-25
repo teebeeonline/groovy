@@ -31,7 +31,7 @@ classpath, making scripting even easier. The simplest use is as simple as adding
 
 [source,groovy]
 --------------------------------------------------------------------
-@Grab(group='org.springframework', module='spring-orm', version='3.2.5.RELEASE')
+@Grab(group='org.springframework', module='spring-orm', version='5.2.8.RELEASE')
 import org.springframework.jdbc.core.JdbcTemplate
 --------------------------------------------------------------------
 
@@ -39,7 +39,7 @@ import org.springframework.jdbc.core.JdbcTemplate
 
 [source,groovy]
 --------------------------------------------------------------------
-@Grab('org.springframework:spring-orm:3.2.5.RELEASE')
+@Grab('org.springframework:spring-orm:5.2.8.RELEASE')
 import org.springframework.jdbc.core.JdbcTemplate
 --------------------------------------------------------------------
 
@@ -150,7 +150,7 @@ module system for Groovy. This allows a developer to write a script with
 an essentially arbitrary library requirement, and ship just the script.
 Grape will, at runtime, download as needed and link the named libraries
 and all dependencies forming a transitive closure when the script is run
-from existing repositories such as JCenter, Ibiblio and java.net.
+from existing repositories such as Maven Central.
 
 Grape follows the Ivy conventions for module version identification,
 with naming change.
@@ -256,10 +256,10 @@ different `ClassLoader` context then resolution may be re-run.
 be in the `ClassLoader` chain of the calling class. By default failure to
 have such a `ClassLoader` available will result in module resolution and
 an exception being thrown
-** The ClassLoader passed in via the `classLoader:` argument and it’s
+** The ClassLoader passed in via the `classLoader:` argument and its
 parent classloaders.
 ** The ClassLoader of the object passed in as the `referenceObject:`
-argument, and it’s parent classloaders.
+argument, and its parent classloaders.
 ** The ClassLoader of the class issuing the call to `grab`
 
 [[Grape-grabHashMapParameters]]
@@ -282,7 +282,7 @@ maven `runtime` and `master` scopes.
 revision must be used in case of conflicts, independently of
 * conflicts manager
 * `changing:` - <boolean>, default false - Whether the artifact can
-change without it’s version designation changing.
+change without its version designation changing.
 * `transitive:` - <boolean>, default true - Whether to resolve other
 dependencies this module has or not.
 

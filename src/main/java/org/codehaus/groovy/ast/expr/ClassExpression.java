@@ -31,18 +31,22 @@ public class ClassExpression extends Expression {
         super.setType(type);
     }
 
+    @Override
     public void visit(GroovyCodeVisitor visitor) {
         visitor.visitClassExpression(this);
     }
     
+    @Override
     public Expression transformExpression(ExpressionTransformer transformer) {
         return this;
     }
     
+    @Override
     public String getText() {
         return getType().getName();
     }
 
+    @Override
     public String toString() {
        return super.toString() + "[type: " + getType().getName() + "]";
     }

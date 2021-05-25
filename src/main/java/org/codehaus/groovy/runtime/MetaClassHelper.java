@@ -33,6 +33,7 @@ import org.codehaus.groovy.util.FastArray;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -42,6 +43,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import static org.codehaus.groovy.reflection.stdclasses.CachedSAMClass.getSAMMethod;
 
 public class MetaClassHelper {
 
@@ -290,56 +293,76 @@ public class MetaClassHelper {
         return Math.max(max, superClassMax);
     }
 
-    private static long calculateParameterDistance(Class argument, CachedClass parameter) {
-        /**
+    private static int getParameterCount(final Class<?> closureOrLambdaClass) {
+        int parameterCount = -2;
+        if (GeneratedClosure.class.isAssignableFrom(closureOrLambdaClass)) {
+            // determine parameter count from generated "doCall" method(s)
+            for (Method m : closureOrLambdaClass.getDeclaredMethods()) {
+                if (m.getName().equals("doCall")) {
+                    if (parameterCount != -2) {
+                        parameterCount = -1; // 0 or 1
+                    } else {
+                        parameterCount = m.getParameterCount();
+                    }
+                }
+            }
+        }
+        return parameterCount;
+    }
+
+    private static long calculateParameterDistance(final Class<?> argument, final CachedClass parameter) {
+        /*
          * note: when shifting with 32 bit, you should only shift on a long. If you do
          *       that with an int, then i==(i<<32), which means you loose the shift
          *       information
          */
 
-        if (parameter.getTheClass() == argument) return 0;
+        Class<?> parameterClass = parameter.getTheClass();
+        if (parameterClass == argument) return 0;
 
         if (parameter.isInterface()) {
-            int dist = getMaximumInterfaceDistance(argument, parameter.getTheClass()) << INTERFACE_SHIFT;
-            if (dist>-1 || !(argument!=null && Closure.class.isAssignableFrom(argument))) {
-                return dist;
-            } // else go to object case
+            long dist = getMaximumInterfaceDistance(argument, parameterClass);
+            if (dist >= 0 || argument == null || !Closure.class.isAssignableFrom(argument)) {
+                return dist << INTERFACE_SHIFT;
+            }
         }
 
         long objectDistance = 0;
         if (argument != null) {
-            long pd = getPrimitiveDistance(parameter.getTheClass(), argument);
-            if (pd != -1) return pd << PRIMITIVE_SHIFT;
+            long dist = getPrimitiveDistance(parameterClass, argument);
+            if (dist >= 0) {
+                return dist << PRIMITIVE_SHIFT;
+            }
 
             // add one to dist to be sure interfaces are preferred
-            objectDistance += PRIMITIVES.length + 1;
+            objectDistance += (PRIMITIVES.length + 1);
 
-            // GROOVY-5114 : if we have to choose between two methods
-            // foo(Object[]) and foo(Object) and that the argument is an array type
-            // then the array version should be preferred
+            // GROOVY-5114: if choosing between foo(Object[]) and foo(Object)
+            // and the argument is an array, then array version is preferable
             if (argument.isArray() && !parameter.isArray) {
-                objectDistance+=4;
+                objectDistance += 4;
             }
-            Class clazz = ReflectionCache.autoboxType(argument);
-            while (clazz != null) {
-                if (clazz == parameter.getTheClass()) break;
-                if (clazz == GString.class && parameter.getTheClass() == String.class) {
+
+            Method sam;
+            for (Class<?> c = ReflectionCache.autoboxType(argument); c != null && c != parameterClass; c = c.getSuperclass()) {
+                if (c == Closure.class && parameterClass.isInterface() && (sam = getSAMMethod(parameterClass)) != null) {
+                    if (getParameterCount(argument) == sam.getParameterCount()) objectDistance -= 1; // GROOVY-9881
+                    objectDistance += 5; // ahead of Object but behind GroovyObjectSupport
+                    break;
+                }
+                if (c == GString.class && parameterClass == String.class) {
                     objectDistance += 2;
                     break;
                 }
-                clazz = clazz.getSuperclass();
                 objectDistance += 3;
             }
         } else {
-            // choose the distance to Object if a parameter is null
-            // this will mean that Object is preferred over a more
-            // specific type
-            Class clazz = parameter.getTheClass();
-            if (clazz.isPrimitive()) {
+            // choose the distance to Object if an argument is null, which means
+            // that Object is preferred over a more specific type
+            if (parameterClass.isPrimitive()) {
                 objectDistance += 2;
             } else {
-                while (clazz != Object.class && clazz != null) {
-                    clazz = clazz.getSuperclass();
+                for (Class<?> c = parameterClass; c != null && c != Object.class; c = c.getSuperclass()) {
                     objectDistance += 2;
                 }
             }
@@ -349,10 +372,11 @@ public class MetaClassHelper {
 
     public static long calculateParameterDistance(Class[] arguments, ParameterTypes pt) {
         CachedClass[] parameters = pt.getParameterTypes();
-        if (parameters.length == 0) return 0;
+        final int parametersLength = parameters.length;
+        if (parametersLength == 0) return 0;
 
         long ret = 0;
-        int noVargsLength = parameters.length - 1;
+        int noVargsLength = parametersLength - 1;
 
         // if the number of parameters does not match we have 
         // a vargs usage
@@ -444,7 +468,8 @@ public class MetaClassHelper {
             ret += calculateParameterDistance(arguments[i], parameters[i]);
         }
 
-        if (arguments.length == parameters.length) {
+        final int argumentsLength = arguments.length;
+        if (argumentsLength == parametersLength) {
             // case C&D, we use baseType to calculate and set it
             // to the value we need according to case C and D
             CachedClass baseType = parameters[noVargsLength]; // case C
@@ -453,13 +478,13 @@ public class MetaClassHelper {
                 ret += 2L << VARGS_SHIFT; // penalty for vargs
             }
             ret += calculateParameterDistance(arguments[noVargsLength], baseType);
-        } else if (arguments.length > parameters.length) {
+        } else if (argumentsLength > parametersLength) {
             // case B
             // we give our a vargs penalty for each exceeding argument and iterate
             // by using parameters[noVargsLength].getComponentType()
-            ret += (2L + arguments.length - parameters.length) << VARGS_SHIFT; // penalty for vargs
+            ret += (2L + argumentsLength - parametersLength) << VARGS_SHIFT; // penalty for vargs
             CachedClass vargsType = ReflectionCache.getCachedClass(parameters[noVargsLength].getTheClass().getComponentType());
-            for (int i = noVargsLength; i < arguments.length; i++) {
+            for (int i = noVargsLength; i < argumentsLength; i++) {
                 ret += calculateParameterDistance(arguments[i], vargsType);
             }
         } else {
@@ -787,8 +812,9 @@ public class MetaClassHelper {
     }
 
     public static boolean parametersAreCompatible(Class[] arguments, Class[] parameters) {
-        if (arguments.length != parameters.length) return false;
-        for (int i = 0; i < arguments.length; i++) {
+        final int argumentsLength = arguments.length;
+        if (argumentsLength != parameters.length) return false;
+        for (int i = 0; i < argumentsLength; i++) {
             if (!isAssignableFrom(parameters[i], arguments[i])) return false;
         }
         return true;

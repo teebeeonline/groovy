@@ -19,7 +19,6 @@
 package org.codehaus.groovy.control;
 
 import org.codehaus.groovy.ast.ClassCodeExpressionTransformer;
-import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.FieldNode;
 import org.codehaus.groovy.ast.expr.ClosureExpression;
@@ -34,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.codehaus.groovy.ast.ClassHelper.isPrimitiveType;
+import static org.codehaus.groovy.ast.ClassHelper.isGroovyObjectType;
 
 /**
  * Visitor to produce several optimizations:
@@ -74,7 +74,7 @@ public class OptimizerVisitor extends ClassCodeExpressionTransformer {
             ClassNode[] interfaces = node.getInterfaces();
             boolean needsFix = false;
             for (ClassNode classNode : interfaces) {
-                if (classNode.equals(ClassHelper.GROOVY_OBJECT_TYPE)) {
+                if (isGroovyObjectType(classNode)) {
                     needsFix = true;
                     break;
                 }
@@ -82,7 +82,7 @@ public class OptimizerVisitor extends ClassCodeExpressionTransformer {
             if (needsFix) {
                 List<ClassNode> newInterfaces = new ArrayList<ClassNode>(interfaces.length);
                 for (ClassNode classNode : interfaces) {
-                    if (!classNode.equals(ClassHelper.GROOVY_OBJECT_TYPE)) {
+                    if (!isGroovyObjectType(classNode)) {
                         newInterfaces.add(classNode);
                     }
                 }
@@ -129,6 +129,7 @@ public class OptimizerVisitor extends ClassCodeExpressionTransformer {
         }
     }
 
+    @Override
     public Expression transform(Expression exp) {
         if (exp == null) return null;
         if (!currentClass.isInterface() && exp.getClass() == ConstantExpression.class) {
@@ -137,10 +138,12 @@ public class OptimizerVisitor extends ClassCodeExpressionTransformer {
         return exp.transformExpression(this);
     }
 
+    @Override
     protected SourceUnit getSourceUnit() {
         return source;
     }
 
+    @Override
     public void visitClosureExpression(ClosureExpression expression) {
         /*
          * GROOVY-3339 - do nothing - so that numbers don't get replaced by cached constants in closure classes

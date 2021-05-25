@@ -21,14 +21,13 @@ package org.codehaus.groovy.classgen;
 import org.codehaus.groovy.ast.ClassCodeVisitorSupport;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.control.SourceUnit;
-import org.objectweb.asm.Opcodes;
 
 import java.util.LinkedList;
 
 /**
  * Abstract base class for generator of Java class versions of Groovy AST classes
  */
-public abstract class ClassGenerator extends ClassCodeVisitorSupport implements Opcodes {
+public abstract class ClassGenerator extends ClassCodeVisitorSupport {
     // inner classes created while generating bytecode
     protected LinkedList<ClassNode> innerClasses = new LinkedList<ClassNode>();
 
@@ -36,6 +35,7 @@ public abstract class ClassGenerator extends ClassCodeVisitorSupport implements 
         return innerClasses;
     }
 
+    @Override
     protected SourceUnit getSourceUnit() {
         return null;
     }

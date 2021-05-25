@@ -25,6 +25,7 @@ import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.FieldNode;
 import org.codehaus.groovy.ast.InnerClassNode;
+import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.Parameter;
 import org.codehaus.groovy.ast.PropertyNode;
 import org.codehaus.groovy.ast.expr.ConstantExpression;
@@ -37,6 +38,7 @@ import org.codehaus.groovy.ast.stmt.Statement;
 import org.codehaus.groovy.ast.stmt.SynchronizedStatement;
 import org.codehaus.groovy.control.CompilePhase;
 import org.codehaus.groovy.control.SourceUnit;
+import org.objectweb.asm.Opcodes;
 
 import java.lang.ref.SoftReference;
 
@@ -51,6 +53,7 @@ import static org.codehaus.groovy.ast.tools.GeneralUtils.callX;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.classX;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.ctorX;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.declS;
+import static org.codehaus.groovy.ast.tools.GeneralUtils.getSetterName;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.ifElseS;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.localVarX;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.notNullX;
@@ -61,6 +64,13 @@ import static org.codehaus.groovy.ast.tools.GeneralUtils.propX;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.returnS;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.stmt;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.varX;
+import static org.codehaus.groovy.ast.ClassHelper.isPrimitiveBoolean;
+import static org.objectweb.asm.Opcodes.ACC_FINAL;
+import static org.objectweb.asm.Opcodes.ACC_PRIVATE;
+import static org.objectweb.asm.Opcodes.ACC_PROTECTED;
+import static org.objectweb.asm.Opcodes.ACC_PUBLIC;
+import static org.objectweb.asm.Opcodes.ACC_STATIC;
+import static org.objectweb.asm.Opcodes.ACC_SYNTHETIC;
 
 /**
  * Handles generation of code for the @Lazy annotation
@@ -70,6 +80,7 @@ public class LazyASTTransformation extends AbstractASTTransformation {
 
     private static final ClassNode SOFT_REF = makeWithoutCaching(SoftReference.class, false);
 
+    @Override
     public void visit(ASTNode[] nodes, SourceUnit source) {
         init(nodes, source);
         AnnotatedNode parent = (AnnotatedNode) nodes[1];
@@ -94,9 +105,9 @@ public class LazyASTTransformation extends AbstractASTTransformation {
         }
 
         if (soft instanceof ConstantExpression && ((ConstantExpression) soft).getValue().equals(true)) {
-            createSoft(fieldNode, init);
+            createSoft(fieldNode, init, xform);
         } else {
-            create(fieldNode, init);
+            create(fieldNode, init, xform);
             // @Lazy not meaningful with primitive so convert to wrapper if needed
             if (ClassHelper.isPrimitiveType(fieldNode.getType())) {
                 fieldNode.setType(ClassHelper.getWrapper(fieldNode.getType()));
@@ -104,7 +115,7 @@ public class LazyASTTransformation extends AbstractASTTransformation {
         }
     }
 
-    private static void create(FieldNode fieldNode, final Expression initExpr) {
+    private static void create(FieldNode fieldNode, final Expression initExpr, ErrorCollecting xform) {
         final BlockStatement body = new BlockStatement();
         if (fieldNode.isStatic()) {
             addHolderClassIdiomBody(body, fieldNode, initExpr);
@@ -113,7 +124,7 @@ public class LazyASTTransformation extends AbstractASTTransformation {
         } else {
             addNonThreadSafeBody(body, fieldNode, initExpr);
         }
-        addMethod(fieldNode, body, fieldNode.getType());
+        addMethod(fieldNode, body, fieldNode.getType(), xform);
     }
 
     private static void addHolderClassIdiomBody(BlockStatement body, FieldNode fieldNode, Expression initExpr) {
@@ -162,26 +173,39 @@ public class LazyASTTransformation extends AbstractASTTransformation {
         body.addStatement(ifElseS(notNullX(fieldExpr), stmt(fieldExpr), assignS(fieldExpr, initExpr)));
     }
 
-    private static void addMethod(FieldNode fieldNode, BlockStatement body, ClassNode type) {
+    private static void addMethod(FieldNode fieldNode, BlockStatement body, ClassNode type, ErrorCollecting xform) {
         int visibility = ACC_PUBLIC;
         if (fieldNode.isStatic()) visibility |= ACC_STATIC;
         String propName = capitalize(fieldNode.getName().substring(1));
         ClassNode declaringClass = fieldNode.getDeclaringClass();
-        addGeneratedMethod(declaringClass, "get" + propName, visibility, type, Parameter.EMPTY_ARRAY, ClassNode.EMPTY_ARRAY, body);
-        if (ClassHelper.boolean_TYPE.equals(type)) {
-            addGeneratedMethod(declaringClass, "is" + propName, visibility, type,
-                    Parameter.EMPTY_ARRAY, ClassNode.EMPTY_ARRAY, stmt(callThisX("get" + propName)));
+        addGeneratedMethodOrError(declaringClass, "get" + propName, visibility, type, body, xform, fieldNode);
+        if (isPrimitiveBoolean(type)) {
+            addGeneratedMethodOrError(declaringClass, "is" + propName, visibility, type, stmt(callThisX("get" + propName)), xform, fieldNode);
+        }
+        // expect no setter
+        MethodNode existing = declaringClass.getDeclaredMethod("set" + propName, params(param(fieldNode.getType(), "value")));
+        if (existing != null && (existing.getModifiers() & Opcodes.ACC_SYNTHETIC) == 0) {
+            xform.addError("Error during @Lazy processing: invalid explicit setter 'set" + propName + "' found", fieldNode);
         }
     }
 
-    private static void createSoft(FieldNode fieldNode, Expression initExpr) {
+    private static void addGeneratedMethodOrError(ClassNode declaringClass, String name, int visibility, ClassNode type, Statement body, ErrorCollecting xform, FieldNode fieldNode) {
+        Parameter[] params = Parameter.EMPTY_ARRAY;
+        MethodNode existing = declaringClass.getDeclaredMethod(name, params);
+        if (existing != null && (existing.getModifiers() & Opcodes.ACC_SYNTHETIC) == 0) {
+            xform.addError("Error during @Lazy processing: invalid explicit getter '" + name + "' found", fieldNode);
+        }
+        addGeneratedMethod(declaringClass, name, visibility, type, params, ClassNode.EMPTY_ARRAY, body);
+    }
+
+    private static void createSoft(FieldNode fieldNode, Expression initExpr, ErrorCollecting xform) {
         final ClassNode type = fieldNode.getType();
         fieldNode.setType(SOFT_REF);
-        createSoftGetter(fieldNode, initExpr, type);
+        createSoftGetter(fieldNode, initExpr, type, xform);
         createSoftSetter(fieldNode, type);
     }
 
-    private static void createSoftGetter(FieldNode fieldNode, Expression initExpr, ClassNode type) {
+    private static void createSoftGetter(FieldNode fieldNode, Expression initExpr, ClassNode type, ErrorCollecting xform) {
         final BlockStatement body = new BlockStatement();
         final Expression fieldExpr = varX(fieldNode);
         final Expression resExpr = localVarX("_result", type);
@@ -206,13 +230,13 @@ public class LazyASTTransformation extends AbstractASTTransformation {
         } else {
             body.addStatement(mainIf);
         }
-        addMethod(fieldNode, body, type);
+        addMethod(fieldNode, body, type, xform);
     }
 
     private static void createSoftSetter(FieldNode fieldNode, ClassNode type) {
         final BlockStatement body = new BlockStatement();
         final Expression fieldExpr = varX(fieldNode);
-        final String name = "set" + capitalize(fieldNode.getName().substring(1));
+        final String name = getSetterName(fieldNode.getName().substring(1));
         final Parameter parameter = param(type, "value");
         final Expression paramExpr = varX(parameter);
         body.addStatement(ifElseS(

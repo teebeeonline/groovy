@@ -37,10 +37,13 @@ import static org.apache.groovy.util.BeanUtils.capitalize;
 import static org.codehaus.groovy.ast.ClassHelper.make;
 import static org.codehaus.groovy.ast.ClassHelper.makeWithoutCaching;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.assignS;
+import static org.codehaus.groovy.ast.tools.GeneralUtils.getSetterName;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.indexX;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.params;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.stmt;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.varX;
+import static org.objectweb.asm.Opcodes.ACC_PUBLIC;
+import static org.objectweb.asm.Opcodes.ACC_STATIC;
 
 /**
  * Handles generation of code for the {@code @}IndexedProperty annotation.
@@ -53,6 +56,7 @@ public class IndexedPropertyASTTransformation extends AbstractASTTransformation 
     private static final String MY_TYPE_NAME = "@" + MY_TYPE.getNameWithoutPackage();
     private static final ClassNode LIST_TYPE = makeWithoutCaching(List.class, false);
 
+    @Override
     public void visit(ASTNode[] nodes, SourceUnit source) {
         init(nodes, source);
         AnnotatedNode parent = (AnnotatedNode) nodes[1];
@@ -113,7 +117,7 @@ public class IndexedPropertyASTTransformation extends AbstractASTTransformation 
                 new Parameter(ClassHelper.int_TYPE, "index"),
                 new Parameter(componentType, "value"));
         body.addStatement(assignS(indexX(varX(fNode), varX(theParams[0])), varX(theParams[1])));
-        addGeneratedMethod(cNode, makeName(fNode, "set"), getModifiers(fNode), ClassHelper.VOID_TYPE, theParams, null, body);
+        addGeneratedMethod(cNode, getSetterName(fNode.getName()), getModifiers(fNode), ClassHelper.VOID_TYPE, theParams, null, body);
     }
 
     private static ClassNode getComponentTypeForList(ClassNode fType) {

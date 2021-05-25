@@ -164,18 +164,13 @@ class ScriptToTreeNodeAdapter {
      *      a Groovy script in String form
      * @param compilePhase
      *      the int based CompilePhase to compile it to.
-     * @param indy
-     *      if {@code true} InvokeDynamic (Indy) bytecode is generated
      */
-    def compile(String script, int compilePhase, boolean indy=false) {
+    def compile(String script, int compilePhase) {
         def scriptName = 'script' + System.currentTimeMillis() + '.groovy'
         GroovyCodeSource codeSource = new GroovyCodeSource(script, scriptName, '/groovy/script')
         CompilerConfiguration cc = new CompilerConfiguration(config ?: CompilerConfiguration.DEFAULT)
         if (config) {
             cc.addCompilationCustomizers(*config.compilationCustomizers)
-        }
-        if (indy) {
-            cc.optimizationOptions.put(CompilerConfiguration.INVOKEDYNAMIC, true)
         }
         CompilationUnit cu = new CompilationUnit(cc, codeSource.codeSource, classLoader)
         cu.setClassgenCallback(classLoader.createCollector(cu, null))
@@ -405,28 +400,41 @@ class TreeNodeBuildingNodeOperation implements CompilationUnit.IPrimaryClassNode
     }
 
     private void doCollectMethodData(allMethods, List methods) {
-        methods?.each {MethodNode methodNode ->
+        methods?.each { MethodNode methodNode ->
             def ggrandchild = adapter.make(methodNode)
             allMethods.add(ggrandchild)
 
+            def returnType = nodeMaker.makeNode("Return Type")
+            def gggrandchild = adapter.make(methodNode.returnType)
+            ggrandchild.add(returnType)
+            returnType.add(gggrandchild)
+
             // print out parameters of method
-            methodNode.parameters?.each {Parameter parameter ->
-                def gggrandchild = adapter.make(parameter)
+            methodNode.parameters?.each { Parameter parameter ->
+                gggrandchild = adapter.make(parameter)
                 ggrandchild.add(gggrandchild)
                 if (parameter.initialExpression) {
                     TreeNodeBuildingVisitor visitor = new TreeNodeBuildingVisitor(adapter)
                     parameter.initialExpression.visit(visitor)
                     if (visitor.currentNode) gggrandchild.add(visitor.currentNode)
                 }
+                def type = nodeMaker.makeNode("Type")
+                type.add(adapter.make(parameter.type))
+                gggrandchild.add(type)
                 collectAnnotationData(gggrandchild, 'Annotations', parameter)
             }
 
             // print out code of method
             TreeNodeBuildingVisitor visitor = new TreeNodeBuildingVisitor(adapter)
             if (methodNode.code) {
+                def body = nodeMaker.makeNode("Body")
                 methodNode.code.visit(visitor)
-                if (visitor.currentNode) ggrandchild.add(visitor.currentNode)
+                if (visitor.currentNode) {
+                    ggrandchild.add(body)
+                    body.add(visitor.currentNode)
+                }
             }
+
             collectAnnotationData(ggrandchild, 'Annotations', methodNode)
         }
     }

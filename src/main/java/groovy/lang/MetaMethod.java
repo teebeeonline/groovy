@@ -146,6 +146,7 @@ public abstract class MetaMethod extends ParameterTypes implements Cloneable {
     /**
      * Returns a string representation of this method
      */
+    @Override
     public String toString() {
         return super.toString()
             + "[name: "
@@ -159,6 +160,7 @@ public abstract class MetaMethod extends ParameterTypes implements Cloneable {
             + "]";
     }
 
+    @Override
     public Object clone() {
         try {
             return super.clone();

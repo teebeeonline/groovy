@@ -23,6 +23,7 @@ import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.MethodNode
 import org.codehaus.groovy.ast.tools.WideningCategories
 import org.codehaus.groovy.classgen.GeneratorContext
+import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.CompilePhase
 import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.control.customizers.CompilationCustomizer
@@ -40,6 +41,19 @@ class TypeInferenceSTCTest extends StaticTypeCheckingTestCase {
         '''
     }
 
+    // GROOVY-9935
+    void testIntegerToNumber() {
+        ['def', 'int', 'Integer', 'BigInteger'].each { type ->
+            assertScript """
+                Number f() {
+                    $type n = 10
+                    return n
+                }
+                assert f() == 10
+            """
+        }
+    }
+
     void testGStringMethods() {
         assertScript '''
             def myname = 'Cedric'
@@ -48,35 +62,32 @@ class TypeInferenceSTCTest extends StaticTypeCheckingTestCase {
         '''
     }
 
-    void testAnnotationOnSingleMethod() {
-        GroovyShell shell = new GroovyShell()
-        shell.evaluate '''
-            // calling a method which has got some dynamic stuff in it
+    void testDynamicMethodWithinTypeCheckedClass() {
+        assertScript '''
+            import groovy.transform.*
 
-            import groovy.transform.TypeChecked
-            import groovy.xml.MarkupBuilder
-
-            class Greeter {
-                @TypeChecked
-                String greeting(String name) {
-                    generateMarkup(name.toUpperCase())
+            class C {
+                String m(String s) {
+                    generateMarkup(s.toUpperCase())
                 }
 
-                // MarkupBuilder is dynamic so we won't do typechecking here
-                String generateMarkup(String name) {
+                // MarkupBuilder is dynamic so skip type-checking
+                @TypeChecked(TypeCheckingMode.SKIP)
+                String generateMarkup(String s) {
                     def sw = new StringWriter()
-                    def mkp = new MarkupBuilder()
-                    mkp.html {
+                    def mb = new groovy.xml.MarkupBuilder(sw)
+                    mb.html {
                         body {
-                            div name
+                            div s
                         }
                     }
-                    sw
+                    sw.toString()
                 }
             }
 
-            def g = new Greeter()
-            g.greeting("Guillaume")
+            def c = new C()
+            def xml = c.m('x')
+            // TODO: check XML
         '''
     }
 
@@ -377,7 +388,7 @@ class TypeInferenceSTCTest extends StaticTypeCheckingTestCase {
         '''
     }
 
-    void testInstanceOfInferenceWithField() {
+    void testInstanceOfInferenceWithProperty1() {
         assertScript '''
             class A {
                 int x
@@ -389,7 +400,7 @@ class TypeInferenceSTCTest extends StaticTypeCheckingTestCase {
         '''
     }
 
-    void testInstanceOfInferenceWithFieldAndAssignment() {
+    void testInstanceOfInferenceWithProperty2() {
         shouldFailWithMessages '''
             class A {
                 int x
@@ -401,7 +412,7 @@ class TypeInferenceSTCTest extends StaticTypeCheckingTestCase {
         ''', 'Cannot assign value of type java.lang.String to variable of type int'
     }
 
-    void testInstanceOfInferenceWithMissingField() {
+    void testInstanceOfInferenceWithMissingProperty() {
         shouldFailWithMessages '''
             class A {
                 int x
@@ -411,6 +422,69 @@ class TypeInferenceSTCTest extends StaticTypeCheckingTestCase {
                 a.y = 2
             }
         ''', 'No such property: y for class: A'
+    }
+
+    // GROOVY-9967
+    void testInstanceOfInferenceWithSubclassProperty() {
+        assertScript '''
+            class A {
+                int i
+            }
+            class B extends A {
+                String s = 'foo'
+            }
+
+            String scenario1(x) {
+                (x instanceof String) ? x.toLowerCase() : 'bar'
+            }
+            String scenario2(B x) {
+                x.s
+            }
+            String scenario2a(B x) {
+                x.getS()
+            }
+            String scenario3(B x) {
+                (x instanceof B) ? x.s : 'bar'
+            }
+            String scenario3a(B x) {
+                (x instanceof B) ? x.getS() : 'bar'
+            }
+            String scenario4(A x) {
+                (x instanceof B) ? x.s : 'bar' // Access to A#s is forbidden
+            }
+            String scenario4a(A x) {
+                (x instanceof B) ? x.getS() : 'bar'
+            }
+
+            assert scenario1(null) == 'bar'
+            assert scenario1('Foo') == 'foo'
+            assert scenario2(new B()) == 'foo'
+            assert scenario2a(new B()) == 'foo'
+            assert scenario3(new B()) == 'foo'
+            assert scenario3a(new B()) == 'foo'
+
+            assert scenario4(new A()) == 'bar'
+            assert scenario4(new B()) == 'foo'
+            assert scenario4a(new A()) == 'bar'
+            assert scenario4a(new B()) == 'foo'
+        '''
+    }
+
+    // GROOVY-9953
+    void testInstanceOfPropagatesToLocalVariable() {
+        assertScript '''
+            class A {
+            }
+            A test(Object x) {
+                if (x instanceof A) {
+                    def y = x
+                    return y
+                } else {
+                    new A()
+                }
+            }
+            new A().with { assert test(it) === it }
+        '''
     }
 
     void testShouldNotFailWithWith() {
@@ -930,6 +1004,118 @@ class TypeInferenceSTCTest extends StaticTypeCheckingTestCase {
         '''
     }
 
+    // GROOVY-7549
+    void testShouldKeepDeclTypeWhenAssignedInaccessibleT() {
+        config.targetDirectory = File.createTempDir()
+        def parentDir = File.createTempDir()
+        try {
+            new File(parentDir, 'a').mkdir()
+            new File(parentDir, 'b').mkdir()
+
+            def a = new File(parentDir, 'a/Main.groovy')
+            a.write '''
+                package a
+                class Main {
+                  static main(args) {
+                    Face f = b.Maker.make() // returns b.Impl
+                    assert f.meth() == 1234
+                  }
+                }
+            '''
+            def b = new File(parentDir, 'a/Face.groovy')
+            b.write '''
+                package a
+                interface Face {
+                  int meth()
+                }
+            '''
+            def c = new File(parentDir, 'b/Impl.groovy')
+            c.write '''
+                package b
+                @groovy.transform.PackageScope
+                class Impl implements a.Face {
+                  int meth() {
+                    1234
+                  }
+                }
+            '''
+            def d = new File(parentDir, 'b/Maker.groovy')
+            d.write '''
+                package b
+                class Maker {
+                  static Impl make() { // probably should return a.Face
+                    new Impl()
+                  }
+                }
+            '''
+
+            def loader = new GroovyClassLoader(this.class.classLoader)
+            def cu = new CompilationUnit(config, null, loader)
+            cu.addSources(a, b, c, d)
+            cu.compile()
+
+            loader.addClasspath(config.targetDirectory.absolutePath)
+            loader.loadClass('a.Main', true).main()
+        } finally {
+            config.targetDirectory.deleteDir()
+            parentDir.deleteDir()
+        }
+    }
+
+    // GROOVY-5655
+    void testByteArrayInference() {
+        assertScript '''
+            @ASTTest(phase=INSTRUCTION_SELECTION, value={
+                assert node.getNodeMetaData(INFERRED_TYPE) == byte_TYPE.makeArray()
+            })
+            def b = "foo".bytes
+            new String(b)
+        '''
+    }
+
+    // GROOVY-
+    void testGetAnnotationFails() {
+        assertScript '''
+            import groovy.transform.*
+            import java.lang.annotation.*
+
+            @Retention(RetentionPolicy.RUNTIME)
+            @Target([ElementType.FIELD])
+            @interface Ann1 {}
+
+            @Retention(RetentionPolicy.RUNTIME)
+            @Target([ElementType.FIELD])
+            @interface Ann2 {}
+
+            class A {
+                @Ann2
+                String field
+            }
+
+            @ASTTest(phase=INSTRUCTION_SELECTION,value={
+                lookup('second').each {
+                  assert it.expression.getNodeMetaData(INFERRED_TYPE).name == 'Ann2'
+                }
+            })
+            def doit(obj, String propName) {
+                def field = obj.getClass().getDeclaredField(propName)
+                if (field) {
+                    @ASTTest(phase=INSTRUCTION_SELECTION,value={
+                        assert node.getNodeMetaData(INFERRED_TYPE).name == 'Ann1'
+                    })
+                    def annotation = field.getAnnotation Ann1
+                    if(true) {
+                        second: annotation = field.getAnnotation Ann2
+                    }
+                    return annotation
+                }
+                return null
+            }
+
+            assert Ann2.isAssignableFrom(doit(new A(), "field").class)
+        '''
+    }
+
     // GROOVY-9077
     void testInferredTypeForPropertyThatResolvesToMethod() {
         assertScript '''
@@ -960,6 +1146,29 @@ class TypeInferenceSTCTest extends StaticTypeCheckingTestCase {
             }
 
             meth()
+        '''
+    }
+
+    // GROOVY-10089
+    void testInferredTypeForMapOfList() {
+        assertScript '''
+            void test(... attributes) {
+                List one = [
+                    [id:'x', options:[count:1]]
+                ]
+                List two = attributes.collect {
+                    def node = Collections.singletonMap('children', one)
+                    if (node) {
+                        node = node.get('children').find { child -> child['id'] == 'x' }
+                    }
+                    // inferred type of node must be something like Map<String,List<...>>
+
+                    [id: it['id'], name: node['name'], count: node['options']['count']]
+                    //                                        ^^^^^^^^^^^^^^^ GroovyCastException (map ctor for Collection)
+                }
+            }
+
+            test( [id:'x'] )
         '''
     }
 }

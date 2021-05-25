@@ -30,6 +30,7 @@ import org.codehaus.groovy.runtime.IteratorClosureAdapter;
 import org.codehaus.groovy.runtime.MethodClosure;
 import org.codehaus.groovy.runtime.NullObject;
 import org.codehaus.groovy.runtime.ResourceGroovyMethods;
+import org.codehaus.groovy.runtime.StreamGroovyMethods;
 import org.codehaus.groovy.runtime.StringGroovyMethods;
 
 import java.io.File;
@@ -44,11 +45,17 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Supplier;
+import java.util.stream.BaseStream;
+import java.util.stream.DoubleStream;
+import java.util.stream.IntStream;
+import java.util.stream.LongStream;
+
+import static org.codehaus.groovy.reflection.ReflectionCache.isArray;
 
 /**
  * Class providing various type conversions, coercions and boxing/unboxing operations.
@@ -214,17 +221,18 @@ public class DefaultTypeTransformation {
         }
     }
 
-    public static Object castToType(Object object, Class type) {
-        if (object == null) return null;
+    public static Object castToType(final Object object, final Class type) {
+        if (object == null) return type == boolean.class ? Boolean.FALSE : null;
         if (type == Object.class) return object;
 
         final Class aClass = object.getClass();
-        if (type == aClass) return object;
-        if (type.isAssignableFrom(aClass)) return object;
+        if (type == aClass || type.isAssignableFrom(aClass)) {
+            return object;
+        }
 
-        if (ReflectionCache.isArray(type)) return asArray(object, type);
-
-        if (type.isEnum()) {
+        if (isArray(type)) {
+            return asArray(object, type);
+        } else if (type.isEnum()) {
             return ShortTypeHandling.castToEnum(object, type);
         } else if (Collection.class.isAssignableFrom(type)) {
             return continueCastOnCollection(object, type);
@@ -243,33 +251,37 @@ public class DefaultTypeTransformation {
         return continueCastOnNumber(object, type);
     }
 
-    private static Object continueCastOnCollection(Object object, Class type) {
-        int modifiers = type.getModifiers();
-        Collection answer;
-        if (object instanceof Collection && type.isAssignableFrom(LinkedHashSet.class) &&
-                (type == LinkedHashSet.class || Modifier.isAbstract(modifiers) || Modifier.isInterface(modifiers))) {
+    private static Object continueCastOnCollection(final Object object, final Class type) {
+        if (object instanceof Collection && type.isAssignableFrom(LinkedHashSet.class)) {
             return new LinkedHashSet((Collection) object);
         }
-        if (object.getClass().isArray()) {
-            if (type.isAssignableFrom(ArrayList.class) && (Modifier.isAbstract(modifiers) || Modifier.isInterface(modifiers))) {
-                answer = new ArrayList();
-            } else if (type.isAssignableFrom(LinkedHashSet.class) && (Modifier.isAbstract(modifiers) || Modifier.isInterface(modifiers))) {
-                answer = new LinkedHashSet();
+
+        Supplier<Collection> newCollection = () -> {
+            if (type.isAssignableFrom(ArrayList.class) && Modifier.isAbstract(type.getModifiers())) {
+                return new ArrayList();
+            } else if (type.isAssignableFrom(LinkedHashSet.class) && Modifier.isAbstract(type.getModifiers())) {
+                return new LinkedHashSet();
             } else {
-                // let's call the collections constructor
-                // passing in the list wrapper
                 try {
-                    answer = (Collection) type.getDeclaredConstructor().newInstance();
+                    return (Collection) type.getDeclaredConstructor().newInstance();
                 } catch (Exception e) {
                     throw new GroovyCastException("Could not instantiate instance of: " + type.getName() + ". Reason: " + e);
                 }
             }
+        };
 
+        if (object instanceof BaseStream) {
+            Collection answer = newCollection.get();
+            answer.addAll(asCollection(object));
+            return answer;
+        }
+
+        if (object.getClass().isArray()) {
+            Collection answer = newCollection.get();
             // we cannot just wrap in a List as we support primitive type arrays
             int length = Array.getLength(object);
-            for (int i = 0; i < length; i++) {
-                Object element = Array.get(object, i);
-                answer.add(element);
+            for (int i = 0; i < length; i += 1) {
+                answer.add(Array.get(object, i));
             }
             return answer;
         }
@@ -309,20 +321,10 @@ public class DefaultTypeTransformation {
                 return answer;
             }
             if (type == BigDecimal.class) {
-                if (n instanceof Float || n instanceof Double) {
-                    return new BigDecimal(n.doubleValue());
-                }
-                return new BigDecimal(n.toString());
+                return NumberMath.toBigDecimal(n);
             }
             if (type == BigInteger.class) {
-                if (object instanceof Float || object instanceof Double) {
-                    BigDecimal bd = new BigDecimal(n.doubleValue());
-                    return bd.toBigInteger();
-                }
-                if (object instanceof BigDecimal) {
-                    return ((BigDecimal) object).toBigInteger();
-                }
-                return new BigInteger(n.toString());
+                return NumberMath.toBigInteger(n);
             }
         }
 
@@ -417,39 +419,64 @@ public class DefaultTypeTransformation {
         throw gce;
     }
 
-    public static Object asArray(Object object, Class type) {
+    public static Object asArray(final Object object, final Class type) {
         if (type.isAssignableFrom(object.getClass())) {
             return object;
         }
 
-        Collection list = asCollection(object);
-        int size = list.size();
-        Class elementType = type.getComponentType();
-        Object array = Array.newInstance(elementType, size);
+        if (object instanceof IntStream) {
+            if (type.equals(int[].class)) {
+                return ((IntStream) object).toArray();
+            } else if (type.equals(long[].class)) {
+                return ((IntStream) object).asLongStream().toArray();
+            } else if (type.equals(double[].class)) {
+                return ((IntStream) object).asDoubleStream().toArray();
+            } else if (type.equals(Integer[].class)) {
+                return ((IntStream) object).boxed().toArray(Integer[]::new);
+            }
+        } else if (object instanceof LongStream) {
+            if (type.equals(long[].class)) {
+                return ((LongStream) object).toArray();
+            } else if (type.equals(double[].class)) {
+                return ((LongStream) object).asDoubleStream().toArray();
+            } else if (type.equals(Long[].class)) {
+                return ((LongStream) object).boxed().toArray(Long[]::new);
+            }
+        } else if (object instanceof DoubleStream) {
+            if (type.equals(double[].class)) {
+                return ((DoubleStream) object).toArray();
+            } else if (type.equals(Double[].class)) {
+                return ((DoubleStream) object).boxed().toArray(Double[]::new);
+            }
+        }
 
-        int idx = 0;
-        for (Iterator iter = list.iterator(); iter.hasNext(); idx++) {
-            Object element = iter.next();
-            Array.set(array, idx, castToType(element, elementType));
+        Class<?> elementType = type.getComponentType();
+        Collection<?> collection = asCollection(object);
+        Object array = Array.newInstance(elementType, collection.size());
+
+        int i = 0;
+        for (Object element : collection) {
+            Array.set(array, i++, castToType(element, elementType));
         }
 
         return array;
     }
 
-    public static <T> Collection<T> asCollection(T[] value) {
+    public static <T> Collection<T> asCollection(final T[] value) {
         return arrayAsCollection(value);
     }
 
-    public static Collection asCollection(Object value) {
+    public static Collection asCollection(final Object value) {
         if (value == null) {
             return Collections.EMPTY_LIST;
         } else if (value instanceof Collection) {
             return (Collection) value;
         } else if (value instanceof Map) {
-            Map map = (Map) value;
-            return map.entrySet();
+            return ((Map) value).entrySet();
         } else if (value.getClass().isArray()) {
             return arrayAsCollection(value);
+        } else if (value instanceof BaseStream) {
+            return StreamGroovyMethods.toList((BaseStream) value);
         } else if (value instanceof MethodClosure) {
             MethodClosure method = (MethodClosure) value;
             IteratorClosureAdapter adapter = new IteratorClosureAdapter(method.getDelegate());
@@ -589,12 +616,12 @@ public class DefaultTypeTransformation {
                     || (right.getClass() != Object.class && right.getClass().isAssignableFrom(left.getClass()) //GROOVY-4046
                     || right instanceof Comparable) // GROOVY-7954
             ) {
-                Comparable comparable = (Comparable) left;
                 // GROOVY-7876: when comparing for equality we try to only call compareTo when an assignable
                 // relationship holds but with a container/holder class and because of erasure, we might still end
                 // up with the prospect of a ClassCastException which we want to ignore but only if testing equality
                 try {
-                    return comparable.compareTo(right);
+                    // GROOVY-9711: don't rely on Java method selection
+                    return (int) InvokerHelper.invokeMethod(left, "compareTo", right);
                 } catch (ClassCastException cce) {
                     if (!equalityCheckOnly) cause = cce;
                 }

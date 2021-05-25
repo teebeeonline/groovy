@@ -52,6 +52,10 @@ import static org.codehaus.groovy.ast.tools.GeneralUtils.returnS;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.stmt;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.varX;
 import static org.codehaus.groovy.ast.tools.GenericsUtils.newClass;
+import static org.objectweb.asm.Opcodes.ACC_FINAL;
+import static org.objectweb.asm.Opcodes.ACC_PRIVATE;
+import static org.objectweb.asm.Opcodes.ACC_PROTECTED;
+import static org.objectweb.asm.Opcodes.ACC_STATIC;
 
 /**
  * Handles generation of code for the {@link Memoized} annotation.
@@ -69,6 +73,7 @@ public class MemoizedASTTransformation extends AbstractASTTransformation {
     private static final String METHOD_LABEL = "Priv";
     private static final ClassNode OVERRIDE_CLASSNODE = make(Override.class);
 
+    @Override
     public void visit(ASTNode[] nodes, final SourceUnit source) {
         init(nodes, source);
         AnnotationNode annotationNode = (AnnotationNode) nodes[0];
@@ -88,9 +93,9 @@ public class MemoizedASTTransformation extends AbstractASTTransformation {
             MethodNode delegatingMethod = buildDelegatingMethod(methodNode, ownerClassNode);
             addGeneratedMethod(ownerClassNode, delegatingMethod);
 
-            int modifiers = FieldNode.ACC_PRIVATE | FieldNode.ACC_FINAL;
+            int modifiers = ACC_PRIVATE | ACC_FINAL;
             if (methodNode.isStatic()) {
-                modifiers = modifiers | FieldNode.ACC_STATIC;
+                modifiers = modifiers | ACC_STATIC;
             }
 
             int protectedCacheSize = getMemberIntValue(annotationNode, PROTECTED_CACHE_SIZE_NAME);

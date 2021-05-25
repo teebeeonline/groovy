@@ -162,9 +162,6 @@ class Console implements CaretListener, HyperlinkListener, ComponentListener, Fo
     boolean loopMode = prefs.getBoolean('loopMode', false)
     int inputAreaContentHash
 
-    boolean indy = prefs.getBoolean('indy', false)
-    Action indyAction
-
     //to allow loading classes dynamically when using @Grab (GROOVY-4877, GROOVY-5871)
     boolean useScriptClassLoaderForScriptExecution = false
 
@@ -254,7 +251,6 @@ class Console implements CaretListener, HyperlinkListener, ComponentListener, Fo
             V(longOpt: 'version', messages['cli.option.version.description'])
             pa(longOpt: 'parameters', messages['cli.option.parameters.description'])
             pr(longOpt: 'enable-preview', messages['cli.option.enable.preview.description'])
-            i(longOpt: 'indy', messages['cli.option.indy.description'])
             D(longOpt: 'define', type: Map, argName: 'name=value', messages['cli.option.define.description'])
             _(longOpt: 'configscript', args: 1, messages['cli.option.configscript.description'])
         }
@@ -299,10 +295,6 @@ class Console implements CaretListener, HyperlinkListener, ComponentListener, Fo
         }
 
         baseConfig.setParameters(options.hasOption("pa"))
-
-        if (options.i) {
-            enableIndy(baseConfig)
-        }
 
         def console = new Console(Thread.currentThread().contextClassLoader, new Binding(), baseConfig)
         console.useScriptClassLoaderForScriptExecution = true
@@ -360,10 +352,6 @@ class Console implements CaretListener, HyperlinkListener, ComponentListener, Fo
     Console(ClassLoader parent, Binding binding = new Binding(), CompilerConfiguration baseConfig = new CompilerConfiguration(System.getProperties())) {
         this.baseConfig = baseConfig
         this.maxOutputChars = loadMaxOutputChars()
-        indy = indy || isIndyEnabled(baseConfig)
-        if (indy) {
-            enableIndy(baseConfig)
-        }
 
         // Set up output file for stdout/stderr, if any
         def outputLogFileName = prefs.get('outputLogFileName', null)
@@ -477,7 +465,7 @@ class Console implements CaretListener, HyperlinkListener, ComponentListener, Fo
             swing.consoleFrame.show()
         }
         installInterceptor()
-        updateTitle() // Title changes based on indy setting
+        updateTitle()
         swing.doLater inputArea.&requestFocus
     }
 
@@ -504,6 +492,7 @@ class Console implements CaretListener, HyperlinkListener, ComponentListener, Fo
         systemOutInterceptor.start()
         systemErrorInterceptor = new SystemOutputInterceptor(this.&notifySystemErr, false)
         systemErrorInterceptor.start()
+        // TODO: would this be a good place to assign the console id?
     }
 
     void addToHistory(record) {
@@ -557,6 +546,11 @@ class Console implements CaretListener, HyperlinkListener, ComponentListener, Fo
     }
 
     void appendStacktrace(text) {
+        // prevent NPE when outputArea is missing, i.e. there is currently no window present
+        // TODO the text should not be swallowed (options: postpone output, open new window, log file, terminal, ...)
+        if (outputArea == null) {
+            return
+        }
         def doc = outputArea.styledDocument
 
         // split lines by new line separator
@@ -837,6 +831,11 @@ class Console implements CaretListener, HyperlinkListener, ComponentListener, Fo
         swing.controller = consoleController
         swing.build(ConsoleActions)
         swing.build(ConsoleView)
+        // TODO The call to installInterceptor() conveys that the interceptors are installed for the new window,
+        //      but this seems not to be the case. Instead the method creates new interceptors for the current window.
+        //      The new window inherited the interceptors from this window a few statements above.
+        //      Actually - since System.out and System.err exists only once - there should be only one interceptor
+        //      forwarding to potentially more than one window.
         installInterceptor()
         nativeFullScreenForMac(swing.consoleFrame)
         swing.consoleFrame.pack()
@@ -1003,11 +1002,12 @@ class Console implements CaretListener, HyperlinkListener, ComponentListener, Fo
         appendStacktrace("\n${sw.builder}\n")
     }
 
-    def finishNormal(Object result) {
+    def finishNormal(Object result, Long elapsedTime=null) {
+        String elapsedTimeStr = null != elapsedTime ? " Elapsed time: ${elapsedTime}ms." : ''
         // Take down the wait/cancel dialog
         history[-1].result = result
         if (result != null) {
-            statusLabel.text = 'Execution complete.'
+            statusLabel.text = "Execution complete.${elapsedTimeStr}"
             appendOutputNl('Result: ', promptStyle)
             def obj = (visualizeScriptResults
                     ? OutputTransforms.transformResult(result, shell.getContext()._outputTransforms)
@@ -1016,7 +1016,7 @@ class Console implements CaretListener, HyperlinkListener, ComponentListener, Fo
             // multi-methods are magical!
             appendOutput(obj, resultStyle)
         } else {
-            statusLabel.text = 'Execution complete. Result was null.'
+            statusLabel.text = "Execution complete. Result was null.${elapsedTimeStr}"
         }
         bindResults()
         if (detachedOutput) {
@@ -1259,30 +1259,6 @@ class Console implements CaretListener, HyperlinkListener, ComponentListener, Fo
         prefs.putBoolean('loopMode', loopMode)
     }
 
-    void indy(EventObject evt = null) {
-        indy = evt.source.selected
-        prefs.putBoolean('indy', indy)
-        if (indy) {
-            enableIndy(baseConfig)
-        } else {
-            disableIndy(baseConfig)
-        }
-        updateTitle()
-        newScript(shell.classLoader, shell.context)
-    }
-
-    private static void enableIndy(CompilerConfiguration cc) {
-        cc.getOptimizationOptions().put(CompilerConfiguration.INVOKEDYNAMIC, true)
-    }
-
-    private static void disableIndy(CompilerConfiguration cc) {
-        cc.getOptimizationOptions().remove(CompilerConfiguration.INVOKEDYNAMIC)
-    }
-
-    private static boolean isIndyEnabled(CompilerConfiguration cc) {
-        cc.getOptimizationOptions().get(CompilerConfiguration.INVOKEDYNAMIC)
-    }
-
     void runSelectedJava(EventObject evt = null) {
         runSelectedScript(evt, new JavaSourceType())
     }
@@ -1389,27 +1365,28 @@ class Console implements CaretListener, HyperlinkListener, ComponentListener, Fo
         runThread = Thread.start {
             try {
                 systemOutInterceptor.setConsoleId(this.getConsoleId())
+                // TODO should systemErrorInterceptor receive the console id, too?
                 SwingUtilities.invokeLater { showExecutingMessage() }
                 if (beforeExecution) {
                     beforeExecution()
                 }
-                def result
+                Tuple2<Object, Long> resultAndElapsedTime
                 if (useScriptClassLoaderForScriptExecution) {
                     ClassLoader savedThreadContextClassLoader = Thread.currentThread().contextClassLoader
                     try {
                         Thread.currentThread().contextClassLoader = shell.classLoader
-                        result = doRun(selected, st, record)
+                        resultAndElapsedTime = doRun(selected, st, record)
                     }
                     finally {
                         Thread.currentThread().contextClassLoader = savedThreadContextClassLoader
                     }
                 } else {
-                    result = doRun(selected, st, record)
+                    resultAndElapsedTime = doRun(selected, st, record)
                 }
                 if (afterExecution) {
                     afterExecution()
                 }
-                SwingUtilities.invokeLater { finishNormal(result) }
+                SwingUtilities.invokeLater { finishNormal(resultAndElapsedTime.v1, resultAndElapsedTime.v2) }
             } catch (Throwable t) {
                 if (t instanceof StackOverflowError) {
                     // set the flag that will be used in printing exception details in output pane
@@ -1437,9 +1414,13 @@ class Console implements CaretListener, HyperlinkListener, ComponentListener, Fo
     }
 
     @CompileStatic
-    private Object doRun(boolean selected, SourceType st, HistoryRecord record) {
+    private Tuple2<Object, Long> doRun(boolean selected, SourceType st, HistoryRecord record) {
         def src = record.getTextToRun(selected)
-        return st.run(src)
+        long begin = System.currentTimeMillis()
+        Object result = st.run(src)
+        long end = System.currentTimeMillis()
+
+        return Tuple.tuple(result, (end - begin))
     }
 
     @CompileStatic
@@ -1746,9 +1727,6 @@ class Console implements CaretListener, HyperlinkListener, ComponentListener, Fo
     void updateTitle() {
         if (frame.title) {
             String title = 'GroovyConsole'
-            if (indy) {
-                title += ' (Indy)'
-            }
             if (scriptFile != null) {
                 frame.title = scriptFile.name + (dirty ? ' * ' : '') + ' - ' + title
             } else {

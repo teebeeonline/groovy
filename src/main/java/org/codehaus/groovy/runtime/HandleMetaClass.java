@@ -45,6 +45,7 @@ public class HandleMetaClass extends DelegatingMetaClass {
         }
     }
 
+    @Override
     public void initialize() {
         replaceDelegate();
         delegate.initialize();
@@ -75,11 +76,13 @@ public class HandleMetaClass extends DelegatingMetaClass {
         return (GroovyObject)delegate;
     }
 
+    @Override
     public Object invokeMethod(String name, Object args) {
         return replaceDelegate().invokeMethod(name, args);
     }
 
     // this method mimics EMC behavior
+    @Override
     public Object getProperty(String property) {
         if(ExpandoMetaClass.isValidExpandoProperty(property)) {
             if(property.equals(ExpandoMetaClass.STATIC_QUALIFIER) ||
@@ -91,26 +94,32 @@ public class HandleMetaClass extends DelegatingMetaClass {
         return Holder.META_CLASS.getProperty(this, property);
     }
 
+    @Override
     public void setProperty(String property, Object newValue) {
         replaceDelegate().setProperty(property, newValue);
     }
 
+    @Override
     public void addNewInstanceMethod(Method method) {
         throw new UnsupportedOperationException();
     }
 
+    @Override
     public void addNewStaticMethod(Method method) {
         throw new UnsupportedOperationException();
     }
 
+    @Override
     public void addMetaMethod(MetaMethod metaMethod) {
         throw new UnsupportedOperationException();
     }
 
+    @Override
     public void addMetaBeanProperty(MetaBeanProperty metaBeanProperty) {
         throw new UnsupportedOperationException();
     }
 
+    @Override
     public boolean equals(Object obj) {
         return super.equals(obj) || getAdaptee().equals(obj) || (obj instanceof HandleMetaClass && equals(((HandleMetaClass)obj).getAdaptee()));
     }

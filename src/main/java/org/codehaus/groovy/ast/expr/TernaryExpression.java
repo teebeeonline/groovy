@@ -39,10 +39,12 @@ public class TernaryExpression extends Expression {
         this.trueExpression = trueExpression;
         this.falseExpression = falseExpression;
     }
+    @Override
     public void visit(GroovyCodeVisitor visitor) {
         visitor.visitTernaryExpression(this);
     }
 
+    @Override
     public Expression transformExpression(ExpressionTransformer transformer) {
         Expression ret = new TernaryExpression(
                 (BooleanExpression) transformer.transform(booleanExpression),
@@ -53,6 +55,7 @@ public class TernaryExpression extends Expression {
         return ret; 
     }
 
+    @Override
     public String toString() {
         return super.toString() +"[" + booleanExpression + " ? " + trueExpression + " : " + falseExpression + "]";
     }
@@ -69,6 +72,7 @@ public class TernaryExpression extends Expression {
         return trueExpression;
     }
 
+    @Override
     public String getText() {
         return "("
             + booleanExpression.getText()
@@ -78,6 +82,7 @@ public class TernaryExpression extends Expression {
             + falseExpression.getText();
     }
 
+    @Override
     public ClassNode getType() {
         return ClassHelper.OBJECT_TYPE;
     }

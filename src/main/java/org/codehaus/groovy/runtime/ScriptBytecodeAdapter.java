@@ -635,29 +635,61 @@ public class ScriptBytecodeAdapter {
         return InvokerHelper.createMap(values);
     }
 
-    public static List createRange(Object from, Object to, boolean inclusive) throws Throwable {
-        if (from instanceof Integer && to instanceof Integer) {
-            int ifrom = (Integer) from;
-            int ito = (Integer) to;
-            if (inclusive || ifrom != ito) {
-                return new IntRange(inclusive, ifrom, ito);
-            } // else fall through for EmptyRange
+    public static List createRange(Object from, Object to, boolean exclusiveLeft, boolean exclusiveRight) throws Throwable {
+        if (exclusiveLeft && exclusiveRight) {
+            if (compareEqual(from, to)) {
+                return new EmptyRange((Comparable) from);
+            }
+            Object tmpFrom;
+            if (compareLessThan(from, to)) {
+                tmpFrom = invokeMethod0(ScriptBytecodeAdapter.class, from, "next");
+            } else {
+                tmpFrom = invokeMethod0(ScriptBytecodeAdapter.class, from, "previous");
+            }
+            // Create an empty range if the difference between from and to is one and they have the same sign. This
+            // means that range syntaxes like 5<..<6 will result in an empty range, but 0<..<-1 won't, since the latter
+            // is used in list indexing where negative indices count from the end towards the beginning. Note that
+            // positive numbers and zeros are considered to have the same sign to make ranges like 0<..<1 be EmptyRanges
+            int fromComp = compareTo(from, 0);
+            int toComp = compareTo(to, 0);
+            boolean sameSign = (fromComp >= 0 && toComp >= 0) || (fromComp < 0 && toComp < 0);
+            if (compareEqual(tmpFrom, to) && sameSign) {
+                return new EmptyRange((Comparable) from);
+            }
         }
-        if (!inclusive && compareEqual(from, to)) {
+        if ((exclusiveLeft || exclusiveRight) && compareEqual(from, to)) {
             return new EmptyRange((Comparable) from);
         }
-        if (from instanceof Number && to instanceof Number) {
-            return new NumberRange(comparableNumber((Number) from), comparableNumber((Number) to), inclusive);
+        if (from instanceof Integer && to instanceof Integer) {
+            // Currently, empty ranges where from != to, the range is full exclusive (e.g. 0<..<-1) and from and to
+            // have a different sign are constructed as IntRanges. This is because t3hese ranges can still be used to
+            // index into lists.
+            return new IntRange(!exclusiveLeft, !exclusiveRight, (Integer) from, (Integer) to);
         }
-        if (!inclusive) {
+        if (from instanceof Number && to instanceof Number) {
+            return new NumberRange(comparableNumber((Number) from), comparableNumber((Number) to), !exclusiveLeft, !exclusiveRight);
+        }
+        // ObjectRange does not include information about inclusivity, so we need to consider it here
+        if (exclusiveRight) {
             if (compareGreaterThan(from, to)) {
                 to = invokeMethod0(ScriptBytecodeAdapter.class, to, "next");
             } else {
                 to = invokeMethod0(ScriptBytecodeAdapter.class, to, "previous");
             }
         }
-
+        if (exclusiveLeft) {
+            if (compareGreaterThan(from, to)) {
+                from = invokeMethod0(ScriptBytecodeAdapter.class, from, "previous");
+            } else {
+                from = invokeMethod0(ScriptBytecodeAdapter.class, from, "next");
+            }
+        }
         return new ObjectRange((Comparable) from, (Comparable) to);
+    }
+
+    // Kept in for backwards compatibility
+    public static List createRange(Object from, Object to, boolean inclusive) throws Throwable {
+        return createRange(from, to, false, !inclusive);
     }
 
     @SuppressWarnings("unchecked")

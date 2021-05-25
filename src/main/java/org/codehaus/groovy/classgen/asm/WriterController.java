@@ -32,6 +32,7 @@ import org.codehaus.groovy.classgen.asm.util.LoggableClassVisitor;
 import org.codehaus.groovy.control.CompilerConfiguration;
 import org.codehaus.groovy.control.SourceUnit;
 import org.objectweb.asm.ClassVisitor;
+import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
@@ -87,7 +88,7 @@ public class WriterController {
             this.optimizeForInt = false;
             // set other optimizations options to false here
         } else {
-            if (Boolean.TRUE.equals(optOptions.get(CompilerConfiguration.INVOKEDYNAMIC))) invokedynamic = true;
+            if (config.isIndyEnabled()) invokedynamic = true;
             if (Boolean.FALSE.equals(optOptions.get("int"))) this.optimizeForInt = false;
             if (invokedynamic) this.optimizeForInt = false;
             // set other optimizations options to false here
@@ -286,6 +287,14 @@ public class WriterController {
         this.methodNode = null;
     }
 
+    public ClassNode getThisType() {
+        ClassNode thisType = getClassNode();
+        while (isGeneratedFunction(thisType)) {
+            thisType = thisType.getOuterClass();
+        }
+        return thisType;
+    }
+
     public ClassNode getReturnType() {
         if (methodNode != null) {
             return methodNode.getReturnType();
@@ -389,12 +398,25 @@ public class WriterController {
         return lineNumber;
     }
 
+    public void resetLineNumber() {
+        setLineNumber(-1);
+    }
+
     public void setLineNumber(final int lineNumber) {
         this.lineNumber = lineNumber;
     }
 
-    public void resetLineNumber() {
-        setLineNumber(-1);
+    public void visitLineNumber(final int lineNumber) {
+        if (lineNumber > 0 && lineNumber != this.lineNumber) {
+            setLineNumber(lineNumber);
+
+            MethodVisitor mv = getMethodVisitor();
+            if (mv != null) {
+                Label label = new Label();
+                mv.visitLabel(label);
+                mv.visitLineNumber(lineNumber, label);
+            }
+        }
     }
 
     public int getBytecodeVersion() {

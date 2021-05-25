@@ -81,6 +81,7 @@ public class CategoryASTTransformation implements ASTTransformation, Opcodes {
      * Property invocations done on 'this' reference are transformed so that the invocations at runtime are
      * done on the additional parameter 'self'
      */
+    @Override
     public void visit(ASTNode[] nodes, final SourceUnit source) {
         if (nodes.length != 2 || !(nodes[0] instanceof AnnotationNode) || !(nodes[1] instanceof ClassNode)) {
             source.getErrorCollector().addError(
@@ -108,6 +109,7 @@ public class CategoryASTTransformation implements ASTTransformation, Opcodes {
 
         final Reference parameter = new Reference();
         final ClassCodeExpressionTransformer expressionTransformer = new ClassCodeExpressionTransformer() {
+            @Override
             protected SourceUnit getSourceUnit() {
                 return source;
             }
@@ -194,7 +196,9 @@ public class CategoryASTTransformation implements ASTTransformation, Opcodes {
                         return thisExpression;
                     else {
                         if (!varStack.getLast().contains(ve.getName())) {
-                            return new PropertyExpression(thisExpression, ve.getName());
+                            PropertyExpression transformed = new PropertyExpression(thisExpression, ve.getName());
+                            transformed.setSourcePosition(ve);
+                            return transformed;
                         }
                     }
                 } else if (exp instanceof PropertyExpression) {

@@ -16,13 +16,14 @@
  *  specific language governing permissions and limitations
  *  under the License.
  */
-dependencies {
-    testImplementation project(':groovy-test')
+plugins {
+    id 'org.apache.groovy-stresstest'
 }
 
-test {
-    minHeapSize = '512m'
-    maxHeapSize = '512m'
+dependencies {
+    stressTestImplementation project(':groovy-test')
+}
 
-    outputs.upToDateWhen { false }
+sonarqube {
+    skipProject = true
 }

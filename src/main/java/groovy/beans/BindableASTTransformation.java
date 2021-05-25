@@ -42,7 +42,6 @@ import java.beans.PropertyChangeListener;
 import java.beans.PropertyChangeSupport;
 
 import static org.apache.groovy.ast.tools.ClassNodeUtils.addGeneratedMethod;
-import static org.apache.groovy.util.BeanUtils.capitalize;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.args;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.assignX;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.callThisX;
@@ -98,6 +97,7 @@ public class BindableASTTransformation implements ASTTransformation, Opcodes {
      * @param nodes   the ast nodes
      * @param source  the source unit for the nodes
      */
+    @Override
     public void visit(ASTNode[] nodes, SourceUnit source) {
         if (!(nodes[0] instanceof AnnotationNode) || !(nodes[1] instanceof AnnotatedNode)) {
             throw new RuntimeException("Internal error: wrong types: $node.class / $parent.class");
@@ -171,9 +171,9 @@ public class BindableASTTransformation implements ASTTransformation, Opcodes {
     /*
      * Wrap an existing setter.
      */
-    private static void wrapSetterMethod(ClassNode classNode, String propertyName) {
-        String getterName = "get" + capitalize(propertyName);
-        MethodNode setter = classNode.getSetterMethod("set" + capitalize(propertyName));
+    private static void wrapSetterMethod(ClassNode classNode, PropertyNode propertyNode) {
+        String getterName = propertyNode.getGetterNameOrDefault();
+        MethodNode setter = classNode.getSetterMethod(propertyNode.getSetterNameOrDefault());
 
         if (setter != null) {
             // Get the existing code block
@@ -193,7 +193,7 @@ public class BindableASTTransformation implements ASTTransformation, Opcodes {
             block.addStatement(declS(newValue, callThisX(getterName)));
 
             // add the firePropertyChange method call
-            block.addStatement(stmt(callThisX("firePropertyChange", args(constX(propertyName), oldValue, newValue))));
+            block.addStatement(stmt(callThisX("firePropertyChange", args(constX(propertyNode.getName()), oldValue, newValue))));
 
             // replace the existing code block with our new one
             setter.setCode(block);
@@ -201,14 +201,14 @@ public class BindableASTTransformation implements ASTTransformation, Opcodes {
     }
 
     private void createListenerSetter(ClassNode classNode, PropertyNode propertyNode) {
-        String setterName = "set" + capitalize(propertyNode.getName());
+        String setterName = propertyNode.getSetterNameOrDefault();
         if (classNode.getMethods(setterName).isEmpty()) {
             Statement setterBlock = createBindableStatement(propertyNode, fieldX(propertyNode.getField()));
 
             // create method void <setter>(<type> fieldName)
             createSetterMethod(classNode, propertyNode, setterName, setterBlock);
         } else {
-            wrapSetterMethod(classNode, propertyNode.getName());
+            wrapSetterMethod(classNode, propertyNode);
         }
     }
 

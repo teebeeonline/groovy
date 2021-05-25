@@ -18,12 +18,14 @@
  */
 package org.codehaus.groovy.util;
 
+@Deprecated
 public abstract class AbstractConcurrentMap<K, V> extends AbstractConcurrentMapBase {
 
     public AbstractConcurrentMap(Object segmentInfo) {
         super(segmentInfo);
     }
 
+    @Override
     public Segment segmentFor (int hash) {
         return (Segment) super.segmentFor(hash);
     }

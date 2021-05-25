@@ -33,7 +33,6 @@ import org.codehaus.groovy.ast.VariableScope;
 import org.codehaus.groovy.ast.expr.ClosureExpression;
 import org.codehaus.groovy.ast.expr.ConstructorCallExpression;
 import org.codehaus.groovy.ast.expr.Expression;
-import org.codehaus.groovy.ast.expr.PropertyExpression;
 import org.codehaus.groovy.ast.expr.TupleExpression;
 import org.codehaus.groovy.ast.expr.VariableExpression;
 import org.codehaus.groovy.ast.stmt.BlockStatement;
@@ -41,14 +40,22 @@ import org.codehaus.groovy.ast.stmt.ExpressionStatement;
 import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.transform.trait.Traits;
-import org.objectweb.asm.Opcodes;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 
-public class InnerClassVisitor extends InnerClassVisitorHelper implements Opcodes {
+import static org.codehaus.groovy.ast.tools.GeneralUtils.attrX;
+import static org.codehaus.groovy.ast.tools.GeneralUtils.callX;
+import static org.codehaus.groovy.ast.tools.GeneralUtils.constX;
+import static org.codehaus.groovy.ast.tools.GeneralUtils.varX;
+import static org.objectweb.asm.Opcodes.ACC_FINAL;
+import static org.objectweb.asm.Opcodes.ACC_PUBLIC;
+import static org.objectweb.asm.Opcodes.ACC_STATIC;
+import static org.objectweb.asm.Opcodes.ACC_SYNTHETIC;
+
+public class InnerClassVisitor extends InnerClassVisitorHelper {
 
     private ClassNode classNode;
     private FieldNode currentField;
@@ -170,7 +177,7 @@ public class InnerClassVisitor extends InnerClassVisitorHelper implements Opcode
             // add one parameter for each expression in the constructor call
             Parameter param = new Parameter(ClassHelper.OBJECT_TYPE, "p" + additionalParamCount + i);
             parameters.add(param);
-            // add the corresponsing argument to the super constructor call
+            // add the corresponding argument to the super constructor call
             superCallArguments.add(new VariableExpression(param));
         }
 
@@ -185,9 +192,8 @@ public class InnerClassVisitor extends InnerClassVisitorHelper implements Opcode
         int pCount = 0;
         if (!isStatic) {
             // need to pass "this" to access unknown methods/properties
-            expressions.add(pCount, VariableExpression.THIS_EXPRESSION);
-
             ClassNode enclosingType = (inClosure ? ClassHelper.CLOSURE_TYPE : outerClass).getPlainNodeReference();
+            expressions.add(pCount, new VariableExpression("this", enclosingType));
             Parameter thisParameter = new Parameter(enclosingType, "p" + pCount);
             parameters.add(pCount++, thisParameter);
 
@@ -291,14 +297,18 @@ public class InnerClassVisitor extends InnerClassVisitorHelper implements Opcode
         // if constructor call is not in outer class, don't pass 'this' implicitly. Return.
         if (parent == null) return;
 
-        //add this parameter to node
-        Expression argsExp = call.getArguments();
-        if (argsExp instanceof TupleExpression) {
-            TupleExpression argsListExp = (TupleExpression) argsExp;
-            Expression this0 = VariableExpression.THIS_EXPRESSION;
-            for (int i = 0; i != level; ++i)
-                this0 = new PropertyExpression(this0, "this$0");
-            argsListExp.getExpressions().add(0, this0);
+        Expression args = call.getArguments();
+        if (args instanceof TupleExpression) {
+            Expression this0 = varX("this"); // bypass closure
+            for (int i = 0; i != level; ++i) {
+                this0 = attrX(this0, constX("this$0"));
+                // GROOVY-8104: an anonymous inner class may still have closure nesting
+                if (i == 0 && classNode.getDeclaredField("this$0").getType().equals(ClassHelper.CLOSURE_TYPE)) {
+                    this0 = callX(this0, "getThisObject");
+                }
+            }
+
+            ((TupleExpression) args).getExpressions().add(0, this0);
         }
     }
 }

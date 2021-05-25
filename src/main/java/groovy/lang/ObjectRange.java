@@ -23,6 +23,7 @@ import org.codehaus.groovy.runtime.InvokerHelper;
 import org.codehaus.groovy.runtime.IteratorClosureAdapter;
 import org.codehaus.groovy.runtime.ScriptBytecodeAdapter;
 import org.codehaus.groovy.runtime.typehandling.DefaultTypeTransformation;
+import org.codehaus.groovy.runtime.typehandling.NumberMath;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -202,6 +203,7 @@ public class ObjectRange extends AbstractList<Comparable> implements Range<Compa
         }
     }
 
+    @Override
     public boolean equals(Object that) {
         return (that instanceof ObjectRange) ? equals((ObjectRange) that) : super.equals(that);
     }
@@ -300,8 +302,8 @@ public class ObjectRange extends AbstractList<Comparable> implements Range<Compa
             } else if (((from instanceof BigDecimal || from instanceof BigInteger) && to instanceof Number) ||
                     ((to instanceof BigDecimal || to instanceof BigInteger) && from instanceof Number)) {
                 // let's fast calculate the size
-                final BigDecimal fromNum = new BigDecimal(from.toString());
-                final BigDecimal toNum = new BigDecimal(to.toString());
+                final BigDecimal fromNum = NumberMath.toBigDecimal((Number) from);
+                final BigDecimal toNum = NumberMath.toBigDecimal((Number) to);
                 final BigInteger sizeNum = toNum.subtract(fromNum).add(BigDecimal.ONE).toBigInteger();
                 tempsize = sizeNum.intValue();
                 if (!BigInteger.valueOf(tempsize).equals(sizeNum)) {
@@ -363,6 +365,7 @@ public class ObjectRange extends AbstractList<Comparable> implements Range<Compa
         return new ObjectRange(fromValue, toValue, reverse);
     }
 
+    @Override
     public String toString() {
         return reverse ? "" + to + ".." + from : "" + from + ".." + to;
     }

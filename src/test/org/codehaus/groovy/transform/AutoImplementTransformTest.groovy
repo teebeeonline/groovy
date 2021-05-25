@@ -18,30 +18,14 @@
  */
 package org.codehaus.groovy.transform
 
-import groovy.test.GroovyShellTestCase
+import org.junit.Test
 
-class AutoImplementTransformTest extends GroovyShellTestCase {
+import static groovy.test.GroovyAssert.assertScript
+import static groovy.test.GroovyAssert.shouldFail
 
-    void testGenericReturnTypes() {
-        assertScript '''
-            interface HasXs<T> {
-                T[] x()
-            }
+final class AutoImplementTransformTest {
 
-            abstract class HasXsY<E> implements HasXs<Long> {
-                abstract E y()
-            }
-
-            interface MyIt<T> extends Iterator<T> {}
-
-            @groovy.transform.AutoImplement
-            class Foo extends HasXsY<Integer> implements MyIt<String> { }
-
-            def publicMethods = Foo.methods.findAll{ it.modifiers == 1 }.collect{ "$it.returnType.simpleName $it.name" }*.toString()
-            assert ['boolean hasNext', 'String next', 'Long[] x', 'Integer y'].every{ publicMethods.contains(it) }
-            '''
-    }
-
+    @Test
     void testException() {
         shouldFail UnsupportedOperationException, '''
             import groovy.transform.*
@@ -53,8 +37,9 @@ class AutoImplementTransformTest extends GroovyShellTestCase {
         '''
     }
 
+    @Test
     void testExceptionWithMessage() {
-        def message = shouldFail UnsupportedOperationException, '''
+        def err = shouldFail UnsupportedOperationException, '''
             import groovy.transform.*
 
             @AutoImplement(exception=UnsupportedOperationException, message='Not supported by Foo')
@@ -62,20 +47,22 @@ class AutoImplementTransformTest extends GroovyShellTestCase {
 
             new Foo().hasNext()
         '''
-        assert message.contains('Not supported by Foo')
+        assert err.message.contains('Not supported by Foo')
     }
 
+    @Test
     void testClosureBody() {
         shouldFail IllegalStateException, '''
             import groovy.transform.*
 
-            @AutoImplement(code={ throw new IllegalStateException()})
+            @AutoImplement(code={ throw new IllegalStateException() })
             class Foo implements Iterator<String> { }
 
             new Foo().hasNext()
         '''
     }
 
+    @Test
     void testInheritedMethodNotOverwritten() {
         assertScript '''
             class WithNext {
@@ -84,10 +71,12 @@ class AutoImplementTransformTest extends GroovyShellTestCase {
 
             @groovy.transform.AutoImplement
             class Foo extends WithNext implements Iterator<String> { }
+
             assert new Foo().next() == 'foo'
         '''
     }
 
+    @Test
     void testExistingMethodNotOverwritten() {
         assertScript '''
             @groovy.transform.AutoImplement
@@ -99,4 +88,132 @@ class AutoImplementTransformTest extends GroovyShellTestCase {
         '''
     }
 
+    @Test // GROOVY-9816
+    void testPropertyMethodsNotOverwritten() {
+        assertScript '''
+            interface Bar {
+                def getBaz(); void setBaz(baz)
+            }
+
+            @groovy.transform.AutoImplement
+            class Foo implements Bar {
+                def baz
+            }
+
+            def foo = new Foo(baz: 123)
+            assert foo.baz == 123
+        '''
+
+        assertScript '''
+            interface Bar {
+                def getBaz(); void setBaz(baz)
+            }
+
+            @groovy.transform.AutoImplement
+            class Foo implements Bar {
+                final baz = 123
+            }
+
+            // setter is independent of constant
+            def foo = new Foo(baz: 456)
+            assert foo.baz == 123
+        '''
+
+        assertScript '''
+            interface Bar {
+                boolean getBaz(); boolean isBaz()
+            }
+
+            @groovy.transform.AutoImplement
+            class Foo implements Bar {
+                boolean baz
+            }
+
+            def foo = new Foo(baz: true)
+            assert foo.getBaz()
+            assert foo.isBaz()
+            assert foo.baz
+        '''
+
+        assertScript '''
+            interface Bar {
+                boolean getBaz(); boolean isBaz()
+            }
+
+            @groovy.transform.AutoImplement
+            class Foo implements Bar {
+                boolean baz
+                boolean getBaz() { baz }
+            }
+
+            def foo = new Foo(baz: true)
+            assert foo.getBaz()
+            assert foo.isBaz()
+            assert foo.baz
+        '''
+
+        assertScript '''
+            interface Bar {
+                boolean getBaz(); boolean isBaz()
+            }
+
+            @groovy.transform.AutoImplement
+            class Foo implements Bar {
+                boolean baz
+                boolean isBaz() { baz }
+            }
+
+            def foo = new Foo(baz: true)
+            assert foo.getBaz()
+            assert foo.isBaz()
+            assert foo.baz
+        '''
+    }
+
+    @Test
+    void testVoidReturnType() {
+        assertScript '''
+            interface Bar {
+                void baz()
+            }
+
+            @groovy.transform.AutoImplement
+            class Foo implements Bar { }
+
+            new Foo().baz() // no value to assert
+        '''
+    }
+
+    @Test
+    void testGenericReturnTypes() {
+        assertScript '''
+            interface HasXs<T> {
+                T[] x()
+            }
+
+            abstract class HasXsY<E> implements HasXs<Long> {
+                abstract E y()
+            }
+
+            interface MyIt<T> extends Iterator<T> { }
+
+            @groovy.transform.AutoImplement
+            class Foo extends HasXsY<Integer> implements MyIt<String> { }
+
+            def publicMethods = Foo.methods.findAll{ it.modifiers == 1 }.collect{ "$it.returnType.simpleName $it.name" }*.toString()
+            assert ['boolean hasNext', 'String next', 'Long[] x', 'Integer y'].every{ publicMethods.contains(it) }
+            '''
+    }
+
+    @Test // GROOVY-8270
+    void testGenericParameterTypes() {
+        assertScript '''
+            @groovy.transform.AutoImplement
+            class Foo implements Comparator<String> { }
+            // Can't have an abstract method in a non-abstract class. The class 'Foo' must be declared
+            // abstract or the method 'int compare(java.lang.Object, java.lang.Object)' must be implemented.
+
+            assert new Foo().compare('bar', 'baz') == 0
+            '''
+    }
 }

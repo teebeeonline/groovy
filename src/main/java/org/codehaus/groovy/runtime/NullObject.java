@@ -46,6 +46,7 @@ public class NullObject extends GroovyObjectSupport {
      * Since this is implemented as a singleton, we should avoid the
      * use of the clone method
      */
+    @Override
     public Object clone() {
         throw new NullPointerException("Cannot invoke method clone() on null object");
     }
@@ -56,6 +57,7 @@ public class NullObject extends GroovyObjectSupport {
      * @param property - the property to get
      * @return a NPE
      */
+    @Override
     public Object getProperty(String property) {
         throw new NullPointerException("Cannot get property '" + property + "' on null object");
     }
@@ -76,6 +78,7 @@ public class NullObject extends GroovyObjectSupport {
      * @param property - the proprty to set
      * @param newValue - the new value of the property
      */
+    @Override
     public void setProperty(String property, Object newValue) {
         throw new NullPointerException("Cannot set property '" + property + "' on null object");
     }
@@ -87,6 +90,7 @@ public class NullObject extends GroovyObjectSupport {
      * @param args - arguments to the method
      * @return a NPE
      */
+    @Override
     public Object invokeMethod(String name, Object args) {
         throw new NullPointerException("Cannot invoke method " + name + "() on null object");
     }
@@ -97,6 +101,7 @@ public class NullObject extends GroovyObjectSupport {
      * @param to - the reference object with which to compare
      * @return - true if this object is the same as the to argument
      */
+    @Override
     public boolean equals(Object to) {
         return to == null;
     }
@@ -166,10 +171,12 @@ public class NullObject extends GroovyObjectSupport {
         return false;
     }
 
+    @Override
     public String toString() {
         return "null";
     }
 
+    @Override
     public int hashCode() {
         throw new NullPointerException("Cannot invoke method hashCode() on null object");
     }

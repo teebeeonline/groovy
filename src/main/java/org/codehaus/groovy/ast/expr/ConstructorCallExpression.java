@@ -40,10 +40,12 @@ public class ConstructorCallExpression extends Expression implements MethodCall 
         }
     }
 
+    @Override
     public void visit(GroovyCodeVisitor visitor) {
         visitor.visitConstructorCallExpression(this);
     }
 
+    @Override
     public Expression transformExpression(ExpressionTransformer transformer) {
         ConstructorCallExpression answer = new ConstructorCallExpression(getType(), transformer.transform(arguments));
         answer.setUsingAnonymousInnerClass(isUsingAnonymousInnerClass());
@@ -52,18 +54,22 @@ public class ConstructorCallExpression extends Expression implements MethodCall 
         return answer;
     }
 
+    @Override
     public ASTNode getReceiver() {
         return null;
     }
 
+    @Override
     public String getMethodAsString() {
         return "<init>";
     }
 
+    @Override
     public Expression getArguments() {
         return arguments;
     }
 
+    @Override
     public String getText() {
         String text;
         if (isSuperCall()) {
@@ -71,9 +77,9 @@ public class ConstructorCallExpression extends Expression implements MethodCall 
         } else if (isThisCall()) {
             text = "this ";
         } else {
-            text = "new " + getType().getName();
+            text = "new " + getType().toString(false);
         }
-        return text + arguments.getText();
+        return text + getArguments().getText();
     }
 
     public boolean isSpecialCall() {
@@ -96,6 +102,7 @@ public class ConstructorCallExpression extends Expression implements MethodCall 
         this.usesAnonymousInnerClass = usage;
     }
 
+    @Override
     public String toString() {
         return super.toString() + "[type: " + getType() + " arguments: " + arguments + "]";
     }

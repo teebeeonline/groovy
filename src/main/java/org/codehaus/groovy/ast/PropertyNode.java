@@ -18,19 +18,26 @@
  */
 package org.codehaus.groovy.ast;
 
+import groovy.lang.MetaProperty;
 import org.codehaus.groovy.ast.expr.Expression;
 import org.codehaus.groovy.ast.stmt.Statement;
-import org.objectweb.asm.Opcodes;
+
+import static org.apache.groovy.util.BeanUtils.capitalize;
+import static org.objectweb.asm.Opcodes.ACC_PRIVATE;
+import static org.objectweb.asm.Opcodes.ACC_PUBLIC;
+import static org.objectweb.asm.Opcodes.ACC_STATIC;
 
 /**
  * Represents a property (member variable, a getter and setter)
  */
-public class PropertyNode extends AnnotatedNode implements Opcodes, Variable {
+public class PropertyNode extends AnnotatedNode implements Variable {
 
     private FieldNode field;
 
     private Statement getterBlock;
     private Statement setterBlock;
+    private String getterName = null;
+    private String setterName = null;
     private final int modifiers;
 
     public PropertyNode(
@@ -51,6 +58,7 @@ public class PropertyNode extends AnnotatedNode implements Opcodes, Variable {
         return getterBlock;
     }
 
+    @Override
     public Expression getInitialExpression() {
         return field.getInitialExpression();
     }
@@ -63,10 +71,53 @@ public class PropertyNode extends AnnotatedNode implements Opcodes, Variable {
         this.setterBlock = setterBlock;
     }
 
+    public String getGetterName() {
+        return getterName;
+    }
+
+    /**
+     * If an explicit getterName has been set, return that, otherwise return the default name for the property.
+     * For a property {@code foo}, the default name is {@code getFoo} except for a boolean property where
+     * {@code isFoo} is the default if no {@code getFoo} method exists in the declaring class.
+     */
+    public String getGetterNameOrDefault() {
+        if (getterName != null) return getterName;
+        String defaultName = "get" + capitalize(getName());
+        if (ClassHelper.boolean_TYPE.equals(getOriginType())
+                && !getDeclaringClass().hasMethod(defaultName, Parameter.EMPTY_ARRAY)) {
+            defaultName = "is" + capitalize(getName());
+        }
+        return defaultName;
+    }
+
+    public void setGetterName(String getterName) {
+        if (getterName == null || getterName.isEmpty()) {
+            throw new IllegalArgumentException("A non-null non-empty getter name is required");
+        }
+        this.getterName = getterName;
+    }
+
+    public String getSetterName() {
+        return setterName;
+    }
+
+    public String getSetterNameOrDefault() {
+        return setterName != null ? setterName : MetaProperty.getSetterName(getName());
+    }
+
+    public void setSetterName(String setterName) {
+        if (setterName == null || setterName.isEmpty()) {
+            throw new IllegalArgumentException("A non-null non-empty setter name is required");
+        }
+        this.setterName = setterName;
+    }
+
+    @Override
     public int getModifiers() {
         return modifiers;
     }
 
+    @Override
     public String getName() {
         return field.getName();
     }
@@ -75,6 +126,7 @@ public class PropertyNode extends AnnotatedNode implements Opcodes, Variable {
         return setterBlock;
     }
 
+    @Override
     public ClassNode getType() {
         return field.getType();
     }
@@ -103,18 +155,22 @@ public class PropertyNode extends AnnotatedNode implements Opcodes, Variable {
         return (modifiers & ACC_STATIC) != 0;
     }
 
+    @Override
     public boolean hasInitialExpression() {
         return field.hasInitialExpression();
     }
 
+    @Override
     public boolean isInStaticContext() {
         return field.isInStaticContext();
     }
 
+    @Override
     public boolean isDynamicTyped() {
         return field.isDynamicTyped();
     }
 
+    @Override
     public boolean isClosureSharedVariable() {
         return false;
     }
@@ -122,11 +178,13 @@ public class PropertyNode extends AnnotatedNode implements Opcodes, Variable {
     /**
       * @deprecated not used anymore, has no effect
       */
+    @Override
     @Deprecated
     public void setClosureSharedVariable(boolean inClosure) {
         // unused
     }
 
+    @Override
     public ClassNode getOriginType() {
         return getType();
     }

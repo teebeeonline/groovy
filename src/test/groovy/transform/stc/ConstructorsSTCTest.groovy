@@ -18,6 +18,8 @@
  */
 package groovy.transform.stc
 
+import org.codehaus.groovy.runtime.typehandling.GroovyCastException
+
 /**
  * Unit tests for static type checking : constructors.
  */
@@ -91,7 +93,7 @@ class ConstructorsSTCTest extends StaticTypeCheckingTestCase {
             import java.awt.Dimension
             List args = [100,200]
             Dimension d = args // not supported
-        ''', 'Cannot assign value of type java.util.List <java.lang.Integer> to variable of type java.awt.Dimension'
+        ''', 'Cannot assign value of type java.util.ArrayList<java.lang.Integer> to variable of type java.awt.Dimension'
     }
 
     void testConstructFromMap() {
@@ -121,16 +123,7 @@ class ConstructorsSTCTest extends StaticTypeCheckingTestCase {
         '''
     }
 
-    void testConstructMap() {
-        assertScript '''
-            def a = [:]
-            Map b = [:]
-            Object c = [:]
-            HashMap d = [:]
-        '''
-    }
-
-    void testConstructFromValuedMap() {
+    void testConstructFromValuedMap1() {
         assertScript '''
             class A {
                 int x
@@ -139,6 +132,72 @@ class ConstructorsSTCTest extends StaticTypeCheckingTestCase {
             A a = [x:100, y:200]
             assert a.x == 100
             assert a.y == 200
+        '''
+    }
+
+    void testConstructFromValuedMap2() {
+        assertScript '''
+            class A<B,C> {
+                int x
+                int y
+            }
+            A<Number,String> a = [x:100, y:200]
+            assert a.x == 100
+            assert a.y == 200
+        '''
+    }
+
+    void testMapLiteral() {
+        assertScript '''
+            def m = [:]
+            assert m instanceof Map
+        '''
+        assertScript '''
+            Map m = [:]
+            assert m instanceof Map
+        '''
+        assertScript '''
+            Object m = [:]
+            assert m instanceof Map
+        '''
+        assertScript '''
+            HashMap m = [:]
+            assert m instanceof HashMap
+        '''
+        assertScript '''
+            LinkedHashMap m = [:]
+            assert m instanceof LinkedHashMap
+        '''
+
+        shouldFail GroovyCastException, '''
+            EnumMap m = [:] // constructor fails on empty map
+        '''
+        shouldFail GroovyCastException, '''
+            SortedMap m = [:] // no constructor for interface
+        '''
+    }
+
+    // GROOVY-9603
+    void testDoNotConstructFromValuedMap() {
+        assertScript '''
+            void test(Map<String, Object> map) {
+                // assign to local variable to establish standard behavior
+                def foobar = [foo: 'bar']
+                map.proper = foobar
+                assert map.proper['foo'] == 'bar'
+
+                // put map literal into "map" parameter in various forms:
+
+                map.put('proper', [key: 'abc'])
+                assert map.proper['key'] == 'abc'
+
+                map['proper'] = [key: 'def']
+                assert map.proper['key'] == 'def'
+
+                map.proper = [key: 'ghi']
+                assert map.proper['key'] == 'ghi'
+            }
+            test([:])
         '''
     }
 
@@ -295,6 +354,22 @@ class ConstructorsSTCTest extends StaticTypeCheckingTestCase {
         '''
     }
 
+    // GROOVY-9885
+    void testUseGStringTernaryInNamedParameter() {
+        assertScript '''
+            @groovy.transform.ToString
+            class Pogo {
+                String value
+            }
+            def make(String string, whatever) {
+                new Pogo(value: string.trim() ?: "$whatever")
+            }
+            assert make('x','y').toString() == 'Pogo(x)'
+            assert make(' ','y').toString() == 'Pogo(y)'
+            assert make(' ',123).toString() == 'Pogo(123)'
+        '''
+    }
+
     // GROOVY-5578
     void testConstructJavaBeanFromMap() {
         assertScript '''import groovy.transform.stc.MyBean
@@ -442,5 +517,22 @@ class ConstructorsSTCTest extends StaticTypeCheckingTestCase {
             new Test().main()
         '''
     }
-}
 
+    // GROOVY-9422
+    void testInnerClassConstructorCallWithinClosure() {
+        assertScript '''
+            class A {
+              class B {
+                B(param) {}
+                String x = 'value'
+              }
+              def test() {
+                ['s'].collect { String s ->
+                  new B(s).x // expect outer class, not closure as implicit first param to inner class constructor
+                }
+              }
+            }
+            assert new A().test() == ['value']
+        '''
+    }
+}

@@ -54,10 +54,12 @@ public class SimpleGroovyDoc implements GroovyDoc/*, GroovyTokenTypes*/ {
         definitionType = CLASS_DEF;
     }
 
+    @Override
     public String name() {
         return name;
     }
 
+    @Override
     public String toString() {
         return "" + getClass() + "(" + name + ")";
     }
@@ -70,18 +72,22 @@ public class SimpleGroovyDoc implements GroovyDoc/*, GroovyTokenTypes*/ {
         this.firstSentenceCommentText = firstSentenceCommentText;
     }
 
+    @Override
     public String commentText() {
         return commentText;
     }
 
+    @Override
     public String firstSentenceCommentText() {
         return firstSentenceCommentText;
     }
 
+    @Override
     public String getRawCommentText() {
         return rawCommentText;
     }
 
+    @Override
     public void setRawCommentText(String rawCommentText) {
         this.rawCommentText = rawCommentText;
         calculateTags(rawCommentText);
@@ -95,7 +101,7 @@ public class SimpleGroovyDoc implements GroovyDoc/*, GroovyTokenTypes*/ {
         String trimmed = RAW_COMMENT_PATTERN.matcher(rawCommentText).replaceFirst("@");
         if (trimmed.equals(rawCommentText)) return;
         String cleaned = TRIMMED_COMMENT_PATTERN.matcher(trimmed).replaceAll("$1").trim();
-        String[] split = cleaned.split("(?m)^@");
+        String[] split = cleaned.split("(?m)^@", -1);
         List<GroovyTag> result = new ArrayList<GroovyTag>();
         for (String s : split) {
             String tagname = null;
@@ -140,6 +146,7 @@ public class SimpleGroovyDoc implements GroovyDoc/*, GroovyTokenTypes*/ {
         return text;
     }
 
+    @Override
     public boolean isClass() {
         return definitionType == CLASS_DEF && !isScript;
     }
@@ -152,14 +159,17 @@ public class SimpleGroovyDoc implements GroovyDoc/*, GroovyTokenTypes*/ {
         return definitionType == TRAIT_DEF;
     }
 
+    @Override
     public boolean isInterface() {
         return definitionType == INTERFACE_DEF;
     }
 
+    @Override
     public boolean isAnnotationType() {
         return definitionType == ANNOTATION_DEF;
     }
 
+    @Override
     public boolean isEnum() {
         return definitionType == ENUM_DEF;
     }
@@ -190,6 +200,7 @@ public class SimpleGroovyDoc implements GroovyDoc/*, GroovyTokenTypes*/ {
     }
 
     // Methods from Comparable
+    @Override
     public int compareTo(Object that) {
         if (that instanceof GroovyDoc) {
             return name.compareTo(((GroovyDoc) that).name());
@@ -203,42 +214,52 @@ public class SimpleGroovyDoc implements GroovyDoc/*, GroovyTokenTypes*/ {
     //    public GroovyTag[] firstSentenceTags() {/*todo*/return null;}
     //    public GroovyTag[] inlineTags() {/*todo*/return null;}
 
+    @Override
     public boolean isAnnotationTypeElement() {/*todo*/
         return false;
     }
 
+    @Override
     public boolean isConstructor() {/*todo*/
         return false;
     }
 
+    @Override
     public boolean isEnumConstant() {/*todo*/
         return false;
     }
 
+    @Override
     public boolean isDeprecated() {
         return deprecated;
     }
 
+    @Override
     public boolean isError() {/*todo*/
         return false;
     }
 
+    @Override
     public boolean isException() {/*todo*/
         return false;
     }
 
+    @Override
     public boolean isField() {/*todo*/
         return false;
     }
 
+    @Override
     public boolean isIncluded() {/*todo*/
         return false;
     }
 
+    @Override
     public boolean isMethod() {/*todo*/
         return false;
     }
 
+    @Override
     public boolean isOrdinaryClass() {/*todo*/
         return false;
     }

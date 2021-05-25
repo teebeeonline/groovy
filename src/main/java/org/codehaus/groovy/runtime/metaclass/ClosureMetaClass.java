@@ -20,6 +20,7 @@ package org.codehaus.groovy.runtime.metaclass;
 
 import groovy.lang.Closure;
 import groovy.lang.ExpandoMetaClass;
+import groovy.lang.GroovyInterceptable;
 import groovy.lang.GroovyObject;
 import groovy.lang.GroovyRuntimeException;
 import groovy.lang.MetaBeanProperty;
@@ -47,7 +48,6 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
@@ -70,14 +70,13 @@ import java.util.Map;
  * @since 1.5
  */
 public final class ClosureMetaClass extends MetaClassImpl {
-    private volatile boolean initialized;
+    private volatile boolean initialized, attributeInitDone;
     private final FastArray closureMethods = new FastArray(3);
-    private Map<String, CachedField> attributes = new HashMap<String, CachedField>();
+    private final Map<String, CachedField> attributes = new HashMap<>();
     private MethodChooser chooser;
-    private volatile boolean attributeInitDone = false;
 
-    private static MetaClassImpl CLOSURE_METACLASS;
     private static MetaClassImpl classMetaClass;
+    private static MetaClassImpl CLOSURE_METACLASS;
     private static final Object[] EMPTY_ARGUMENTS = {};
     private static final String CLOSURE_CALL_METHOD = "call";
     private static final String CLOSURE_DO_CALL_METHOD = "doCall";
@@ -92,7 +91,7 @@ public final class ClosureMetaClass extends MetaClassImpl {
         synchronized (ClosureMetaClass.class) {
             CLOSURE_METACLASS = temp;
         }
-        if (classMetaClass!=null) {
+        if (classMetaClass != null) {
             temp = new MetaClassImpl(Class.class);
             temp.initialize();
             synchronized (ClosureMetaClass.class) {
@@ -117,12 +116,13 @@ public final class ClosureMetaClass extends MetaClassImpl {
         private final MetaMethod doCall0;
         private final MetaMethod doCall1;
 
-        StandardClosureChooser(MetaMethod m0, MetaMethod m1) {
+        StandardClosureChooser(final MetaMethod m0, final MetaMethod m1) {
             doCall0 = m0;
             doCall1 = m1;
         }
 
-        public Object chooseMethod(Class[] arguments, boolean coerce) {
+        @Override
+        public Object chooseMethod(final Class[] arguments, final boolean coerce) {
             if (arguments.length == 0) return doCall0;
             if (arguments.length == 1) return doCall1;
             return null;
@@ -133,12 +133,13 @@ public final class ClosureMetaClass extends MetaClassImpl {
         private final FastArray methods;
         final Class theClass;
 
-        NormalMethodChooser(Class theClass, FastArray methods) {
+        NormalMethodChooser(final Class theClass, final FastArray methods) {
             this.theClass = theClass;
             this.methods = methods;
         }
 
-        public Object chooseMethod(Class[] arguments, boolean coerce) {
+        @Override
+        public Object chooseMethod(final Class[] arguments, final boolean coerce) {
             if (arguments.length == 0) {
                 return MetaClassHelper.chooseEmptyMethodParams(methods);
             } else if (arguments.length == 1 && arguments[0] == null) {
@@ -146,7 +147,7 @@ public final class ClosureMetaClass extends MetaClassImpl {
             } else {
                 List matchingMethods = new ArrayList();
                 final Object[] data = methods.getArray();
-                for (int i = 0, len = methods.size(); i != len; ++i) {
+                for (int i = 0, n = methods.size(); i < n; i += 1) {
                     Object method = data[i];
 
                     // making this false helps find matches
@@ -166,20 +167,23 @@ public final class ClosureMetaClass extends MetaClassImpl {
             }
         }
 
-        private Object chooseMostSpecificParams(String name, List matchingMethods, Class[] arguments) {
+        private Object chooseMostSpecificParams(final String name, final List matchingMethods, final Class[] arguments) {
             return doChooseMostSpecificParams(theClass.getName(), name, matchingMethods, arguments, true);
         }
     }
 
-    public ClosureMetaClass(MetaClassRegistry registry, Class theClass) {
+    //--------------------------------------------------------------------------
+
+    public ClosureMetaClass(final MetaClassRegistry registry, final Class theClass) {
         super(registry, theClass);
     }
 
-    public MetaProperty getMetaProperty(String name) {
+    @Override
+    public MetaProperty getMetaProperty(final String name) {
         return CLOSURE_METACLASS.getMetaProperty(name);
     }
 
-    private static void unwrap(Object[] arguments) {
+    private static void unwrap(final Object[] arguments) {
         for (int i = 0; i != arguments.length; i++) {
             if (arguments[i] instanceof Wrapper) {
                 arguments[i] = ((Wrapper) arguments[i]).unwrap();
@@ -187,12 +191,12 @@ public final class ClosureMetaClass extends MetaClassImpl {
         }
     }
 
-    private MetaMethod pickClosureMethod(Class[] argClasses) {
+    private MetaMethod pickClosureMethod(final Class[] argClasses) {
         Object answer = chooser.chooseMethod(argClasses, false);
         return (MetaMethod) answer;
     }
 
-    private MetaMethod getDelegateMethod(Closure closure, Object delegate, String methodName, Class[] argClasses) {
+    private MetaMethod getDelegateMethod(final Closure closure, final Object delegate, final String methodName, final Class[] argClasses) {
         if (delegate == closure || delegate == null) return null;
         if (delegate instanceof Class) {
             for (Class superClass = (Class) delegate;
@@ -204,6 +208,16 @@ public final class ClosureMetaClass extends MetaClassImpl {
                 if (method != null) return method;
             }
             return null;
+        } else if (delegate instanceof GroovyInterceptable) {
+            MetaClass delegateMetaClass = lookupObjectMetaClass(delegate);
+            // GROOVY-3015: must route calls through GroovyObject#invokeMethod(String,Object)
+            MetaMethod interceptMethod = delegateMetaClass.pickMethod("invokeMethod", new Class[]{String.class, Object.class});
+            return new TransformMetaMethod(interceptMethod) {
+                @Override
+                public Object invoke(final Object object, final Object[] arguments) {
+                    return super.invoke(object, new Object[]{methodName, arguments});
+                }
+            };
         } else {
             MetaClass delegateMetaClass = lookupObjectMetaClass(delegate);
             MetaMethod method = delegateMetaClass.pickMethod(methodName, argClasses);
@@ -232,30 +246,32 @@ public final class ClosureMetaClass extends MetaClassImpl {
         }
     }
 
-    public Object invokeMethod(Class sender, Object object, String methodName, Object[] originalArguments, boolean isCallToSuper, boolean fromInsideClass) {
+    @Override
+    public Object invokeMethod(final Class sender, final Object object, final String methodName, final Object[] originalArguments, final boolean isCallToSuper, final boolean fromInsideClass) {
         checkInitalised();
         if (object == null) {
             throw new NullPointerException("Cannot invoke method: " + methodName + " on null object");
         }
 
         final Object[] arguments = makeArguments(originalArguments, methodName);
-        final Class[] argClasses = MetaClassHelper.convertToTypeArray(arguments);
+        final Class<?>[] argClasses = MetaClassHelper.convertToTypeArray(arguments);
         unwrap(arguments);
 
         MetaMethod method = null;
-        final Closure closure = (Closure) object;
+        final Closure<?> closure = (Closure<?>) object;
+        final int resolveStrategy = closure.getResolveStrategy();
 
         if (CLOSURE_DO_CALL_METHOD.equals(methodName) || CLOSURE_CALL_METHOD.equals(methodName)) {
             method = pickClosureMethod(argClasses);
             if (method == null && arguments.length == 1 && arguments[0] instanceof List) {
-                Object[] newArguments = ((List) arguments[0]).toArray();
-                Class[] newArgClasses = MetaClassHelper.convertToTypeArray(newArguments);
+                Object[] newArguments = ((List<?>) arguments[0]).toArray();
+                Class<?>[] newArgClasses = MetaClassHelper.convertToTypeArray(newArguments);
                 method = createTransformMetaMethod(pickClosureMethod(newArgClasses));
             }
             if (method == null) throw new MissingMethodException(methodName, theClass, arguments, false);
         }
 
-        boolean shouldDefer = closure.getResolveStrategy() == Closure.DELEGATE_ONLY && isInternalMethod(methodName);
+        boolean shouldDefer = resolveStrategy == Closure.DELEGATE_ONLY && isInternalMethod(methodName);
         if (method == null && !shouldDefer) {
             method = CLOSURE_METACLASS.pickMethod(methodName, argClasses);
         }
@@ -266,8 +282,6 @@ public final class ClosureMetaClass extends MetaClassImpl {
         Object callObject = object;
         final Object owner = closure.getOwner();
         final Object delegate = closure.getDelegate();
-        final Object thisObject = closure.getThisObject();
-        final int resolveStrategy = closure.getResolveStrategy();
         boolean invokeOnDelegate = false;
         boolean invokeOnOwner = false;
         boolean ownerFirst = true;
@@ -288,48 +302,25 @@ public final class ClosureMetaClass extends MetaClassImpl {
                 if (method == null) {
                     invokeOnOwner = owner != closure && (owner instanceof GroovyObject);
                 }
-
                 break;
             case Closure.DELEGATE_FIRST:
                 method = getDelegateMethod(closure, delegate, methodName, argClasses);
                 callObject = delegate;
                 if (method == null) {
-                    method = getDelegateMethod(closure, owner, methodName, argClasses);
-                    callObject = owner;
-                }
-                if (method == null) {
-                    invokeOnDelegate = delegate != closure && (delegate instanceof GroovyObject);
-                    invokeOnOwner = owner != closure && (owner instanceof GroovyObject);
+                    invokeOnDelegate = delegate != closure;
+                    invokeOnOwner = owner != closure;
                     ownerFirst = false;
                 }
                 break;
-            default: // owner first
-                // owner first means we start with the outer most owner that is not a generated closure
-                // this owner is equal to the this object, so we check that one first.
-                method = getDelegateMethod(closure, thisObject, methodName, argClasses);
-                callObject = thisObject;
+            default: // Closure.OWNER_FIRST:
+                method = getDelegateMethod(closure, owner, methodName, argClasses);
+                callObject = owner;
                 if (method == null) {
-                    // try finding a delegate that has that method... we start from
-                    // outside building a stack and try each delegate
-                    LinkedList list = new LinkedList();
-                    for (Object current = closure; current != thisObject;) {
-                        if (!(current instanceof Closure)) break;
-                        Closure currentClosure = (Closure) current;
-                        if (currentClosure.getDelegate() != null) list.add(current);
-                        current = currentClosure.getOwner();
-                    }
-
-                    while (!list.isEmpty() && method == null) {
-                        Closure closureWithDelegate = (Closure) list.removeLast();
-                        Object currentDelegate = closureWithDelegate.getDelegate();
-                        method = getDelegateMethod(closureWithDelegate, currentDelegate, methodName, argClasses);
-                        callObject = currentDelegate;
-                    }
+                    invokeOnDelegate = delegate != closure;
+                    invokeOnOwner = owner != closure;
+                    ownerFirst = true;
                 }
-                if (method == null) {
-                    invokeOnDelegate = delegate != closure && (delegate instanceof GroovyObject);
-                    invokeOnOwner = owner != closure && (owner instanceof GroovyObject);
-                }
+                break;
         }
         if (method == null && (invokeOnOwner || invokeOnDelegate)) {
             try {
@@ -351,73 +342,74 @@ public final class ClosureMetaClass extends MetaClassImpl {
                 return method.doMethodInvoke(callObject, arguments);
             }
         } else {
-            // if no method was found, try to find a closure defined as a field of the class and run it
+            // no method was found; try to find a closure defined as a field of the class and run it
             Object value = null;
             try {
-                value = this.getProperty(object, methodName);
+                value = getProperty(sender, object, methodName, isCallToSuper, fromInsideClass);
             } catch (MissingPropertyException mpe) {
                 // ignore
             }
             if (value instanceof Closure) {  // This test ensures that value != this If you ever change this ensure that value != this
-                Closure cl = (Closure) value;
+                Closure<?> cl = (Closure<?>) value;
                 MetaClass delegateMetaClass = cl.getMetaClass();
                 return delegateMetaClass.invokeMethod(cl.getClass(), closure, CLOSURE_DO_CALL_METHOD, originalArguments, false, fromInsideClass);
             }
         }
 
-        if (last != null) throw last;
-        throw new MissingMethodException(methodName, theClass, arguments, false);
+        throw last != null ? last : new MissingMethodException(methodName, theClass, arguments, false);
     }
 
-    private static boolean isInternalMethod(String methodName) {
-        return methodName.equals("curry") || methodName.equals("ncurry") || methodName.equals("rcurry") ||
-                methodName.equals("leftShift") || methodName.equals("rightShift");
+    private static boolean isInternalMethod(final String methodName) {
+        switch (methodName) {
+            case "curry":
+            case "ncurry":
+            case "rcurry":
+            case "leftShift":
+            case "rightShift":
+                return true;
+            default:
+                return false;
+        }
     }
 
-    private static Object[] makeArguments(Object[] arguments, String methodName) {
+    private static Object[] makeArguments(final Object[] arguments, final String methodName) {
         if (arguments == null) return EMPTY_ARGUMENTS;
         return arguments;
     }
 
-    private static Throwable unwrap(GroovyRuntimeException gre) {
+    private static Throwable unwrap(final GroovyRuntimeException gre) {
         Throwable th = gre;
         if (th.getCause() != null && th.getCause() != gre) th = th.getCause();
         if (th != gre && (th instanceof GroovyRuntimeException)) return unwrap((GroovyRuntimeException) th);
         return th;
     }
 
-    private static Object invokeOnDelegationObjects(
-            boolean invoke1, Object o1,
-            boolean invoke2, Object o2,
-            String methodName, Object[] args) {
+    private static Object invokeOnDelegationObjects(final boolean invoke1, final Object o1, final boolean invoke2, final Object o2, final String methodName, final Object[] args) {
         MissingMethodException first = null;
         if (invoke1) {
-            GroovyObject go = (GroovyObject) o1;
             try {
-                return go.invokeMethod(methodName, args);
+                return InvokerHelper.invokeMethod(o1, methodName, args);
             } catch (MissingMethodException mme) {
                 first = mme;
             } catch (GroovyRuntimeException gre) {
-                Throwable th = unwrap(gre);
-                if ((th instanceof MissingMethodException)
-                        && (methodName.equals(((MissingMethodException) th).getMethod()))) {
-                    first = (MissingMethodException) th;
+                Throwable t = unwrap(gre);
+                if (t instanceof MissingMethodException && methodName.equals(((MissingMethodException) t).getMethod())) {
+                    first = (MissingMethodException) t;
                 } else {
                     throw gre;
                 }
             }
         }
         if (invoke2 && (!invoke1 || o1 != o2)) {
-            GroovyObject go = (GroovyObject) o2;
             try {
-                return go.invokeMethod(methodName, args);
+                return InvokerHelper.invokeMethod(o2, methodName, args);
             } catch (MissingMethodException mme) {
                 // patch needed here too, but we need a test case to trip it first
                 if (first == null) first = mme;
             } catch (GroovyRuntimeException gre) {
-                Throwable th = unwrap(gre);
-                if (th instanceof MissingMethodException) {
-                    first = (MissingMethodException) th;
+                Throwable t = unwrap(gre);
+                if (t instanceof MissingMethodException) {
+                    first = (MissingMethodException) t;
                 } else {
                     throw gre;
                 }
@@ -531,7 +523,7 @@ public final class ClosureMetaClass extends MetaClassImpl {
         }
     }
 
-    private MetaClass lookupObjectMetaClass(Object object) {
+    private MetaClass lookupObjectMetaClass(final Object object) {
         if (object instanceof GroovyObject) {
             GroovyObject go = (GroovyObject) object;
             return go.getMetaClass();
@@ -563,15 +555,14 @@ public final class ClosureMetaClass extends MetaClassImpl {
     }
 
     @Override
-    public MetaMethod pickMethod(String name, Class[] argTypes) {
-        if (argTypes == null) argTypes = MetaClassHelper.EMPTY_CLASS_ARRAY;
-        if (name.equals(CLOSURE_CALL_METHOD) || name.equals(CLOSURE_DO_CALL_METHOD)) {
-            return pickClosureMethod(argTypes);
+    public MetaMethod pickMethod(final String methodName, final Class[] argumentTypes) {
+        if (CLOSURE_CALL_METHOD.equals(methodName) || CLOSURE_DO_CALL_METHOD.equals(methodName)) {
+            return pickClosureMethod(argumentTypes != null ? argumentTypes : MetaClassHelper.EMPTY_CLASS_ARRAY);
         }
-        return CLOSURE_METACLASS.getMetaMethod(name, argTypes);
+        return CLOSURE_METACLASS.getMetaMethod(methodName, argumentTypes);
     }
 
-    public MetaMethod retrieveStaticMethod(String methodName, Class[] arguments) {
+    public MetaMethod retrieveStaticMethod(final String methodName, final Class[] arguments) {
         return null;
     }
 
@@ -581,19 +572,21 @@ public final class ClosureMetaClass extends MetaClassImpl {
     }
 
     @Override
-    protected void setInitialized(boolean initialized) {
+    protected void setInitialized(final boolean initialized) {
         this.initialized = initialized;
     }
 
-    public MetaMethod getStaticMetaMethod(String name, Object[] args) {
+    @Override
+    public MetaMethod getStaticMetaMethod(final String name, final Object[] args) {
         return CLOSURE_METACLASS.getStaticMetaMethod(name, args);
     }
 
-    public MetaMethod getStaticMetaMethod(String name, Class[] argTypes) {
+    public MetaMethod getStaticMetaMethod(final String name, final Class[] argTypes) {
         return CLOSURE_METACLASS.getStaticMetaMethod(name, argTypes);
     }
 
-    public Object getProperty(Class sender, Object object, String name, boolean useSuper, boolean fromInsideClass) {
+    @Override
+    public Object getProperty(final Class sender, final Object object, final String name, final boolean useSuper, final boolean fromInsideClass) {
         if (object instanceof Class) {
             return getStaticMetaClass().getProperty(sender, object, name, useSuper, fromInsideClass);
         } else {
@@ -602,7 +595,7 @@ public final class ClosureMetaClass extends MetaClassImpl {
     }
 
     @Override
-    public Object getAttribute(Class sender, Object object, String attribute, boolean useSuper, boolean fromInsideClass) {
+    public Object getAttribute(final Class sender, final Object object, final String attribute, final boolean useSuper, final boolean fromInsideClass) {
         if (object instanceof Class) {
             return getStaticMetaClass().getAttribute(sender, object, attribute, useSuper);
         } else {
@@ -617,8 +610,7 @@ public final class ClosureMetaClass extends MetaClassImpl {
     }
 
     @Override
-    public void setAttribute(Class sender, Object object, String attribute,
-                             Object newValue, boolean useSuper, boolean fromInsideClass) {
+    public void setAttribute(final Class sender, final Object object, final String attribute, final Object newValue, final boolean useSuper, final boolean fromInsideClass) {
         if (object instanceof Class) {
             getStaticMetaClass().setAttribute(sender, object, attribute, newValue, useSuper, fromInsideClass);
         } else {
@@ -632,11 +624,13 @@ public final class ClosureMetaClass extends MetaClassImpl {
         }
     }
 
-    public Object invokeStaticMethod(Object object, String methodName, Object[] arguments) {
+    @Override
+    public Object invokeStaticMethod(final Object object, final String methodName, final Object[] arguments) {
         return getStaticMetaClass().invokeMethod(Class.class, object, methodName, arguments, false, false);
     }
 
-    public void setProperty(Class sender, Object object, String name, Object newValue, boolean useSuper, boolean fromInsideClass) {
+    @Override
+    public void setProperty(final Class sender, final Object object, final String name, final Object newValue, final boolean useSuper, final boolean fromInsideClass) {
         if (object instanceof Class) {
             getStaticMetaClass().setProperty(sender, object, name, newValue, useSuper, fromInsideClass);
         } else {
@@ -644,51 +638,62 @@ public final class ClosureMetaClass extends MetaClassImpl {
         }
     }
 
-    public MetaMethod getMethodWithoutCaching(int index, Class sender, String methodName, Class[] arguments, boolean isCallToSuper) {
+    public MetaMethod getMethodWithoutCaching(final int index, final Class sender, final String methodName, final Class[] arguments, final boolean isCallToSuper) {
         throw new UnsupportedOperationException();
     }
 
-    public void setProperties(Object bean, Map map) {
+    @Override
+    public void setProperties(final Object bean, final Map map) {
         throw new UnsupportedOperationException();
     }
 
-    public void addMetaBeanProperty(MetaBeanProperty mp) {
+    @Override
+    public void addMetaBeanProperty(final MetaBeanProperty mp) {
         throw new UnsupportedOperationException();
     }
 
-    public void addMetaMethod(MetaMethod method) {
+    @Override
+    public void addMetaMethod(final MetaMethod method) {
         throw new UnsupportedOperationException();
     }
 
-    public void addNewInstanceMethod(Method method) {
+    @Override
+    public void addNewInstanceMethod(final Method method) {
         throw new UnsupportedOperationException();
     }
 
-    public void addNewStaticMethod(Method method) {
+    @Override
+    public void addNewStaticMethod(final Method method) {
         throw new UnsupportedOperationException();
     }
 
-    public Constructor retrieveConstructor(Class[] arguments) {
+    @Override
+    public Constructor retrieveConstructor(final Class[] arguments) {
         throw new UnsupportedOperationException();
     }
 
-    public CallSite createPojoCallSite(CallSite site, Object receiver, Object[] args) {
+    @Override
+    public CallSite createPojoCallSite(final CallSite site, final Object receiver, final Object[] args) {
         throw new UnsupportedOperationException();
     }
 
-    public CallSite createPogoCallSite(CallSite site, Object[] args) {
+    @Override
+    public CallSite createPogoCallSite(final CallSite site, final Object[] args) {
         return new PogoMetaClassSite(site, this);
     }
 
-    public CallSite createPogoCallCurrentSite(CallSite site, Class sender, Object[] args) {
+    @Override
+    public CallSite createPogoCallCurrentSite(final CallSite site, final Class sender, final Object[] args) {
         return new PogoMetaClassSite(site, this);
     }
 
-    public List respondsTo(Object obj, String name, Object[] argTypes) {
+    @Override
+    public List respondsTo(final Object obj, final String name, final Object[] argTypes) {
         loadMetaInfo();
         return super.respondsTo(obj, name, argTypes);
     }
 
+    @Override
     public List respondsTo(final Object obj, final String name) {
         loadMetaInfo();
         return super.respondsTo(obj, name);
@@ -696,13 +701,12 @@ public final class ClosureMetaClass extends MetaClassImpl {
 
     private synchronized void loadMetaInfo() {
         if (metaMethodIndex.isEmpty()) {
-            initialized = false;
-            super.initialize();
-            initialized = true;
+          reinitialize();
         }
     }
 
-    protected void applyPropertyDescriptors(PropertyDescriptor[] propertyDescriptors) {
+    @Override
+    protected void applyPropertyDescriptors(final PropertyDescriptor[] propertyDescriptors) {
         // do nothing
     }
 }

@@ -76,8 +76,6 @@ import static java.lang.Math.max;
  * A static helper class to make bytecode generation easier and act as a facade over the Invoker
  */
 public class InvokerHelper {
-    private static final Object[] EMPTY_MAIN_ARGS = new Object[]{new String[0]};
-
     public static final Object[] EMPTY_ARGS = {};
     protected static final Object[] EMPTY_ARGUMENTS = EMPTY_ARGS;
     protected static final Class[] EMPTY_TYPES = {};
@@ -87,6 +85,8 @@ public class InvokerHelper {
 
     public static final MetaClassRegistry metaRegistry = GroovySystem.getMetaClassRegistry();
     public static final String MAIN_METHOD_NAME = "main";
+    private static final String XMLUTIL_CLASS_FULL_NAME = "groovy.xml.XmlUtil";
+    private static final String SERIALIZE_METHOD_NAME = "serialize";
 
     public static void removeClass(Class clazz) {
         metaRegistry.removeMetaClass(clazz);
@@ -228,7 +228,6 @@ public class InvokerHelper {
         setProperty(object, property, newValue);
     }
 
-
     /**
      * This is so we don't have to reorder the stack when we call this method.
      * At some point a better name might be in order.
@@ -240,7 +239,6 @@ public class InvokerHelper {
     public static Object getGroovyObjectProperty(GroovyObject object, String property) {
         return object.getProperty(property);
     }
-
 
     /**
      * This is so we don't have to reorder the stack when we call this method.
@@ -445,6 +443,7 @@ public class InvokerHelper {
     static class NullScript extends Script {
         public NullScript() { this(new Binding()); }
         public NullScript(Binding context) { super(context); }
+        @Override
         public Object run() { return null; }
     }
 
@@ -458,37 +457,33 @@ public class InvokerHelper {
                 if (Script.class.isAssignableFrom(scriptClass)) {
                     script = newScript(scriptClass, context);
                 } else {
-                    final GroovyObject object = (GroovyObject) scriptClass.getDeclaredConstructor().newInstance();
-                    // it could just be a class, so let's wrap it in a Script
-                    // wrapper; though the bindings will be ignored
+                    // wrap call "ScriptClass.main(args)" with a Script instance
                     script = new Script(context) {
+                        @Override
                         public Object run() {
-                            Object argsToPass = EMPTY_MAIN_ARGS;
+                            Object[] mainArgs = {new String[0]};
                             try {
                                 Object args = getProperty("args");
                                 if (args instanceof String[]) {
-                                    argsToPass = args;
+                                    mainArgs[0] = args;
                                 }
-                            } catch (MissingPropertyException e) {
-                                // They'll get empty args since none exist in the context.
+                            } catch (MissingPropertyException mpe) {
+                                // call with empty array
                             }
-                            object.invokeMethod(MAIN_METHOD_NAME, argsToPass);
-                            return null;
+                            return InvokerHelper.invokeStaticMethod(scriptClass, MAIN_METHOD_NAME, mainArgs);
                         }
                     };
-                    Map variables = context.getVariables();
-                    MetaClass mc = getMetaClass(object);
-                    for (Object o : variables.entrySet()) {
-                        Map.Entry entry = (Map.Entry) o;
-                        String key = entry.getKey().toString();
-                        // assume underscore variables are for the wrapper script
-                        setPropertySafe(key.startsWith("_") ? script : object, mc, key, entry.getValue());
-                    }
+
+                    MetaClass smc = getMetaClass(scriptClass);
+                    ((Map<?,?>) context.getVariables()).forEach((key, value) -> {
+                        String name = key.toString();
+                        if (!name.startsWith("_")) { // assume underscore variables are for the wrapper
+                            setPropertySafe(scriptClass, smc, name, value);
+                        }
+                    });
                 }
             } catch (Exception e) {
-                throw new GroovyRuntimeException(
-                        "Failed to create Script instance for class: "
-                                + scriptClass + ". Reason: " + e, e);
+                throw new GroovyRuntimeException("Failed to create Script instance for class: " + scriptClass + ". Reason: " + e, e);
             }
         }
         return script;
@@ -654,7 +649,7 @@ public class InvokerHelper {
         }
         if (arguments instanceof Element) {
             try {
-                Method serialize = Class.forName("groovy.xml.XmlUtil").getMethod("serialize", Element.class);
+                Method serialize = Class.forName(XMLUTIL_CLASS_FULL_NAME).getMethod(SERIALIZE_METHOD_NAME, Element.class);
                 return (String) serialize.invoke(null, arguments);
             } catch (ClassNotFoundException | IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
                 throw new RuntimeException(e);
@@ -929,14 +924,19 @@ public class InvokerHelper {
         return toArrayString(arguments, false, maxSize, safe);
     }
 
-    public static List createRange(Object from, Object to, boolean inclusive) {
+    public static List createRange(Object from, Object to, boolean exclusiveLeft, boolean exclusiveRight) {
         try {
-            return ScriptBytecodeAdapter.createRange(from, to, inclusive);
+            return ScriptBytecodeAdapter.createRange(from, to, exclusiveLeft, exclusiveRight);
         } catch (RuntimeException | Error re) {
             throw re;
         } catch (Throwable t) {
             throw new RuntimeException(t);
         }
+    }
+
+    // Kept in for backwards compatibility
+    public static List createRange(Object from, Object to, boolean inclusive) {
+        return createRange(from, to, false, !inclusive);
     }
 
     public static Object bitwiseNegate(Object value) {
@@ -991,12 +991,11 @@ public class InvokerHelper {
     public static Object invokeMethod(Object object, String methodName, Object arguments) {
         if (object == null) {
             object = NullObject.getNullObject();
-            //throw new NullPointerException("Cannot invoke method " + methodName + "() on null object");
         }
 
         // if the object is a Class, call a static method from that class
         if (object instanceof Class) {
-            Class theClass = (Class) object;
+            Class<?> theClass = (Class<?>) object;
             MetaClass metaClass = metaRegistry.getMetaClass(theClass);
             return metaClass.invokeStaticMethod(object, methodName, asArray(arguments));
         }

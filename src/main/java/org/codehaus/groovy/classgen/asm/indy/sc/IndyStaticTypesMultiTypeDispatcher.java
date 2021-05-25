@@ -30,6 +30,8 @@ import java.lang.invoke.CallSite;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 
+import static org.objectweb.asm.Opcodes.H_INVOKESTATIC;
+
 /**
  * Multi type dispatcher for binary expression backend combining indy and static compilation
  *
@@ -51,7 +53,8 @@ public class IndyStaticTypesMultiTypeDispatcher extends StaticTypesBinaryExpress
                     H_INVOKESTATIC,
                     INDY_INTERFACE_NAME,
                     "staticArrayAccess",
-                    BSM_METHOD_TYPE_DESCRIPTOR);
+                    BSM_METHOD_TYPE_DESCRIPTOR,
+                    false);
     private static class GenericArrayAccess extends MethodCaller {
         private final String name, signature;
         public GenericArrayAccess(String name, String signature) {
@@ -63,6 +66,7 @@ public class IndyStaticTypesMultiTypeDispatcher extends StaticTypesBinaryExpress
         }
     }
 
+    @Override
     protected BinaryExpressionWriter[] initializeDelegateHelpers() {
         BinaryExpressionWriter[] bewArray = super.initializeDelegateHelpers();
         /* 1: int    */

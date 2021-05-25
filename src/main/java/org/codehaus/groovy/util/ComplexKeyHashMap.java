@@ -21,6 +21,7 @@ package org.codehaus.groovy.util;
 import java.util.Arrays;
 import java.util.NoSuchElementException;
 
+@Deprecated
 public class ComplexKeyHashMap
 {
   public static class Entry {
@@ -149,10 +150,12 @@ public class ComplexKeyHashMap
                 index = i;
             }
 
+            @Override
             public boolean hasNext() {
                 return next != null;
             }
 
+            @Override
             public Entry next() {
                 return nextEntry();
             }

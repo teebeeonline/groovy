@@ -63,6 +63,7 @@ import java.io.InputStream;
 import java.net.URL;
 import java.security.CodeSource;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Deque;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -219,7 +220,9 @@ public class CompilationUnit extends ProcessingUnit {
             }
         }, Phases.SEMANTIC_ANALYSIS);
 
-        addPhaseOperation((final SourceUnit source, final GeneratorContext context, final ClassNode classNode) -> TraitComposer.doExtendTraits(classNode, source, this), Phases.CANONICALIZATION);
+        addPhaseOperation((final SourceUnit source, final GeneratorContext context, final ClassNode classNode) -> {
+            TraitComposer.doExtendTraits(classNode, source, this);
+        }, Phases.CANONICALIZATION);
 
         addPhaseOperation(source -> {
             List<ClassNode> classes = source.getAST().getClasses();
@@ -447,7 +450,7 @@ public class CompilationUnit extends ProcessingUnit {
     }
 
     /**
-     * @return the class loader for loading AST transformations
+     * Returns the class loader for loading AST transformations.
      */
     public GroovyClassLoader getTransformLoader() {
         return Optional.ofNullable(getASTTransformationsContext().getTransformLoader()).orElseGet(this::getClassLoader);
@@ -618,10 +621,14 @@ public class CompilationUnit extends ProcessingUnit {
         throughPhase = Math.min(throughPhase, Phases.ALL);
 
         while (throughPhase >= phase && phase <= Phases.ALL) {
-
             if (phase == Phases.SEMANTIC_ANALYSIS) {
                 resolve.doPhaseOperation(this);
                 if (dequeued()) continue;
+            } else if (phase == Phases.CONVERSION) {
+                Collection<SourceUnit> sourceUnits = sources.values();
+                (sourceUnits.size() > 1 && Boolean.TRUE.equals(configuration.getOptimizationOptions().get(CompilerConfiguration.PARALLEL_PARSE))
+                        ? sourceUnits.parallelStream() : sourceUnits.stream()
+                ).forEach(SourceUnit::buildAST);
             }
 
             processPhaseOperations(phase);
@@ -873,8 +880,8 @@ public class CompilationUnit extends ProcessingUnit {
          */
         @Override
         default void doPhaseOperation(final CompilationUnit unit) throws CompilationFailedException {
-            for (String name : unit.sources.keySet()) {
-                SourceUnit source = unit.sources.get(name);
+            for (Map.Entry<String, SourceUnit> entry : unit.sources.entrySet()) {
+                SourceUnit source = entry.getValue();
                 if (source.phase < unit.phase || (source.phase == unit.phase && !source.phaseComplete)) {
                     try {
                         this.call(source);

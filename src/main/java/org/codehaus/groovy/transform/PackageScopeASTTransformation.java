@@ -42,6 +42,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import static org.objectweb.asm.Opcodes.ACC_PRIVATE;
+import static org.objectweb.asm.Opcodes.ACC_PUBLIC;
+
 /**
  * Handles transformation for the @PackageScope annotation.
  * <p>
@@ -58,6 +61,7 @@ public class PackageScopeASTTransformation extends AbstractASTTransformation {
     private static final Class TARGET_CLASS = groovy.transform.PackageScopeTarget.class;
     private static final String TARGET_CLASS_NAME = ClassHelper.make(TARGET_CLASS).getNameWithoutPackage();
 
+    @Override
     public void visit(ASTNode[] nodes, SourceUnit source) {
         init(nodes, source);
         AnnotatedNode parent = (AnnotatedNode) nodes[1];
@@ -132,12 +136,13 @@ public class PackageScopeASTTransformation extends AbstractASTTransformation {
         }
     }
 
-    private static void visitFieldNode(FieldNode fNode) {
+    private void visitFieldNode(FieldNode fNode) {
         final ClassNode cNode = fNode.getDeclaringClass();
         final List<PropertyNode> pList = cNode.getProperties();
         PropertyNode foundProp = null;
+        String fName = fNode.getName();
         for (PropertyNode pNode : pList) {
-            if (pNode.getName().equals(fNode.getName())) {
+            if (pNode.getName().equals(fName) && pNode.getAnnotations(MY_TYPE) != null) {
                 foundProp = pNode;
                 break;
             }
@@ -145,6 +150,26 @@ public class PackageScopeASTTransformation extends AbstractASTTransformation {
         if (foundProp != null) {
             revertVisibility(fNode);
             pList.remove(foundProp);
+            // now check for split property
+            foundProp = null;
+            for (PropertyNode pNode : pList) {
+                if (pNode.getName().equals(fName)) {
+                    foundProp = pNode;
+                    break;
+                }
+            }
+            if (foundProp != null) {
+                FieldNode oldField = foundProp.getField();
+                cNode.getFields().remove(oldField);
+                cNode.getFieldIndex().put(fName, fNode);
+                if (foundProp.hasInitialExpression()) {
+                    if (fNode.hasInitialExpression()) {
+                        addError("The split property definition named '" + fName + "' must not have an initial value for both the field and the property", fNode);
+                    }
+                    fNode.setInitialValueExpression(foundProp.getInitialExpression());
+                }
+                foundProp.setField(fNode);
+            }
         }
     }
 

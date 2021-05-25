@@ -23,89 +23,248 @@ package groovy.transform.stc
  */
 class ClosuresSTCTest extends StaticTypeCheckingTestCase {
 
-    void testClosureWithoutArguments() {
+    void testClosureWithoutArguments1() {
         assertScript '''
-        def clos = { println "hello!" }
-
-        println "Executing the Closure:"
-        clos() //prints "hello!"
+            def c = { return 'foo' }
+            assert c() == 'foo'
         '''
     }
 
-    void testClosureWithoutArgumentsExplicit() {
-        // GROOVY-9079: no params to statically type check but shouldn't get NPE
+    void testClosureWithoutArguments2() {
         assertScript '''
-            import groovy.transform.CompileStatic
-            import java.util.concurrent.Callable
-
-            @CompileStatic
-            String makeFoo() {
-                Callable<String> call = { -> 'foo' }
-                call()
-            }
-
-            assert makeFoo() == 'foo'
+            def c = { -> return 'foo' }
+            assert c() == 'foo'
         '''
     }
 
-    void testClosureWithArguments() {
+    // GROOVY-9079
+    void testClosureWithoutArguments3() {
         assertScript '''
-            def printSum = { int a, int b -> print a+b }
-            printSum( 5, 7 ) //prints "12"
-        '''
-
-        shouldFailWithMessages '''
-            def printSum = { int a, int b -> print a+b }
-            printSum( '5', '7' ) //prints "12"
-        ''', 'Closure argument types: [int, int] do not match with parameter types: [java.lang.String, java.lang.String]'
-    }
-
-    void testClosureWithArgumentsAndNoDef() {
-        assertScript '''
-            { int a, int b -> print a+b }(5,7)
+            java.util.concurrent.Callable<String> c = { -> return 'foo' }
+            assert c() == 'foo'
         '''
     }
 
-    void testClosureWithArgumentsNoDefAndWrongType() {
-        shouldFailWithMessages '''
-            { int a, int b -> print a+b }('5',7)
-        ''', 'Closure argument types: [int, int] do not match with parameter types: [java.lang.String, int]'
+    // GROOVY-10071
+    void testClosureWithoutArguments4() {
+        assertScript '''
+            def c = { ... zeroOrMore -> return 'foo' + zeroOrMore }
+            assert c('bar', 'baz') == 'foo[bar, baz]'
+            assert c('bar') == 'foo[bar]'
+            assert c() == 'foo[]'
+        '''
     }
 
-    void testClosureReturnTypeInferrence() {
+    // GROOVY-10072
+    void testClosureWithoutArguments5() {
         assertScript '''
-            def closure = { int x, int y -> return x+y }
-            int total = closure(2,3)
+            def c = { p = 'foo' -> return p }
+            assert c('bar') == 'bar'
+            assert c() == 'foo'
+        '''
+
+        assertScript '''
+            def c = { p, q = 'baz' -> '' + p + q }
+            assert c('foo', 'bar') == 'foobar'
+            assert c('foo') == 'foobaz'
+        '''
+    }
+
+    void testClosureWithArguments1() {
+        assertScript '''
+            def c = { int a, int b -> a + b }
+            assert c(5, 7) == 12
         '''
 
         shouldFailWithMessages '''
-            def closure = { int x, int y -> return x+y }
-            int total = closure('2',3)
-        ''', 'Closure argument types: [int, int] do not match with parameter types: [java.lang.String, int]'
+            def c = { int a, int b -> a + b }
+            c('5', '7')
+        ''',
+        'Cannot call closure that accepts [int, int] with [java.lang.String, java.lang.String]'
     }
 
-    void testClosureReturnTypeInferrenceWithoutDef() {
+    void testClosureWithArguments2() {
         assertScript '''
-            int total = { int x, int y -> return x+y }(2,3)
+            def result = { int a, int b -> a + b }(5, 7)
+            assert result == 12
+        '''
+
+        shouldFailWithMessages '''
+            { int a, int b -> a + b }('5', 7)
+        ''',
+        'Cannot call closure that accepts [int, int] with [java.lang.String, int]'
+    }
+
+    // GROOVY-6365
+    void testClosureWithArguments3() {
+        assertScript '''
+            def c = { Object[] args -> args.length }
+            assert c('one', 'two') == 2
         '''
     }
 
-    void testClosureReturnTypeInference() {
+    void testClosureReturnTypeInference1() {
+        assertScript '''
+            def c = { int a, int b -> return a + b }
+            int total = c(2, 3)
+            assert total == 5
+        '''
+    }
+
+    void testClosureReturnTypeInference2() {
+        assertScript '''
+            int total = { int a, int b -> return a + b }(2, 3)
+        '''
+    }
+
+    void testClosureReturnTypeInference3() {
         shouldFailWithMessages '''
-            def cl = { int x ->
-                if (x==0) {
-                    1L
+            def c = { int x ->
+                if (x == 0) {
+                    1L // long
                 } else {
                     x // int
                 }
             }
-            byte res = cl(0) // should throw an error because return type inference should be a long
-        ''', 'Possible loss of precision from long to byte'
+            byte res = c(0)
+        ''',
+        'Possible loss of precision from long to byte'
     }
 
-    void testClosureWithoutParam() {
+    // GROOVY-9907
+    void testClosureReturnTypeInference4() {
         assertScript '''
-            { -> println 'Hello' }()
+            Integer foo(x) {
+                if (x instanceof Integer) {
+                    def bar = { -> return x }
+                    return bar.call()
+                }
+                return 0
+            }
+            assert foo(1) == 1
+        '''
+    }
+
+    // GROOVY-9971
+    void testClosureReturnTypeInference5() {
+        assertScript '''
+            def m(Closure<String> c) {
+                c.call()
+            }
+            final x = 123
+            Closure<String> c = { -> "x=$x" }
+            String type = c.call().class.name
+            assert type == 'java.lang.String'
+            type = (m { -> "x=$x" }).class.name
+            assert type == 'java.lang.String' // not GStringImpl
+        '''
+    }
+
+    // GROOVY-10082
+    void testClosureReturnTypeInference6() {
+        assertScript '''
+            class A {}
+            class B extends A {}
+            Closure<A> c = { -> new B() }
+
+            def result = c()
+            assert result instanceof A
+            assert result instanceof B
+        '''
+        shouldFailWithMessages '''
+            Closure<String> c = { -> 42 }
+        ''',
+        'Cannot assign groovy.lang.Closure<java.lang.Integer> to: groovy.lang.Closure<java.lang.String>'
+    }
+
+    // GROOVY-10091
+    void testClosureReturnTypeInference7() {
+        shouldFailWithMessages '''
+            class A<T> {}
+            class B extends A<Number> {}
+            class X extends A<String> {}
+            class Y<Z> extends A<Number> {}
+
+            Closure<A<Number>> c
+            c = { -> return new B() }
+            c = { -> return new X() }
+            c = { -> return new Y<String>() }
+        ''',
+        'Cannot assign groovy.lang.Closure<X> to: groovy.lang.Closure<A<java.lang.Number>>'
+    }
+
+    // GROOVY-8427
+    void testClosureReturnTypeInference8() {
+        assertScript '''
+            import java.util.function.Consumer
+
+            class C {
+                static <T> void m(T a, Consumer<T> c) {
+                    c.accept(a)
+                }
+                static void main(args) {
+                    def c = { ->
+                        int x = 0
+                        m('') {
+                            print 'void return'
+                        }
+                    }
+                    c.call()
+                }
+            }
+        '''
+    }
+
+    // GROOVY-8202
+    void testClosureReturnTypeInference9() {
+        assertScript '''
+            void proc() {
+            }
+            String test0(flag) {
+              if (flag) {
+                'foo'
+              } else {
+                proc()
+              }
+            }
+            String test1(flag) {
+              Closure<String> c = { ->
+                if (flag) {
+                  'bar'
+                } else {
+                  proc()
+                  null
+                }
+              }
+              c.call()
+            }
+            String test2(flag) {
+              Closure<String> c = { -> // Cannot assign Closure<Object> to Closure<String>
+                if (flag) {
+                  'baz'
+                } else {
+                  proc()
+                }
+              }
+              c.call()
+            }
+
+            assert test0(true) == 'foo'
+            assert test1(true) == 'bar'
+            assert test2(true) == 'baz'
+            assert test0(false) == null
+            assert test1(false) == null
+            assert test2(false) == null
+        '''
+
+        assertScript '''
+            Closure<Void> c = { flag ->
+                if (flag) {
+                    print 'true'
+                } else {
+                    print 'false'
+                }
+            }
         '''
     }
 
@@ -127,20 +286,103 @@ class ClosuresSTCTest extends StaticTypeCheckingTestCase {
         '''
     }
 
-    void testClosureShouldNotChangeInferredType() {
+    // GROOVY-7701
+    void testWithDelegateVsOwnerField() {
         assertScript '''
-            def x = '123';
-            { -> x = new StringBuffer() }
-            x.charAt(0)
+            class Foo {
+                List type
+            }
+
+            class Bar {
+                int type = 10
+
+                @Lazy
+                List<Foo> something = { ->
+                    List<Foo> tmp = []
+                    def foo = new Foo()
+                    foo.with {
+                        type = ['String']
+                    //  ^^^^ should be Foo.type, not Bar.type
+                    }
+                    tmp.add(foo)
+                    tmp
+                }()
+            }
+
+            def bar = new Bar()
+            assert bar.type == 10
+            assert bar.something*.type == [['String']]
+            assert bar.type == 10
         '''
     }
 
-    void testClosureSharedVariableWithIncompatibleType() {
+    void testClosureSharedVariable1() {
+        assertScript '''
+            def x = '123';
+            { -> x = new StringBuffer() }
+            x.charAt(0) // available in String and StringBuffer
+        '''
+    }
+
+    void testClosureSharedVariable2() {
         shouldFailWithMessages '''
             def x = '123';
-            { -> x = 1 }
-            x.charAt(0)
-        ''', 'A closure shared variable [x] has been assigned with various types and the method [charAt(int)] does not exist in the lowest upper bound'
+            { -> x = 123 }
+            x.charAt(0) // available in String but not available in Integer
+        ''', 'Cannot find matching method java.io.Serializable or java.lang.Comparable'
+    }
+
+    // GROOVY-9516
+    void testClosureSharedVariable3() {
+        shouldFailWithMessages '''
+            class A {}
+            class B extends A { def m() {} }
+            class C extends A {}
+
+            void test() {
+              def x = new B();
+              { -> x = new C() }();
+              def c = x
+              c.m()
+            }
+        ''', 'Cannot find matching method A#m()'
+    }
+
+    // GROOVY-10052
+    void testClosureSharedVariable4() {
+        assertScript '''
+            String x
+            def f = { ->
+                x = Optional.of('x').orElseThrow{ new Exception() }
+            }
+            assert f() == 'x'
+            assert x == 'x'
+        '''
+    }
+
+    // GROOVY-10052
+    void testClosureSharedVariable5() {
+        assertScript '''
+            def x
+            def f = { ->
+                x = Optional.of('x').orElseThrow{ new Exception() }
+            }
+            assert f() == 'x'
+            assert x == 'x'
+        '''
+    }
+
+    // GROOVY-10052
+    void testNotClosureSharedVariable() {
+        assertScript '''
+            String x = Optional.of('x').orElseThrow{ new Exception() }
+            def f = { ->
+                String y = Optional.of('y').orElseThrow{ new Exception() }
+            }
+
+            assert x == 'x'
+            assert f() == 'y'
+        '''
     }
 
     void testClosureCallAsAMethod() {
@@ -186,7 +428,7 @@ class ClosuresSTCTest extends StaticTypeCheckingTestCase {
             fib.fib(2)
         '''
     }
-    
+
     void testClosureRecursionWithoutClosureTypeArgument() {
         shouldFailWithMessages '''
             Closure fib
@@ -232,6 +474,7 @@ class ClosuresSTCTest extends StaticTypeCheckingTestCase {
         }
         '''
     }
+
     // a case in Grails
     void testShouldNotThrowClosureSharedVariableError2() {
         assertScript '''
@@ -306,32 +549,92 @@ class ClosuresSTCTest extends StaticTypeCheckingTestCase {
             }
         ''', 'Cannot find matching method'
     }
-    
-    //GROOVY-6189
-    void testSAMsInMethodSelection(){
+
+    // GROOVY-6189, GROOVY-9852
+    void testSAMsInMethodSelection() {
         // simple direct case
-        assertScript """
+        assertScript '''
             interface MySAM {
                 def someMethod()
             }
             def foo(MySAM sam) {sam.someMethod()}
             assert foo {1} == 1
-        """
-  
+        '''
+
         // overloads with classes implemented by Closure
-        ["java.util.concurrent.Callable", "Object", "Closure", "GroovyObjectSupport", "Cloneable", "Runnable", "GroovyCallable", "Serializable", "GroovyObject"].each {
-            className ->
+        [
+            'groovy.lang.Closure'            : 'not',
+            'groovy.lang.GroovyCallable'     : 'not',
+            'groovy.lang.GroovyObject'       : 'not',
+            'groovy.lang.GroovyObjectSupport': 'not',
+
+            'java.lang.Object'               : 'sam',
+            'java.lang.Runnable'             : 'not',
+            'java.lang.Cloneable'            : 'not',
+            'java.io.Serializable'           : 'not',
+            'java.util.concurrent.Callable'  : 'not',
+        ].each { type, which ->
             assertScript """
                 interface MySAM {
                     def someMethod()
                 }
-                def foo(MySAM sam) {sam.someMethod()}
-                def foo($className x) {2}
-                assert foo {1} == 2
+                def foo($type ref) { 'not' }
+                def foo(MySAM sam) { sam.someMethod() }
+                assert foo { 'sam' } == '$which' : '$type'
+                assert foo(() -> 'sam') == '$which' : '$type'
             """
         }
     }
-    
+
+    void testSAMsInMethodSelection2() {
+        shouldFailWithMessages '''
+            interface One { void m() }
+            interface Two { void m() }
+            def foo(One one) { one.m() }
+            def foo(Two two) { two.m() }
+            foo {
+                print 'bar'
+            }
+        ''', 'Reference to method is ambiguous. Cannot choose between'
+
+        ['', 'x, y ->'].each { params ->
+            shouldFailWithMessages """
+                import java.util.function.Function
+                import java.util.function.Supplier
+                def foo(Function f) { f.apply(0) }
+                def foo(Supplier s) { s.get() }
+                foo { $params 'bar' }
+            """, 'Reference to method is ambiguous. Cannot choose between'
+        }
+    }
+
+    // GROOVY-9881
+    void testSAMsInMethodSelection3() {
+        // Closure implements both and Runnable is "closer"
+        assertScript '''
+            import java.util.concurrent.Callable
+            def foo(Callable c) { 'call' }
+            def foo(Runnable r) { 'run'  }
+            def which = foo {
+                print 'bar'
+            }
+            assert which == 'run'
+        '''
+
+        ['->', 'x ->'].each { params ->
+            assertScript """
+                import java.util.function.Function
+                import java.util.function.Supplier
+                def foo(Function f) { f.apply(0) }
+                def foo(Supplier s) { s.get() }
+                def ret = foo { $params
+                    'bar'
+                }
+                assert ret == 'bar'
+            """
+        }
+    }
+
     void testSAMVariable() {
         assertScript """
             interface SAM { def foo(); }
@@ -354,7 +657,7 @@ class ClosuresSTCTest extends StaticTypeCheckingTestCase {
             assert s.accept(1) == -1
         """
     }
-    
+
     void testSAMProperty() {
         assertScript """
             interface SAM { def foo(); }
@@ -365,7 +668,7 @@ class ClosuresSTCTest extends StaticTypeCheckingTestCase {
             assert x.s.foo() == 1
         """
     }
-    
+
     void testSAMAttribute() {
         assertScript """
             interface SAM { def foo(); }
@@ -435,18 +738,6 @@ class ClosuresSTCTest extends StaticTypeCheckingTestCase {
         '''
     }
 
-    void testAmbiguousSAMOverload() {
-        shouldFailWithMessages '''
-            interface Sammy { def sammy() }
-            interface Sam { def sam() }
-            def method(Sam sam) { sam.sam() }
-            def method(Sammy sammy) { sammy.sammy() }
-            method {
-                println 'foo'
-            }
-        ''', 'Reference to method is ambiguous. Cannot choose between'
-    }
-    
     void testSAMType() {
         assertScript """
             interface Foo {int foo()}
@@ -536,5 +827,47 @@ class ClosuresSTCTest extends StaticTypeCheckingTestCase {
             assert foo { -> 1 }  == 1
         '''
     }
-}
 
+    // GROOVY-9558
+    void testPutAtClosureDelegateProperty() {
+        assertScript '''
+            def config = new org.codehaus.groovy.control.CompilerConfiguration()
+            config.tap {
+                optimizationOptions['indy'] = true
+                optimizationOptions.indy = true
+            }
+        '''
+    }
+
+    // GROOVY-9652
+    void testDelegatePropertyAndCharCompareOptimization() {
+        ['String', 'Character', 'char'].each { type ->
+            assertScript """
+                class Node {
+                    String name
+                    ${type} text
+                }
+                class Root implements Iterable<Node> {
+                    @Override
+                    Iterator<Node> iterator() {
+                        return [
+                            new Node(name: 'term', text: (${type}) 'a'),
+                            new Node(name: 'dash', text: (${type}) '-'),
+                            new Node(name: 'term', text: (${type}) 'b')
+                        ].iterator()
+                    }
+                }
+
+                void test() {
+                    Root root = new Root()
+                    root[0].with {
+                        assert name == 'term'
+                        assert text == 'a' // GroovyCastException: Cannot cast object 'script@b91d8c4' with class 'script' to class 'bugs.Node'
+                    }
+                }
+
+                test()
+            """
+        }
+    }
+}

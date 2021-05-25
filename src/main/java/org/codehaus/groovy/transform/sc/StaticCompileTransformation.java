@@ -23,6 +23,7 @@ import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.AnnotationNode;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.MethodNode;
+import org.codehaus.groovy.ast.PropertyNode;
 import org.codehaus.groovy.ast.expr.Expression;
 import org.codehaus.groovy.classgen.asm.WriterControllerFactory;
 import org.codehaus.groovy.classgen.asm.sc.StaticTypesWriterControllerFactoryImpl;
@@ -49,45 +50,46 @@ public class StaticCompileTransformation extends StaticTypesTransformation {
 
     @Override
     public void visit(final ASTNode[] nodes, final SourceUnit source) {
-        AnnotationNode annotationInformation = (AnnotationNode) nodes[0];
-        AnnotatedNode node = (AnnotatedNode) nodes[1];
-        StaticTypeCheckingVisitor visitor = null;
-        Map<String,Expression> members = annotationInformation.getMembers();
+        AnnotatedNode target = (AnnotatedNode) nodes[1];
+        if (Boolean.TRUE.equals(target.getNodeMetaData(StaticTypeCheckingVisitor.class))) {
+            return;
+        }
+        Map<String,Expression> members = ((AnnotationNode) nodes[0]).getMembers();
         Expression extensions = members.get("extensions");
-        if (node instanceof ClassNode) {
-            ClassNode classNode = (ClassNode) node;
+        StaticTypeCheckingVisitor visitor = null;
+        if (target instanceof ClassNode) {
+            ClassNode classNode = (ClassNode) target;
             visitor = newVisitor(source, classNode);
             visitor.setCompilationUnit(compilationUnit);
             addTypeCheckingExtensions(visitor, extensions);
             classNode.putNodeMetaData(WriterControllerFactory.class, factory);
-            node.putNodeMetaData(STATIC_COMPILE_NODE, !visitor.isSkipMode(node));
+            target.putNodeMetaData(STATIC_COMPILE_NODE, !visitor.isSkipMode(target));
             visitor.initialize();
             visitor.visitClass(classNode);
-        } else if (node instanceof MethodNode) {
-            MethodNode methodNode = (MethodNode) node;
+        } else if (target instanceof MethodNode) {
+            MethodNode methodNode = (MethodNode) target;
             ClassNode declaringClass = methodNode.getDeclaringClass();
             visitor = newVisitor(source, declaringClass);
             visitor.setCompilationUnit(compilationUnit);
             addTypeCheckingExtensions(visitor, extensions);
-            methodNode.putNodeMetaData(STATIC_COMPILE_NODE, !visitor.isSkipMode(node));
+            methodNode.putNodeMetaData(STATIC_COMPILE_NODE, !visitor.isSkipMode(target));
             if (declaringClass.getNodeMetaData(WriterControllerFactory.class) == null) {
                 declaringClass.putNodeMetaData(WriterControllerFactory.class, factory);
             }
             visitor.setMethodsToBeVisited(Collections.singleton(methodNode));
             visitor.initialize();
             visitor.visitMethod(methodNode);
-        } else {
-            source.addError(new SyntaxException(STATIC_ERROR_PREFIX + "Unimplemented node type",
-                    node.getLineNumber(), node.getColumnNumber(), node.getLastLineNumber(), node.getLastColumnNumber()));
+        } else if (!(target instanceof PropertyNode)) {
+            source.addError(new SyntaxException(STATIC_ERROR_PREFIX + "Unimplemented node type", target));
         }
         if (visitor != null) {
             visitor.performSecondPass();
         }
         StaticCompilationTransformer transformer = new StaticCompilationTransformer(source, visitor);
-        if (node instanceof ClassNode) {
-            transformer.visitClass((ClassNode) node);
-        } else if (node instanceof MethodNode) {
-            transformer.visitMethod((MethodNode) node);
+        if (target instanceof ClassNode) {
+            transformer.visitClass((ClassNode) target);
+        } else if (target instanceof MethodNode) {
+            transformer.visitMethod((MethodNode) target);
         }
     }
 

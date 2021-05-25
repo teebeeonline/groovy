@@ -163,6 +163,7 @@ public class StructuredSyntaxDocumentFilter extends DocumentFilter {
      * @param attrs
      * @throws BadLocationException
      */    
+    @Override
     public void insertString(DocumentFilter.FilterBypass fb, int offset,
                              String text, AttributeSet attrs)
         throws BadLocationException {
@@ -224,6 +225,7 @@ public class StructuredSyntaxDocumentFilter extends DocumentFilter {
      * @param length
      * @throws BadLocationException
      */    
+    @Override
     public void remove(DocumentFilter.FilterBypass fb, int offset, int length)
         throws BadLocationException {
         // FRICKIN' HACK!!!!! For some reason, deleting a string at offset 0
@@ -264,7 +266,8 @@ public class StructuredSyntaxDocumentFilter extends DocumentFilter {
      * @param attrs
      * @throws BadLocationException
      */    
-    public void replace(DocumentFilter.FilterBypass fb, int offset, 
+    @Override
+    public void replace(DocumentFilter.FilterBypass fb, int offset,
                         int length, String text, AttributeSet attrs)
         throws BadLocationException
     {
@@ -312,8 +315,8 @@ public class StructuredSyntaxDocumentFilter extends DocumentFilter {
         private String buildRegexp(String[] regexps) {
             StringBuilder regexp = new StringBuilder();
 
-            for (int i = 0; i < regexps.length; i++) {
-                regexp.append("|").append(regexps[i]);
+            for (String s : regexps) {
+                regexp.append("|").append(s);
             }
 
             // ensure leading '|' is removed
@@ -548,6 +551,7 @@ public class StructuredSyntaxDocumentFilter extends DocumentFilter {
             return start.getOffset();
         }
         
+        @Override
         public String toString() {
             return start.toString() + " " + end.toString();
         }
@@ -558,6 +562,7 @@ public class StructuredSyntaxDocumentFilter extends DocumentFilter {
 
         private static final long serialVersionUID = -4210196728719411217L;
 
+        @Override
         public int compare(Object obj, Object obj1) {
             return valueOf(obj) - valueOf(obj1);
         }

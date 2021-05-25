@@ -98,13 +98,14 @@ public class BytecodeVariable {
         this.endLabel = endLabel;
     }
 
+    @Override
     public String toString() {
         return name + "(index=" + index + ",type=" + type + ",holder="+holder+")";
     }
 
     public void setType(ClassNode type) {
         this.type = type;
-        dynamicTyped |= type==ClassHelper.DYNAMIC_TYPE;
+        dynamicTyped |= ClassHelper.isDynamicTyped(type);
     }
 
     public void setDynamicTyped(boolean b) {

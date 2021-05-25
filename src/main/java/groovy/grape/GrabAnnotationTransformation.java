@@ -151,14 +151,17 @@ public class GrabAnnotationTransformation extends ClassCodeVisitorSupport implem
     Boolean disableChecksums;
     Map<String, String> systemProperties;
 
+    @Override
     public SourceUnit getSourceUnit() {
         return sourceUnit;
     }
 
+    @Override
     public void setCompilationUnit(final CompilationUnit compilationUnit) {
         this.compilationUnit = compilationUnit;
     }
 
+    @Override
     public void visit(ASTNode[] nodes, SourceUnit source) {
         sourceUnit = source;
         loader = null;
@@ -292,7 +295,7 @@ public class GrabAnnotationTransformation extends ClassCodeVisitorSupport implem
                         } catch (URISyntaxException e) {
                             // We'll be silent here.
                             // If the URI scheme is unknown or not hierarchical, then we just can't help them and shouldn't cause any trouble either.
-                            // addError("Attribute \"root\" has value '" + root + "' which can't be turned into a valid URI relative to it's source '" + getSourceUnit().getName() + "' @" + node.getClassNode().getNameWithoutPackage() + " annotations", node);
+                            // addError("Attribute \"root\" has value '" + root + "' which can't be turned into a valid URI relative to its source '" + getSourceUnit().getName() + "' @" + node.getClassNode().getNameWithoutPackage() + " annotations", node);
                         }
                     }
 
@@ -605,6 +608,7 @@ public class GrabAnnotationTransformation extends ClassCodeVisitorSupport implem
      *
      * @param node the AST node we are processing
      */
+    @Override
     public void visitAnnotations(AnnotatedNode node) {
         super.visitAnnotations(node);
         for (AnnotationNode an : node.getAnnotations()) {

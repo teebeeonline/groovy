@@ -20,12 +20,13 @@ package groovy.lang
 
 import junit.framework.TestCase
 
+import static groovy.test.GroovyAssert.assertScript
+
 /**
  * Provides unit tests for the <code>NumberRange</code> class.
  */
-public class NumberRangeTest extends TestCase {
-
-    public void testStep() {
+class NumberRangeTest extends TestCase {
+    void testStep() {
         Range n = new NumberRange(1, 3)
         assert n.step(1) == [1, 2, 3]
         assert n.size() == 3
@@ -72,4 +73,54 @@ public class NumberRangeTest extends TestCase {
         assert Integer.MAX_VALUE == new NumberRange(new BigInteger("-10"), new BigInteger(Long.toString((long) Integer.MAX_VALUE) + 1L)).size()
     }
 
+    void testSizeEdgeCases() {
+        assert new NumberRange(0, 0, false).size() == 0
+        assert new NumberRange(0, 0, true).size() == 1
+        assert new NumberRange(0, 1, false).size() == 1
+        assert new NumberRange(0, 1, true).size() == 2
+        assert new NumberRange(0, 0, true, true).size() == 1
+        assert new NumberRange(0, 0, false, true).size() == 0
+        assert new NumberRange(0, 1, false, true).size() == 1
+        assert new NumberRange(0, 0, false, false).size() == 0
+        assert new NumberRange(0, 1, false, false).size() == 0
+    }
+
+    void testContainsWithinBounds() {
+        assertScript '''
+        def r1 = 5.5 ..< 3.5
+        assert !r1.containsWithinBounds(3.5)
+        assert r1.containsWithinBounds(3.6)
+        assert r1.containsWithinBounds(4.5)
+        assert r1.containsWithinBounds(5.4)
+        assert r1.containsWithinBounds(5.5)
+
+        def r2 = 3.5 <.. 5.5
+        assert !r2.containsWithinBounds(3.5)
+        assert r2.containsWithinBounds(3.6)
+        assert r2.containsWithinBounds(4.5)
+        assert r2.containsWithinBounds(5.4)
+        assert r2.containsWithinBounds(5.5)
+
+        def s = 3.5 ..< 5.5
+        assert s.containsWithinBounds(3.5)
+        assert s.containsWithinBounds(3.6)
+        assert s.containsWithinBounds(4.5)
+        assert s.containsWithinBounds(5.4)
+        assert !s.containsWithinBounds(5.5)
+
+        def t = 3.5 <..< 5.5
+        assert !t.containsWithinBounds(3.5)
+        assert t.containsWithinBounds(3.6)
+        assert t.containsWithinBounds(4.5)
+        assert t.containsWithinBounds(5.4)
+        assert !t.containsWithinBounds(5.5)
+
+        def u = 5.5 <..< 3.5
+        assert !u.containsWithinBounds(3.5)
+        assert u.containsWithinBounds(3.6)
+        assert u.containsWithinBounds(4.5)
+        assert u.containsWithinBounds(5.4)
+        assert !u.containsWithinBounds(5.5)
+        '''
+    }
 }

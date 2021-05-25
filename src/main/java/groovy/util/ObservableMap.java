@@ -134,6 +134,7 @@ public class ObservableMap implements Map {
 
     // Map interface
 
+    @Override
     public void clear() {
         int oldSize = size();
         Map values = new HashMap();
@@ -145,38 +146,47 @@ public class ObservableMap implements Map {
         fireSizeChangedEvent(oldSize, size());
     }
 
+    @Override
     public boolean containsKey(Object key) {
         return delegate.containsKey(key);
     }
 
+    @Override
     public boolean containsValue(Object value) {
         return delegate.containsValue(value);
     }
 
+    @Override
     public Set entrySet() {
         return delegate.entrySet();
     }
 
+    @Override
     public boolean equals(Object o) {
         return delegate.equals(o);
     }
 
+    @Override
     public Object get(Object key) {
         return delegate.get(key);
     }
 
+    @Override
     public int hashCode() {
         return delegate.hashCode();
     }
 
+    @Override
     public boolean isEmpty() {
         return delegate.isEmpty();
     }
 
+    @Override
     public Set keySet() {
         return delegate.keySet();
     }
 
+    @Override
     public Object put(Object key, Object value) {
         int oldSize = size();
         Object oldValue = null;
@@ -209,6 +219,7 @@ public class ObservableMap implements Map {
         return oldValue;
     }
 
+    @Override
     public void putAll(Map map) {
         int oldSize = size();
         if (map != null) {
@@ -252,6 +263,7 @@ public class ObservableMap implements Map {
         }
     }
 
+    @Override
     public Object remove(Object key) {
         int oldSize = size();
         Object result = delegate.remove(key);
@@ -262,6 +274,7 @@ public class ObservableMap implements Map {
         return result;
     }
 
+    @Override
     public int size() {
         return delegate.size();
     }
@@ -270,6 +283,7 @@ public class ObservableMap implements Map {
         return size();
     }
 
+    @Override
     public Collection values() {
         return delegate.values();
     }

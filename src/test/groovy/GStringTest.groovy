@@ -19,6 +19,7 @@
 package groovy
 
 import groovy.test.GroovyTestCase
+import groovy.transform.Pure
 
 class GStringTest extends GroovyTestCase {
 
@@ -99,18 +100,18 @@ class GStringTest extends GroovyTestCase {
         check(/$name\?/, "Bob\\?")
         check(/$name$/, "Bob\$")
 
-        def guy = [name: name]
-        check("${guy.name}", "Bob")
-        check("$guy.name", "Bob")
-        check("$guy.name.", "Bob.")
-        check("$guy.name...", "Bob...")
-        check("$guy.name?", "Bob?")
-        check(/$guy.name/, "Bob")
-        check(/$guy.name./, "Bob.")
-        check(/$guy.name.../, "Bob...")
-        check(/$guy.name?/, "Bob?")
-        check(/$guy.name\?/, "Bob\\?")
-        check(/$guy.name$/, "Bob\$")
+        def person = [name: name]
+        check("${person.name}", "Bob")
+        check("$person.name", "Bob")
+        check("$person.name.", "Bob.")
+        check("$person.name...", "Bob...")
+        check("$person.name?", "Bob?")
+        check(/$person.name/, "Bob")
+        check(/$person.name./, "Bob.")
+        check(/$person.name.../, "Bob...")
+        check(/$person.name?/, "Bob?")
+        check(/$person.name\?/, "Bob\\?")
+        check(/$person.name$/, "Bob\$")
     }
 
     void testWithTwoVariables() {
@@ -581,5 +582,135 @@ class GStringTest extends GroovyTestCase {
         assert Eval.me('''def foo='bar'; /${foo}*baz/''') == 'bar*baz'
         assert Eval.me('''def foo='bar'; /$foo\u002abaz/''') == 'bar*baz'
         assert Eval.me('''def foo='bar'; /${foo}\u002abaz/''') == 'bar*baz'
+    }
+
+    void testGStringMutation() {
+        def cat = 'cat', hat = 'hat'
+        def gstring = "The ${cat} in the ${hat}"
+        assert gstring.toString() == 'The cat in the hat'
+        gstring.values[0] = 'eggs'
+        gstring.values[1] = 'ham'
+        gstring.strings[0] = 'Green '
+        gstring.strings[1] = ' and '
+        assert gstring.toString() == 'Green eggs and ham'
+    }
+
+    // GROOVY-7494
+    void testGStringCoercionForArrayPutAt() {
+        String[] fubar = new String[1]
+        fubar[0] = "x${'y'}"
+        assert fubar.toString() == '[xy]'
+    }
+
+    void testGStringLiteral() {
+        def gstr = "a${'1'}"
+        assert gstr.toString() === gstr.toString()
+
+        def gstr2 = "a${true}"
+        assert gstr2.toString() === gstr2.toString()
+
+        def gstr3 = "a${(byte) 1}"
+        assert gstr3.toString() === gstr3.toString()
+
+        def gstr4 = "a${(char) 65}"
+        assert gstr4.toString() === gstr4.toString()
+
+        def gstr5 = "a${1D}"
+        assert gstr5.toString() === gstr5.toString()
+
+        def gstr6 = "a${1F}"
+        assert gstr6.toString() === gstr6.toString()
+
+        def gstr7 = "a${1}"
+        assert gstr7.toString() === gstr7.toString()
+
+        def gstr8 = "a${1L}"
+        assert gstr8.toString() === gstr8.toString()
+
+        def gstr9 = "a${(short) 1}"
+        assert gstr9.toString() === gstr9.toString()
+
+        def gstr10 = "a${Map.class}"
+        assert gstr10.toString() === gstr10.toString()
+
+        def gstr11 = "a${new File('.')}"
+        assert gstr11.toString() === gstr11.toString()
+
+        def gstr12 = "a${"${123}"}b"
+        assert 'a123b' == gstr12
+        assert gstr12.toString() === gstr12.toString()
+
+        def gstr13 = "a${new GroovyImmutableValue()}b"
+        assert 'a123b' == gstr13
+        assert gstr13.toString() === gstr13.toString()
+
+        def gstr14 = "a${new JcipImmutableValue()}b"
+        assert 'a234b' == gstr14
+        assert gstr14.toString() === gstr14.toString()
+
+        def gstr15 = "a${new PureValue()}b"
+        assert 'a345b' == gstr15
+        assert gstr15.toString() === gstr15.toString()
+    }
+
+    void testGStringLiteral2() {
+        assertScript '''
+            final class Test {
+                @groovy.transform.KnownImmutable
+                private static final class Item {
+                    private int toStringInvocationCount = 0
+                    @Override
+                    synchronized String toString() {
+                        toStringInvocationCount++
+                        return "item"
+                    }
+                }
+                static void main(String[] args) {
+                    Item item = new Item()
+                    new StringBuilder().append("item: ${item}")
+                    assert 1 == item.toStringInvocationCount
+                }
+            }
+        '''
+    }
+
+    // GROOVY-9946
+    void testGStringLiteral3() {
+        assertScript '''
+            final class Test {
+                private static final class Item {
+                    private int toStringInvocationCount = 0
+                    @Override
+                    @groovy.transform.Pure
+                    synchronized String toString() {
+                        toStringInvocationCount++
+                        return "item"
+                    }
+                }
+                static void main(String[] args) {
+                    Item item = new Item()
+                    new StringBuilder().append("item: ${item}")
+                    assert 1 == item.toStringInvocationCount
+                }
+            }
+        '''
+    }
+
+    @groovy.transform.Immutable
+    static class GroovyImmutableValue {
+        private final String v = '123'
+        String toString() { v }
+    }
+
+    @net.jcip.annotations.Immutable
+    static final class JcipImmutableValue {
+        private final String v = '234'
+        String toString() { v }
+    }
+
+    static final class PureValue {
+        private final String v = '345'
+        @Pure
+        String toString() { v }
     }
 }

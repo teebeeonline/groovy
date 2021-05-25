@@ -105,6 +105,20 @@ class TypeCheckingTest extends StaticTypeCheckingTestCase {
             // end::stc_assign_array_list[]
         '''
 
+        assertScript '''
+            // tag::stc_assign_array_set[]
+            Set set = [1,2,3]
+            Number[] na = set               // passes
+            // end::stc_assign_array_set[]
+        '''
+
+        assertScript '''
+            // tag::stc_assign_array_stream[]
+            def stream = Arrays.stream(1,2,3)
+            int[] i = stream                // passes
+            // end::stc_assign_array_stream[]
+        '''
+
         shouldFailWithMessages '''
             // tag::stc_assign_array_fail[]
             int[] i = new String[4]     // fails
@@ -685,7 +699,7 @@ import static org.codehaus.groovy.ast.tools.WideningCategories.lowestUpperBound 
             }
             // end::flowtyping_typeconstraints_failure[]
             flowTypingWithExplicitType()
-        ''', '[Static type checking] - Cannot find matching method java.util.List#add(int)'
+        ''', '[Static type checking] - Cannot find matching method java.util.ArrayList#add(int)'
 
         assertScript '''
             // tag::flowtyping_typeconstraints_fixed[]

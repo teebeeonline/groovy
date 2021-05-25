@@ -27,44 +27,52 @@ import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.Parameter;
+import org.codehaus.groovy.ast.PropertyNode;
 import org.codehaus.groovy.ast.expr.ClosureExpression;
 import org.codehaus.groovy.ast.expr.Expression;
-import org.codehaus.groovy.ast.stmt.BlockStatement;
 import org.codehaus.groovy.ast.stmt.EmptyStatement;
-import org.codehaus.groovy.ast.tools.ParameterUtils;
+import org.codehaus.groovy.ast.stmt.Statement;
 import org.codehaus.groovy.control.CompilePhase;
 import org.codehaus.groovy.control.SourceUnit;
-import org.objectweb.asm.Opcodes;
 
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import static org.apache.groovy.ast.tools.ClassNodeUtils.addGeneratedMethod;
+import static org.apache.groovy.ast.tools.MethodNodeUtils.getPropertyName;
 import static org.apache.groovy.ast.tools.MethodNodeUtils.methodDescriptorWithoutReturnType;
-import static org.codehaus.groovy.antlr.PrimitiveHelper.getDefaultValueForPrimitive;
-import static org.codehaus.groovy.ast.ClassHelper.make;
-import static org.codehaus.groovy.ast.expr.ArgumentListExpression.EMPTY_ARGUMENTS;
+import static org.apache.groovy.util.BeanUtils.capitalize;
+import static org.codehaus.groovy.ast.tools.GeneralUtils.callX;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.constX;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.ctorX;
+import static org.codehaus.groovy.ast.tools.GeneralUtils.defaultValueX;
+import static org.codehaus.groovy.ast.tools.GeneralUtils.getGetterName;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.returnS;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.throwS;
+import static org.codehaus.groovy.ast.tools.GeneralUtils.varX;
 import static org.codehaus.groovy.ast.tools.GenericsUtils.correctToGenericsSpec;
 import static org.codehaus.groovy.ast.tools.GenericsUtils.correctToGenericsSpecRecurse;
 import static org.codehaus.groovy.ast.tools.GenericsUtils.createGenericsSpec;
+import static org.codehaus.groovy.ast.tools.ParameterUtils.parametersEqual;
+import static org.codehaus.groovy.ast.ClassHelper.isGroovyObjectType;
+import static org.codehaus.groovy.ast.ClassHelper.isObjectType;
+import static org.codehaus.groovy.ast.ClassHelper.isPrimitiveBoolean;
 
 /**
- * Handles generation of code for the @AutoImplement annotation.
+ * Generates code for the {@code @AutoImplement} annotation.
  */
 @GroovyASTTransformation(phase = CompilePhase.CANONICALIZATION)
 public class AutoImplementASTTransformation extends AbstractASTTransformation {
-    static final Class MY_CLASS = AutoImplement.class;
-    static final ClassNode MY_TYPE = make(MY_CLASS);
-    static final String MY_TYPE_NAME = "@" + MY_TYPE.getNameWithoutPackage();
 
-    public void visit(ASTNode[] nodes, SourceUnit source) {
+    private static final Class<?> MY_CLASS = AutoImplement.class;
+    private static final ClassNode MY_TYPE = ClassHelper.make(MY_CLASS);
+    private static final String MY_TYPE_NAME = "@" + MY_TYPE.getNameWithoutPackage();
+
+    @Override
+    public void visit(final ASTNode[] nodes, final SourceUnit source) {
         init(nodes, source);
         AnnotatedNode parent = (AnnotatedNode) nodes[1];
         AnnotationNode anno = (AnnotationNode) nodes[0];
@@ -73,48 +81,82 @@ public class AutoImplementASTTransformation extends AbstractASTTransformation {
         if (parent instanceof ClassNode) {
             ClassNode cNode = (ClassNode) parent;
             if (!checkNotInterface(cNode, MY_TYPE_NAME)) return;
+
+            String message = getMemberStringValue(anno, "message");
             ClassNode exception = getMemberClassValue(anno, "exception");
             if (exception != null && Undefined.isUndefinedException(exception)) {
                 exception = null;
             }
-            String message = getMemberStringValue(anno, "message");
+
             Expression code = anno.getMember("code");
             if (code != null && !(code instanceof ClosureExpression)) {
                 addError("Expected closure value for annotation parameter 'code'. Found " + code, cNode);
-                return;
-            }
-            createMethods(cNode, exception, message, (ClosureExpression) code);
-            if (code != null) {
-                anno.setMember("code", new ClosureExpression(Parameter.EMPTY_ARRAY, EmptyStatement.INSTANCE));
+            } else {
+                createMethods(cNode, exception, message, (ClosureExpression) code);
+                if (code != null) {
+                    anno.setMember("code", new ClosureExpression(Parameter.EMPTY_ARRAY, EmptyStatement.INSTANCE));
+                }
             }
         }
     }
 
-    private void createMethods(ClassNode cNode, ClassNode exception, String message, ClosureExpression code) {
+    private void createMethods(final ClassNode cNode, final ClassNode exception, final String message, final ClosureExpression code) {
         for (MethodNode candidate : getAllCorrectedMethodsMap(cNode).values()) {
             if (candidate.isAbstract()) {
-                addGeneratedMethod(cNode, candidate.getName(), Opcodes.ACC_PUBLIC, candidate.getReturnType(),
-                        candidate.getParameters(), candidate.getExceptions(),
-                        methodBody(exception, message, code, candidate.getReturnType()));
+                addGeneratedMethod(cNode,
+                        candidate.getName(),
+                        candidate.getModifiers() & 0x7, // visibility only
+                        candidate.getReturnType(),
+                        candidate.getParameters(),
+                        candidate.getExceptions(),
+                        createMethodBody(cNode, candidate, exception, message, code)
+                );
             }
         }
+    }
+
+    private static Statement createMethodBody(final ClassNode cNode, final MethodNode mNode, final ClassNode exception, final String message, final ClosureExpression code) {
+        if (mNode.getParameters().length == 0) {
+            String propertyName = getPropertyName(mNode);
+            if (propertyName != null) {
+                String accessorName = mNode.getName().startsWith("is") ? getGetterName(propertyName) : "is" + capitalize(propertyName);
+                if (cNode.hasMethod(accessorName, Parameter.EMPTY_ARRAY)) {
+                    // delegate to existing accessor to reduce the surprise
+                    return returnS(callX(varX("this"), accessorName));
+                }
+            }
+        }
+
+        if (code != null) {
+            return code.getCode();
+        }
+
+        if (exception != null) {
+            if (message == null) {
+                return throwS(ctorX(exception));
+            } else {
+                return throwS(ctorX(exception, constX(message)));
+            }
+        }
+
+        return returnS(defaultValueX(mNode.getReturnType()));
     }
 
     /**
-     * Return all methods including abstract super/interface methods but only if not overridden
-     * by a concrete declared/inherited method.
+     * Returns all methods including abstract super/interface methods but only
+     * if not overridden by a concrete declared/inherited method.
      */
-    private static Map<String, MethodNode> getAllCorrectedMethodsMap(ClassNode cNode) {
-        Map<String, MethodNode> result = new HashMap<String, MethodNode>();
+    private static Map<String, MethodNode> getAllCorrectedMethodsMap(final ClassNode cNode) {
+        Map<String, MethodNode> result = new HashMap<>();
         for (MethodNode mn : cNode.getMethods()) {
             result.put(methodDescriptorWithoutReturnType(mn), mn);
         }
         ClassNode next = cNode;
         while (true) {
             Map<String, ClassNode> genericsSpec = createGenericsSpec(next);
-            for (MethodNode mn : next.getMethods()) {
-                MethodNode correctedMethod = correctToGenericsSpec(genericsSpec, mn);
-                if (next != cNode) {
+            if (next != cNode) {
+                for (MethodNode mn : next.getMethods()) {
+                    MethodNode correctedMethod = correctToGenericsSpec(genericsSpec, mn);
                     ClassNode correctedClass = correctToGenericsSpecRecurse(genericsSpec, next);
                     MethodNode found = getDeclaredMethodCorrected(genericsSpec, correctedMethod, correctedClass);
                     if (found != null) {
@@ -126,15 +168,17 @@ public class AutoImplementASTTransformation extends AbstractASTTransformation {
                     }
                 }
             }
-            List<ClassNode> interfaces = new ArrayList<ClassNode>(Arrays.asList(next.getInterfaces()));
-            Map<String, ClassNode> updatedGenericsSpec = new HashMap<String, ClassNode>(genericsSpec);
+            List<ClassNode> interfaces = new ArrayList<>();
+            Collections.addAll(interfaces, next.getInterfaces());
+            Map<String, ClassNode> updatedGenericsSpec = new HashMap<>(genericsSpec);
             while (!interfaces.isEmpty()) {
                 ClassNode origInterface = interfaces.remove(0);
-                if (!origInterface.equals(ClassHelper.OBJECT_TYPE)) {
+                // ignore java.lang.Object; also methods added by Verifier for GroovyObject are already good enough
+                if (!isObjectType(origInterface) && !isGroovyObjectType(origInterface)) {
                     updatedGenericsSpec = createGenericsSpec(origInterface, updatedGenericsSpec);
                     ClassNode correctedInterface = correctToGenericsSpecRecurse(updatedGenericsSpec, origInterface);
                     for (MethodNode nextMethod : correctedInterface.getMethods()) {
-                        MethodNode correctedMethod = correctToGenericsSpec(genericsSpec, nextMethod);
+                        MethodNode correctedMethod = correctToGenericsSpec(updatedGenericsSpec, nextMethod);
                         MethodNode found = getDeclaredMethodCorrected(updatedGenericsSpec, correctedMethod, correctedInterface);
                         if (found != null) {
                             String td = methodDescriptorWithoutReturnType(found);
@@ -144,7 +188,7 @@ public class AutoImplementASTTransformation extends AbstractASTTransformation {
                             result.put(td, found);
                         }
                     }
-                    interfaces.addAll(Arrays.asList(correctedInterface.getInterfaces()));
+                    Collections.addAll(interfaces, correctedInterface.getInterfaces());
                 }
             }
             ClassNode superClass = next.getUnresolvedSuperClass();
@@ -153,31 +197,41 @@ public class AutoImplementASTTransformation extends AbstractASTTransformation {
             }
             next = correctToGenericsSpecRecurse(updatedGenericsSpec, superClass);
         }
+
+        // GROOVY-9816: remove entries for to-be-generated property access and mutate methods
+        for (ClassNode cn = cNode; cn != null && !isObjectType(cn); cn = cn.getSuperClass()) {
+            for (PropertyNode pn : cn.getProperties()) {
+                if (!pn.getField().isFinal()) {
+                    result.remove(pn.getSetterNameOrDefault() + ":" + pn.getType().getText() + ",");
+                }
+                if (!isPrimitiveBoolean(pn.getType())) {
+                    result.remove(pn.getGetterNameOrDefault() + ":");
+                } else if (pn.getGetterName() != null) {
+                    result.remove(pn.getGetterName() + ":");
+                } else {
+                    // getter generated only if no explicit isser and vice versa
+                    String isserName  = "is" + capitalize(pn.getName());
+                    String getterName = getGetterName(pn.getName());
+                    if (!cNode.hasMethod(isserName, Parameter.EMPTY_ARRAY)) {
+                        result.remove(getterName + ":");
+                    }
+                    if (!cNode.hasMethod(getterName, Parameter.EMPTY_ARRAY)) {
+                        result.remove(isserName + ":");
+                    }
+                }
+            }
+        }
+
         return result;
     }
 
-    private static MethodNode getDeclaredMethodCorrected(Map<String, ClassNode> genericsSpec, MethodNode origMethod, ClassNode correctedClass) {
+    private static MethodNode getDeclaredMethodCorrected(final Map<String, ClassNode> genericsSpec, final MethodNode origMethod, final ClassNode correctedClass) {
         for (MethodNode nameMatch : correctedClass.getDeclaredMethods(origMethod.getName())) {
             MethodNode correctedMethod = correctToGenericsSpec(genericsSpec, nameMatch);
-            if (ParameterUtils.parametersEqual(correctedMethod.getParameters(), origMethod.getParameters())) {
+            if (parametersEqual(correctedMethod.getParameters(), origMethod.getParameters())) {
                 return correctedMethod;
             }
         }
         return null;
-    }
-
-    private BlockStatement methodBody(ClassNode exception, String message, ClosureExpression code, ClassNode returnType) {
-        BlockStatement body = new BlockStatement();
-        if (code != null) {
-            body.addStatement(code.getCode());
-        } else if (exception != null) {
-            body.addStatement(throwS(ctorX(exception, message == null ? EMPTY_ARGUMENTS : constX(message))));
-        } else {
-            Expression result = getDefaultValueForPrimitive(returnType);
-            if (result != null) {
-                body.addStatement(returnS(result));
-            }
-        }
-        return body;
     }
 }

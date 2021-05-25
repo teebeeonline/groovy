@@ -47,13 +47,12 @@ import groovy.lang.Tuple7;
 import groovy.lang.Tuple8;
 import groovy.lang.Tuple9;
 import org.apache.groovy.util.Maps;
+import org.apache.groovy.util.concurrent.ManagedIdentityConcurrentMap;
 import org.codehaus.groovy.classgen.asm.util.TypeUtil;
 import org.codehaus.groovy.runtime.GeneratedClosure;
 import org.codehaus.groovy.runtime.GeneratedLambda;
 import org.codehaus.groovy.transform.stc.StaticTypeCheckingSupport;
 import org.codehaus.groovy.transform.trait.Traits;
-import org.codehaus.groovy.util.ManagedConcurrentMap;
-import org.codehaus.groovy.util.ReferenceBundle;
 import org.codehaus.groovy.vmplugin.VMPluginFactory;
 import org.objectweb.asm.Opcodes;
 
@@ -65,9 +64,11 @@ import java.lang.ref.SoftReference;
 import java.lang.reflect.Modifier;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
@@ -141,11 +142,14 @@ public class ClassHelper {
 
             // uncached constants
             MAP_TYPE = makeWithoutCaching(Map.class),
+            SET_TYPE = makeWithoutCaching(Set.class),
             LIST_TYPE = makeWithoutCaching(List.class),
             Enum_Type = makeWithoutCaching(Enum.class),
             CLASS_Type = makeWithoutCaching(Class.class),
             TUPLE_TYPE = makeWithoutCaching(Tuple.class),
+            ITERABLE_TYPE = makeWithoutCaching(Iterable.class),
             REFERENCE_TYPE = makeWithoutCaching(Reference.class),
+            COLLECTION_TYPE = makeWithoutCaching(Collection.class),
             COMPARABLE_TYPE = makeWithoutCaching(Comparable.class),
             GROOVY_OBJECT_TYPE = makeWithoutCaching(GroovyObject.class),
             GENERATED_LAMBDA_TYPE = makeWithoutCaching(GeneratedLambda.class),
@@ -318,6 +322,9 @@ public class ClassHelper {
         if (!isPrimitiveType(cn)) return cn;
 
         ClassNode result = PRIMITIVE_TYPE_TO_WRAPPER_TYPE_MAP.get(cn);
+        if (result == null) {
+            result = PRIMITIVE_TYPE_TO_WRAPPER_TYPE_MAP.get(cn.redirect());
+        }
 
         if (null != result) {
             return result;
@@ -367,33 +374,31 @@ public class ClassHelper {
      * @see #make(Class)
      * @see #make(String)
      */
-    public static boolean isStaticConstantInitializerType(ClassNode cn) {
-        cn = cn.redirect();
-        return cn == int_TYPE ||
-                cn == float_TYPE ||
-                cn == long_TYPE ||
-                cn == double_TYPE ||
-                cn == STRING_TYPE ||
+    public static boolean isStaticConstantInitializerType(final ClassNode cn) {
+        return isPrimitiveInt(cn) ||
+                isPrimitiveFloat(cn) ||
+                isPrimitiveLong(cn) ||
+                isPrimitiveDouble(cn) ||
+                isStringType(cn) ||
                 // the next items require conversion to int when initializing
-                cn == byte_TYPE ||
-                cn == char_TYPE ||
-                cn == short_TYPE;
+                isPrimitiveByte(cn) ||
+                isPrimitiveChar(cn) ||
+                isPrimitiveShort(cn);
     }
 
-    public static boolean isNumberType(ClassNode cn) {
-        cn = cn.redirect();
-        return cn == Byte_TYPE ||
-                cn == Short_TYPE ||
-                cn == Integer_TYPE ||
-                cn == Long_TYPE ||
-                cn == Float_TYPE ||
-                cn == Double_TYPE ||
-                cn == byte_TYPE ||
-                cn == short_TYPE ||
-                cn == int_TYPE ||
-                cn == long_TYPE ||
-                cn == float_TYPE ||
-                cn == double_TYPE;
+    public static boolean isNumberType(final ClassNode cn) {
+        return isWrapperByte(cn) ||
+                isWrapperShort(cn) ||
+                isWrapperInteger(cn) ||
+                isWrapperLong(cn) ||
+                isWrapperFloat(cn) ||
+                isWrapperDouble(cn) ||
+                isPrimitiveByte(cn) ||
+                isPrimitiveShort(cn) ||
+                isPrimitiveInt(cn) ||
+                isPrimitiveLong(cn) ||
+                isPrimitiveFloat(cn) ||
+                isPrimitiveDouble(cn);
     }
 
     public static ClassNode makeReference() {
@@ -407,8 +412,112 @@ public class ClassHelper {
         return false;
     }
 
+    public static boolean isDynamicTyped(ClassNode type) {
+        return type != null && DYNAMIC_TYPE == type.redirect();
+    }
+
+    public static boolean isPrimitiveBoolean(ClassNode type) {
+        return type.redirect() == boolean_TYPE;
+    }
+
+    public static boolean isPrimitiveChar(ClassNode type) {
+        return type.redirect() == char_TYPE;
+    }
+
+    public static boolean isPrimitiveByte(ClassNode type) {
+        return type.redirect() == byte_TYPE;
+    }
+
+    public static boolean isPrimitiveInt(ClassNode type) {
+        return type.redirect() == int_TYPE;
+    }
+
+    public static boolean isPrimitiveLong(ClassNode type) {
+        return type.redirect() == long_TYPE;
+    }
+
+    public static boolean isPrimitiveShort(ClassNode type) {
+        return type.redirect() == short_TYPE;
+    }
+
+    public static boolean isPrimitiveDouble(ClassNode type) {
+        return type.redirect() == double_TYPE;
+    }
+
+    public static boolean isPrimitiveFloat(ClassNode type) {
+        return type.redirect() == float_TYPE;
+    }
+
+    public static boolean isPrimitiveVoid(ClassNode type) {
+        return type.redirect() == VOID_TYPE;
+    }
+
+    public static boolean isWrapperBoolean(ClassNode type) {
+        return type != null && type.redirect() == Boolean_TYPE;
+    }
+
+    public static boolean isWrapperCharacter(ClassNode type) {
+        return type != null && type.redirect() == Character_TYPE;
+    }
+
+    public static boolean isWrapperByte(ClassNode type) {
+        return type != null && type.redirect() == Byte_TYPE;
+    }
+
+    public static boolean isWrapperInteger(ClassNode type) {
+        return type != null && type.redirect() == Integer_TYPE;
+    }
+
+    public static boolean isWrapperLong(ClassNode type) {
+        return type != null && type.redirect() == Long_TYPE;
+    }
+
+    public static boolean isWrapperShort(ClassNode type) {
+        return type != null && type.redirect() == Short_TYPE;
+    }
+
+    public static boolean isWrapperDouble(ClassNode type) {
+        return type != null && type.redirect() == Double_TYPE;
+    }
+
+    public static boolean isWrapperFloat(ClassNode type) {
+        return type != null && type.redirect() == Float_TYPE;
+    }
+
+    public static boolean isWrapperVoid(ClassNode type) {
+        return type != null && type.redirect() == void_WRAPPER_TYPE;
+    }
+
+    public static boolean isBigIntegerType(ClassNode type) {
+        return type != null && type.redirect() == BigInteger_TYPE;
+    }
+
+    public static boolean isBigDecimalType(ClassNode type) {
+        return type != null && type.redirect() == BigDecimal_TYPE;
+    }
+
+    public static boolean isStringType(ClassNode type) {
+        return type != null && type.redirect() == STRING_TYPE;
+    }
+
+    public static boolean isGStringType(ClassNode type) {
+        return type != null && type.redirect() == GSTRING_TYPE;
+    }
+
+    public static boolean isObjectType(ClassNode type) {
+        return OBJECT_TYPE.equals(type);
+    }
+
+    public static boolean isGroovyObjectType(ClassNode type) {
+        return GROOVY_OBJECT_TYPE.equals(type);
+    }
+
+    public static boolean isClassType(ClassNode type) {
+        return CLASS_Type.equals(type);
+    }
+
     static class ClassHelperCache {
-        static ManagedConcurrentMap<Class, SoftReference<ClassNode>> classCache = new ManagedConcurrentMap<Class, SoftReference<ClassNode>>(ReferenceBundle.getWeakBundle());
+        static ManagedIdentityConcurrentMap<Class, SoftReference<ClassNode>> classCache = new ManagedIdentityConcurrentMap<>(128);
     }
 
     public static boolean isSAMType(final ClassNode type) {
@@ -418,7 +527,7 @@ public class ClassHelper {
     public static boolean isFunctionalInterface(final ClassNode type) {
         // Functional interface must be an interface at first, or the following exception will occur:
         // java.lang.invoke.LambdaConversionException: Functional interface SamCallable is not an interface
-        return type.isInterface() && isSAMType(type);
+        return type != null && type.isInterface() && isSAMType(type);
     }
 
     /**
@@ -453,7 +562,7 @@ public class ClassHelper {
                 if (!Modifier.isAbstract(mi.getModifiers())) continue;
                 // ignore trait methods which have a default implementation
                 if (Traits.hasDefaultImplementation(mi)) continue;
-                if (mi.getDeclaringClass().equals(OBJECT_TYPE)) continue;
+                if (isObjectType(mi.getDeclaringClass())) continue;
                 if (OBJECT_TYPE.getDeclaredMethod(mi.getName(), mi.getParameters()) != null) continue;
 
                 // we have two methods, so no SAM
@@ -481,7 +590,7 @@ public class ClassHelper {
         int asp = found.getModifiers() & ABSTRACT_STATIC_PRIVATE;
         int visible = found.getModifiers() & VISIBILITY;
         if (visible != 0 && asp == 0) return true;
-        if (c.equals(OBJECT_TYPE)) return false;
+        if (isObjectType(c)) return false;
         return hasUsableImplementation(c.getSuperClass(), m);
     }
 
@@ -495,30 +604,25 @@ public class ClassHelper {
      * @param goalClazz the goal class
      * @return the next super class or interface
      */
-    public static ClassNode getNextSuperClass(ClassNode clazz, ClassNode goalClazz) {
+    public static ClassNode getNextSuperClass(final ClassNode clazz, final ClassNode goalClazz) {
         if (clazz.isArray()) {
             if (!goalClazz.isArray()) return null;
+
             ClassNode cn = getNextSuperClass(clazz.getComponentType(), goalClazz.getComponentType());
             if (cn != null) cn = cn.makeArray();
             return cn;
         }
 
-        if (!goalClazz.isInterface()) {
-            if (clazz.isInterface()) {
-                if (OBJECT_TYPE.equals(clazz)) return null;
-                return OBJECT_TYPE;
-            } else {
-                return clazz.getUnresolvedSuperClass();
+        if (goalClazz.isInterface()) {
+            for (ClassNode face : clazz.getUnresolvedInterfaces()) {
+                if (StaticTypeCheckingSupport.implementsInterfaceOrIsSubclassOf(face, goalClazz)) {
+                    return face;
+                }
             }
+        } else if (clazz.isInterface()) {
+            return OBJECT_TYPE;
         }
 
-        ClassNode[] interfaces = clazz.getUnresolvedInterfaces();
-        for (ClassNode anInterface : interfaces) {
-            if (StaticTypeCheckingSupport.implementsInterfaceOrIsSubclassOf(anInterface, goalClazz)) {
-                return anInterface;
-            }
-        }
-        //none of the interfaces here match, so continue with super class
         return clazz.getUnresolvedSuperClass();
     }
 }

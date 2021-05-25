@@ -16,27 +16,26 @@
  *  specific language governing permissions and limitations
  *  under the License.
  */
-repositories {
-    maven {
-        url 'https://oss.sonatype.org/content/repositories/snapshots'
-    }
+plugins {
+    id 'org.apache.groovy-library'
 }
 
 dependencies {
-    api rootProject  // NioExtensions uses Closure...
+    api rootProject // NioExtensions uses Closure
+
     testImplementation project(':groovy-test')
-    testImplementation ("org.spockframework:spock-core:$spockVersion") {
+    testImplementation("org.spockframework:spock-junit4:${versions.spock}") {
         exclude group: 'org.codehaus.groovy'
     }
-    testImplementation ("org.spockframework:spock-junit4:$spockVersion")
 }
 
-task moduleDescriptor(type: org.codehaus.groovy.gradle.WriteExtensionDescriptorTask) {
-    extensionClasses = 'org.apache.groovy.nio.extensions.NioExtensions'
+groovyLibrary {
+    moduleDescriptor {
+        extensionClasses = 'org.apache.groovy.nio.extensions.NioExtensions'
+    }
 }
 
-test {
+tasks.named('test') {
     useJUnitPlatform()
+    systemProperty 'spock.iKnowWhatImDoing.disableGroovyVersionCheck', 'true'
 }
-
-compileJava.dependsOn moduleDescriptor

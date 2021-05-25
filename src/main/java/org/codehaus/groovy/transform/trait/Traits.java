@@ -47,6 +47,8 @@ import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 
+import static org.codehaus.groovy.ast.ClassHelper.isClassType;
+
 /**
  * A collection of utility methods used to deal with traits.
  *
@@ -108,7 +110,7 @@ public abstract class Traits {
     }
 
     private static ClassNode unwrapOwner(ClassNode owner) {
-        if (ClassHelper.CLASS_Type.equals(owner) && owner.getGenericsTypes()!=null && owner.getGenericsTypes().length==1) {
+        if (isClassType(owner) && owner.getGenericsTypes() != null && owner.getGenericsTypes().length == 1) {
             return owner.getGenericsTypes()[0].getType();
         }
         return owner;
@@ -284,15 +286,12 @@ public abstract class Traits {
      * @param cNode a class node
      * @param interfaces ordered set of interfaces
      */
-    public static LinkedHashSet<ClassNode> collectAllInterfacesReverseOrder(ClassNode cNode, LinkedHashSet<ClassNode> interfaces) {
-        if (cNode.isInterface())
-            interfaces.add(cNode);
-
+    public static LinkedHashSet<ClassNode> collectAllInterfacesReverseOrder(final ClassNode cNode, final LinkedHashSet<ClassNode> interfaces) {
+        if (cNode.isInterface()) interfaces.add(cNode);
         ClassNode[] directInterfaces = cNode.getInterfaces();
-        for (int i = directInterfaces.length-1; i >=0 ; i--) {
-            final ClassNode anInterface = directInterfaces[i];
-            interfaces.add(GenericsUtils.parameterizeType(cNode,anInterface));
-            collectAllInterfacesReverseOrder(anInterface, interfaces);
+        for (int i = directInterfaces.length - 1; i >= 0; i -= 1) {
+            ClassNode iNode = GenericsUtils.parameterizeType(cNode, directInterfaces[i]);
+            if (interfaces.add(iNode)) collectAllInterfacesReverseOrder(iNode, interfaces);
         }
         return interfaces;
     }
@@ -363,15 +362,15 @@ public abstract class Traits {
     }
 
     /**
-     * Find all traits associated with the given classnode
+     * Find all traits associated with the given type.
      *
      * @param cNode the given classnode
      * @return the list of ordered trait classnodes
      */
-    public static List<ClassNode> findTraits(ClassNode cNode) {
-        LinkedHashSet<ClassNode> interfaces = new LinkedHashSet<ClassNode>();
+    public static List<ClassNode> findTraits(final ClassNode cNode) {
+        LinkedHashSet<ClassNode> interfaces = new LinkedHashSet<>();
         collectAllInterfacesReverseOrder(cNode, interfaces);
-        List<ClassNode> traits = new LinkedList<ClassNode>();
+        List<ClassNode> traits = new LinkedList<>();
         for (ClassNode candidate : interfaces) {
             if (isAnnotatedWithTrait(candidate)) {
                 traits.add(candidate);

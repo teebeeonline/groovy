@@ -18,7 +18,6 @@
  */
 package org.codehaus.groovy.classgen.asm.sc
 
-import groovy.test.NotYetImplemented
 import groovy.transform.CompileStatic
 import org.junit.Test
 
@@ -43,7 +42,7 @@ final class StaticCompileFlowTypingTest {
         '''
     }
 
-    @NotYetImplemented @Test // GROOVY-9344
+    @Test // GROOVY-9344
     void testFlowTyping2() {
         assertScript '''
             class A {}
@@ -51,15 +50,70 @@ final class StaticCompileFlowTypingTest {
 
             @groovy.transform.CompileStatic
             String m() {
-                def var
-                var = new A()
+                def x = new A()
                 def c = { ->
-                    var = new B()
+                    x = new B()
+                    x.class.simpleName
                 }
                 c()
-                var.toString()
             }
-            assert m() != null
+            assert m() == 'B'
+        '''
+    }
+
+    @Test // GROOVY-9344
+    void testFlowTyping3() {
+        assertScript '''
+            class A {}
+            class B {}
+
+            @groovy.transform.CompileStatic
+            String m() {
+                def x = new A()
+                def c = { ->
+                    x = new B()
+                }
+                c()
+                x.class.simpleName
+            }
+            assert m() == 'B'
+        '''
+    }
+
+    // GROOVY-8946
+    void testFlowTyping4() {
+        assertScript '''
+            /*@GrabResolver(name='grails', root='https://repo.grails.org/grails/core')
+            @Grapes([
+                @Grab('javax.servlet:javax.servlet-api:3.0.1'),
+                @Grab('org.grails.plugins:converters:3.3.+'),
+                @Grab('org.grails:grails-web:3.3.+'),
+                @Grab('org.slf4j:slf4j-nop:1.7.30')
+            ])
+            @GrabExclude('org.codehaus.groovy:*')
+            import static grails.converters.JSON.parse
+            */
+            class JSONElement {
+                def getProperty(String name) {
+                    if (name == 'k') return [1,2]
+                }
+            }
+            JSONElement parse(String json) {
+                new JSONElement()
+            }
+
+            @groovy.transform.CompileStatic
+            def test() {
+                def json = parse('[{"k":1},{"k":2}]')
+                def vals = json['k']
+                assert vals == [1,2]
+                boolean result = 'k'.tokenize('.').every { token -> // 'k' represents a path like 'a.b.c.d'
+                    json = json[token]
+                }
+                assert result
+                return json // Cannot cast object '[1, 2]' with class 'java.util.ArrayList' to class 'org.grails.web.json.JSONElement'
+            }
+            test()
         '''
     }
 

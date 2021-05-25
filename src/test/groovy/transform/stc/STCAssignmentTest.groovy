@@ -359,7 +359,107 @@ class STCAssignmentTest extends StaticTypeCheckingTestCase {
         shouldFailWithMessages '''
             def list = [1,2,3]
             def (x,y) = list
-        ''', 'Multiple assignments without list expressions on the right hand side are unsupported in static type checking mode'
+        ''', 'Multiple assignments without list or tuple on the right-hand side are unsupported in static type checking mode'
+    }
+
+    // GROOVY-8223, GROOVY-8887, GROOVY-10063
+    void testMultipleAssignmentFromTupleTypes() {
+        assertScript '''
+            def (String string) = Tuple.tuple('answer')
+            assert string == 'answer'
+        '''
+
+        assertScript '''
+            def (String string, Integer number) = Tuple.tuple('answer', 42)
+            assert string == 'answer'
+            assert number == 42
+        '''
+
+        shouldFailWithMessages '''
+            def (String string, Integer number) = Tuple.tuple('answer', '42')
+        ''',
+        'Cannot assign value of type java.lang.String to variable of type java.lang.Integer'
+
+        assertScript '''
+            def (int a, int b, int c, int d, int e, int f, int g, int h, int i, int j, int k, int l, int m, int n, int o, int p) = Tuple.tuple(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16)
+            assert a == 1
+            assert b == 2
+            assert c == 3
+            assert d == 4
+            assert e == 5
+            assert f == 6
+            assert g == 7
+            assert h == 8
+            assert i == 9
+            assert j == 10
+            assert k == 11
+            assert l == 12
+            assert m == 13
+            assert n == 14
+            assert o == 15
+            assert p == 16
+        '''
+
+        assertScript '''
+            def (String string, Integer number) = new Tuple2<String, Integer>('answer', 42)
+            assert string == 'answer'
+            assert number == 42
+        '''
+
+        assertScript '''
+            Tuple2<String, Integer> m() {
+                new Tuple2<>('answer', 42)
+            }
+
+            def (String string, Integer number) = m()
+            assert string == 'answer'
+            assert number == 42
+        '''
+
+        assertScript '''
+            Tuple2<String, Integer> m() {
+                new Tuple2<>('answer', 42)
+            }
+
+            def tuple = m()
+            def (String string, Integer number) = tuple
+            assert string == 'answer'
+            assert number == 42
+        '''
+
+        assertScript '''
+            static Tuple2<String, Integer> m() {
+                new Tuple2<>('answer', 42)
+            }
+
+            def (String string, Integer number) = m()
+            assert string == 'answer'
+            assert number == 42
+        '''
+
+        assertScript '''
+            class C {
+                static Tuple2<String, Integer> m() {
+                    new Tuple2<>('answer', 42)
+                }
+            }
+
+            def (String string, Integer number) = C.m()
+            assert string == 'answer'
+            assert number == 42
+        '''
+
+        assertScript '''
+            class C {
+                Tuple2<String, Integer> getM() {
+                    new Tuple2<>('answer', 42)
+                }
+            }
+
+            def (String string, Integer number) = new C().m
+            assert string == 'answer'
+            assert number == 42
+        '''
     }
 
     void testAssignmentToInterface() {
@@ -377,7 +477,7 @@ class STCAssignmentTest extends StaticTypeCheckingTestCase {
     void testTernaryOperatorAssignmentShouldFailBecauseOfIncompatibleGenericTypes() {
         shouldFailWithMessages '''
             List<Integer> foo = true?new LinkedList<String>():new LinkedList<Integer>();
-        ''', 'Incompatible generic argument types. Cannot assign java.util.LinkedList <? extends java.io.Serializable <? extends java.io.Serializable>> to: java.util.List <Integer>'
+        ''', 'Incompatible generic argument types. Cannot assign java.util.LinkedList<? extends java.io.Serializable<? extends java.io.Serializable<java.lang.String>>> to: java.util.List<java.lang.Integer>'
     }
 
     void testCastStringToChar() {
@@ -549,16 +649,50 @@ class STCAssignmentTest extends StaticTypeCheckingTestCase {
 
     void testIfWithCommonInterface() {
         assertScript '''
-            interface Foo { void foo() }
-            class A implements Foo { void foo() { println 'A' } }
-            class B implements Foo { void foo() { println 'B' } }
+            interface I {
+                def foo()
+            }
+            class A implements I {
+                def foo() { 'A' }
+            }
+            class B implements I {
+                def foo() { 'B' }
+            }
+
             def x = new A()
-            def y = 'foo'
+            def y = true
             if (y) {
                 x = new B()
             }
-            x.foo()
+            assert x.foo() == 'B'
         '''
+    }
+
+    // GROOVY-9786
+    void testIfElseIfWithCommonInterface() {
+        ['I', 'def', 'var', 'Object'].each {
+            assertScript """
+                interface I {
+                    def foo()
+                }
+                class A implements I {
+                    def foo() { 'A' }
+                }
+                class B implements I {
+                    def foo() { 'B' }
+                }
+
+                $it x
+                def y = false
+                def z = true
+                if (y) {
+                    x = new A()
+                } else if (z) {
+                    x = new B()
+                }
+                assert x.foo() == 'B'
+            """
+        }
     }
 
     void testForLoopWithNewAssignment() {

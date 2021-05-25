@@ -35,6 +35,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static org.codehaus.groovy.ast.ClassHelper.isPrimitiveDouble;
+import static org.codehaus.groovy.ast.ClassHelper.isPrimitiveLong;
 import static org.objectweb.asm.Opcodes.ACC_ABSTRACT;
 import static org.objectweb.asm.Opcodes.ACC_BRIDGE;
 import static org.objectweb.asm.Opcodes.ACC_PUBLIC;
@@ -62,10 +64,12 @@ public class MopWriter {
             hash = name.hashCode() << 2 + params.length;
         }
 
+        @Override
         public int hashCode() {
             return hash;
         }
 
+        @Override
         public boolean equals(Object obj) {
             if (!(obj instanceof MopKey)) {
                 return false;
@@ -189,7 +193,7 @@ public class MopWriter {
                 ClassNode type = parameter.getType();
                 operandStack.load(parameter.getType(), newRegister);
                 newRegister += 1; // increment to next register; double/long are using two places
-                if (type == ClassHelper.double_TYPE || type == ClassHelper.long_TYPE) newRegister += 1;
+                if (isPrimitiveDouble(type) || isPrimitiveLong(type)) newRegister += 1;
             }
             operandStack.remove(parameters.length);
             ClassNode declaringClass = method.getDeclaringClass();

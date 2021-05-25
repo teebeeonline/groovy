@@ -33,7 +33,7 @@ import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.Parameter;
 import org.codehaus.groovy.ast.expr.Expression;
 import org.codehaus.groovy.ast.stmt.BlockStatement;
-import org.codehaus.groovy.classgen.Verifier;
+import org.codehaus.groovy.ast.tools.GeneralUtils;
 import org.codehaus.groovy.transform.AbstractASTTransformation;
 import org.codehaus.groovy.transform.BuilderASTTransformation;
 
@@ -136,6 +136,7 @@ public class InitializerStrategy extends BuilderASTTransformation.AbstractBuilde
     private static final Expression DEFAULT_INITIAL_VALUE = null;
     private static final ClassNode TUPLECONS_TYPE = ClassHelper.make(TupleConstructor.class);
 
+    @Override
     public void build(BuilderASTTransformation transform, AnnotatedNode annotatedNode, AnnotationNode anno) {
         if (unsupportedAttribute(transform, anno, "forClass")) return;
         if (unsupportedAttribute(transform, anno, "allProperties")) return;
@@ -380,14 +381,10 @@ public class InitializerStrategy extends BuilderASTTransformation.AbstractBuilde
             String name = field.getName();
             body.addStatement(
                     stmt(useSetters && !field.isFinal()
-                                    ? callThisX(getSetterName(name), varX(param(field.getType(), name)))
+                                    ? callThisX(GeneralUtils.getSetterName(name), varX(param(field.getType(), name)))
                                     : assignX(propX(varX("this"), field.getName()), varX(param(field.getType(), name)))
                     )
             );
         }
-    }
-
-    private static String getSetterName(String name) {
-        return "set" + Verifier.capitalize(name);
     }
 }

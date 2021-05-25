@@ -275,7 +275,7 @@ import groovy.transform.stc.ClosureParams
 
 void foo(@ClosureParams(value=FromString,options="java.util.List<java.lang.String>") Closure cl) { cl.call(['foo']) }
 foo { List<Date> d -> d.each { println it } }
-''', 'Expected parameter of type java.util.List <java.lang.String> but got java.util.List <Date>'
+''', 'Expected parameter of type java.util.List<java.lang.String> but got java.util.List<java.util.Date>'
     }
 
     void testFromStringWithDirectGenericPlaceholder() {
@@ -1373,6 +1373,128 @@ method()
             }
 
             new C('blah', { list -> list.get(0) })
+        '''
+    }
+
+    void testGroovy9570() {
+        assertScript '''
+            class C<I extends Item> {
+                Queue<I> queue
+
+                def c = { ->
+                    queue.each { I item ->
+                        println item
+                    }
+                }
+
+                def m() {
+                    queue.each { I item ->
+                        println item
+                    }
+                }
+            }
+
+            interface Item {}
+
+            new C()
+        '''
+    }
+
+    void testGroovy9735() {
+        assertScript '''
+            import groovy.transform.stc.*
+
+            class C<I extends Item> {
+                Queue<I> queue
+
+                def c = { ->
+                    x(queue) { I item ->
+                        println item
+                    }
+                }
+
+                def m() {
+                    x(queue) { I item ->
+                        println item
+                    }
+                }
+
+                def <T> T x(Collection<T> y, @ClosureParams(FirstParam.FirstGenericType) Closure z) {
+                }
+            }
+
+            interface Item {}
+
+            new C()
+        '''
+    }
+
+    void testGroovy9597a() {
+        assertScript '''
+            import groovy.transform.stc.*
+
+            class A {
+                def <T> void proc(Collection<T> values, @ClosureParams(FirstParam.FirstGenericType) Closure<String> block) {
+                }
+            }
+
+            class B {
+                List<Integer> list
+                void test(A a) {
+                    a.proc(this.list) { it.toBigDecimal().toString() } // works
+                    a.with {
+                      proc(this.list) { it.toBigDecimal().toString() } // error
+                    }
+                }
+            }
+
+            new B().test(new A())
+        '''
+    }
+
+    void testGroovy9597b() {
+        assertScript '''
+            import groovy.transform.stc.*
+
+            class A {
+                static A of(@DelegatesTo(A) Closure x) {
+                    new A().tap {
+                        x.delegate = it
+                        x.call()
+                    }
+                }
+                def <T> void proc(Collection<T> values, @ClosureParams(FirstParam.FirstGenericType) Closure<String> block) {
+                }
+            }
+
+            class B {
+              List<Integer> list
+              A a = A.of {
+                  proc(
+                      this.list,
+                      { it.toBigDecimal().toString() } // Cannot find matching method java.lang.Object#toBigDecimal()
+                  )
+              }
+            }
+
+            new B()
+        '''
+    }
+
+    void testGroovy9968() {
+        assertScript '''
+            import groovy.transform.*
+            @Canonical class Pogo { String prop }
+            @Canonical class Type<T extends Pogo> implements Iterable<T> {
+                Iterator<T> iterator() {
+                    list.iterator()
+                }
+                List<T> list
+            }
+
+            def iterable = new Type([new Pogo('x'), new Pogo('y'), new Pogo('z')])
+            assert iterable.collect { Pogo p -> p.prop } == ['x', 'y', 'z']
+            assert iterable.collect { it.prop } == ['x', 'y', 'z']
         '''
     }
 }

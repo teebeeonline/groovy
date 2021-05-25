@@ -36,6 +36,7 @@ public class ExpressionStatement extends Statement {
         this.expression = expression;
     }
 
+    @Override
     public void visit(GroovyCodeVisitor visitor) {
         visitor.visitExpressionStatement(this);
     }
@@ -48,10 +49,12 @@ public class ExpressionStatement extends Statement {
         this.expression = expression;
     }
 
+    @Override
     public String getText() {
         return expression.getText();
     }
 
+    @Override
     public String toString() {
         return super.toString() + "[expression:" + expression + "]";
     }

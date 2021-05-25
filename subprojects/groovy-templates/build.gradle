@@ -16,32 +16,32 @@
  *  specific language governing permissions and limitations
  *  under the License.
  */
-repositories {
-    maven {
-        url 'https://oss.sonatype.org/content/repositories/snapshots'
-    }
+plugins {
+    id 'org.apache.groovy-library'
 }
 
 dependencies {
     api rootProject // Template uses Writable...
     implementation project(':groovy-xml')
-    testImplementation rootProject.sourceSets.test.runtimeClasspath
     testImplementation project(':groovy-test')
-    testImplementation ("org.spockframework:spock-core:$spockVersion") {
+    testImplementation ("org.spockframework:spock-core:${versions.spock}") {
         exclude group: 'org.codehaus.groovy'
     }
-    testRuntimeOnly("org.junit.vintage:junit-vintage-engine:$junit5Version") {
+    testRuntimeOnly("org.junit.vintage:junit-vintage-engine:${versions.junit5}") {
         because 'for JUnit 3/4 tests as well as JUnit 5'
     }
 }
 
-test {
+tasks.named('test') {
     useJUnitPlatform()
+    systemProperty "spock.iKnowWhatImDoing.disableGroovyVersionCheck", "true"
 }
 
-task backportJar(type:Jar) {
-    appendix = 'markup-backport'
-    dependsOn classes
-    from sourceSets.main.output
-    include 'groovy/text/markup/**'
+tasks.named('rat') {
+    excludes += [
+            // test files
+            'src/spec/test-resources/*.txt',
+            'src/test/resources/includes/hello-escaped.txt',
+            'src/test/resources/includes/hello.html'
+    ]
 }

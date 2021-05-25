@@ -16,13 +16,21 @@
  *  specific language governing permissions and limitations
  *  under the License.
  */
-dependencies {
-    compile rootProject
-    testCompile project(':groovy-test')
+plugins {
+    id 'groovy'
+    id 'org.apache.groovy-common'
+    id 'org.apache.groovy-internal'
 }
 
-tasks.withType(Test) {
-    jvmArgs += "--enable-preview"
+dependencies {
+    implementation rootProject
+    testImplementation project(':groovy-test')
+}
+
+tasks.withType(Test).configureEach {
+    if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_14)) {
+        jvmArgs += "--enable-preview"
+    }
 }
 
 sourceSets {

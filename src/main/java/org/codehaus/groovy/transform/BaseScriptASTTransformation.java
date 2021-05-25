@@ -40,6 +40,7 @@ import org.codehaus.groovy.control.SourceUnit;
 import java.util.List;
 
 import static org.apache.groovy.ast.tools.ClassNodeUtils.addGeneratedMethod;
+import static org.objectweb.asm.Opcodes.ACC_ABSTRACT;
 
 /**
  * Handles transformation for the @BaseScript annotation.
@@ -52,6 +53,7 @@ public class BaseScriptASTTransformation extends AbstractASTTransformation {
     private static final String MY_TYPE_NAME = "@" + MY_TYPE.getNameWithoutPackage();
     private static final Parameter[] CONTEXT_CTOR_PARAMETERS = {new Parameter(ClassHelper.BINDING_TYPE, "context")};
 
+    @Override
     public void visit(ASTNode[] nodes, SourceUnit source) {
         init(nodes, source);
         AnnotatedNode parent = (AnnotatedNode) nodes[1];

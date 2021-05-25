@@ -24,37 +24,37 @@ package groovy.transform.stc
 class DefaultGroovyMethodsSTCTest extends StaticTypeCheckingTestCase {
 
     void testEach() {
-        assertScript """
+        assertScript '''
             ['a','b'].each { // DGM#each(Object, Closure)
                 println it // DGM#println(Object,Object)
             }
-        """
+        '''
 
-        assertScript """
+        assertScript '''
             ['a','b'].eachWithIndex { it, i ->// DGM#eachWithIndex(Object, Closure)
                 println it // DGM#println(Object,Object)
             }
-        """
+        '''
     }
 
     void testStringToInteger() {
-        assertScript """
-        String name = "123"
-        name.toInteger() // toInteger() is defined by DGM
-        """
+        assertScript '''
+            String name = "123"
+            name.toInteger() // toInteger() is defined by DGM
+        '''
     }
 
     void testVariousAssignmentsThenToInteger() {
-        assertScript """
-         class A {
-          void foo() {}
-         }
-        def name = new A()
-        name.foo()
-        name = 1
-        name = '123'
-        name.toInteger() // toInteger() is defined by DGM
-        """
+        assertScript '''
+            class A {
+                void foo() {}
+            }
+            def name = new A()
+            name.foo()
+            name = 1
+            name = '123'
+            name.toInteger() // toInteger() is defined by DGM
+        '''
     }
 
     void testMethodsOnPrimitiveTypes() {
@@ -66,29 +66,64 @@ class DefaultGroovyMethodsSTCTest extends StaticTypeCheckingTestCase {
             true.equals { it }
         '''
     }
-  
+
     void testShouldAcceptMethodFromDefaultDateMethods() {
       assertScript '''
-        def s = new Date()
-        println s.year
-        println s.format("yyyyMMdd")
+          def s = new Date()
+          println s.year
+          println s.format("yyyyMMdd")
       '''
     }
 
     // GROOVY-5568
-    void testDGMMethodAsProperty() {
+    void testPropertySemantics1() {
         assertScript '''
-            String foo(InputStream input) {
-                input.text
+            String test(InputStream input) {
+                input.text // IOGroovyMethods#getText(InputStream)
             }
-            def text = new ByteArrayInputStream('foo'.getBytes())
-            assert foo(text) == 'foo'
+            assert test(new ByteArrayInputStream('foo'.bytes)) == 'foo'
         '''
+
+        assertScript '''
+            def chars = new StringBuilder('foo').chars // StringGroovyMethods#getChars(CharSequence)
+            assert chars == new char[] {'f','o','o'}
+        '''
+
+        assertScript '''
+            def a = Character.valueOf((char) 'a')
+            assert a.letter // DefaultGroovyMethods#isLetter(Character)
+        '''
+    }
+
+    // GROOVY-10075
+    void testPropertySemantics2() {
+        // see org.codehaus.groovy.runtime.m12n.TestStringExtension
+
+        assertScript '''
+            List<String> strings = ['x','y','z']
+            assert strings.getSequence() == 'x'
+            assert strings.getString() == 'x'
+          //assert strings.sequence == 'x'
+          //assert strings.string == 'x'
+        '''
+
+        shouldFailWithMessages '''
+            List<Number> numbers = [1, 2, 3]
+            numbers.getSequence()
+            numbers.getString()
+            numbers.sequence
+            numbers.string
+        ''',
+        'Cannot call <CS extends java.lang.CharSequence> java.util.ArrayList#getSequence() with arguments []',
+        'Cannot call java.util.ArrayList#getString() with arguments []',
+        'No such property: sequence for class: java.util.ArrayList',
+        'No such property: string for class: java.util.ArrayList'
     }
 
     // GROOVY-5584
     void testEachOnMap() {
-        assertScript '''import org.codehaus.groovy.transform.stc.ExtensionMethodNode
+        assertScript '''
+            import org.codehaus.groovy.transform.stc.ExtensionMethodNode
             import org.codehaus.groovy.runtime.DefaultGroovyMethods
 
             @ASTTest(phase=INSTRUCTION_SELECTION, value= {
@@ -195,10 +230,109 @@ class DefaultGroovyMethodsSTCTest extends StaticTypeCheckingTestCase {
                 def results = [:]
                 Functions.values().eachWithIndex { val, idx -> results[idx] = val.name() }
                 results
-            } 
+            }
             assert m() == ['A', 'B', 'C']
             assert m2() == [0: 'A', 1: 'B', 2: 'C']
         '''
     }
 
+    void testListGetAtNext() {
+        assertScript '''
+            def test() {
+                def list = [0, 1, 2, 3]
+                for (i in 1..2) {
+                    list[i-1]++
+                }
+                list
+            }
+            assert test() == [1, 2, 2, 3]
+        '''
+    }
+
+    // GROOVY-8840
+    void testListGetAtGetAtNext() {
+        assertScript '''
+            def test() {
+                def list = [0, 1, 2, 3]
+                List<Integer> other = [1]
+                list[other[0]]++
+                //   ^^^^^^^^ puts T on operand stack, not int/Integer
+                list
+            }
+            assert test() == [0, 2, 2, 3]
+        '''
+    }
+
+    void testListGetAtGetAtNext2() {
+        assertScript '''
+            def test() {
+                def list = [0, 1, 2, 3]
+                List<Integer> other = [1]
+                list[(int)other[0]]++
+                list
+            }
+            assert test() == [0, 2, 2, 3]
+        '''
+    }
+
+    void testListGetAtFirstNext() {
+        assertScript '''
+            def test() {
+                def list = [0, 1, 2, 3]
+                List<Integer> other = [1]
+                list[other.first()]++
+                list
+            }
+            assert test() == [0, 2, 2, 3]
+        '''
+    }
+
+    // GROOVY-9420
+    void testMapGetVsGetAt() {
+        assertScript '''
+            void check(String val) {
+                assert val == 'bar'
+            }
+
+            Object getKey() {
+                return 'foo'
+            }
+
+            void test() {
+                Map<String, String> map = [foo: 'bar']
+
+                def one = map.get(key)
+                check(one)
+
+                def two = map[key]
+                check(two)
+            }
+
+            test()
+        '''
+    }
+
+    // GROOVY-9529
+    void testMapGetAtVsObjectGetAt() {
+        assertScript '''
+            interface X extends Map<Object, Object> {}
+
+            interface Y extends X {}
+
+            class C extends HashMap<Object, Object> implements Y {}
+
+            Y newMap() {
+                new C().tap {
+                    put('foo', 'bar')
+                }
+            }
+
+            void test() {
+                def map = newMap()
+                assert map['foo'] == 'bar'
+            }
+
+            test()
+        '''
+    }
 }

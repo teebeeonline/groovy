@@ -63,6 +63,7 @@ import static org.codehaus.groovy.ast.tools.GeneralUtils.param;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.params;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.stmt;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.varX;
+import static org.objectweb.asm.Opcodes.ACC_PUBLIC;
 
 /**
  * Handles generation of code for the @MapConstructor annotation.
@@ -83,6 +84,7 @@ public class MapConstructorASTTransformation extends AbstractASTTransformation i
         return MY_TYPE_NAME;
     }
 
+    @Override
     public void visit(ASTNode[] nodes, SourceUnit source) {
         init(nodes, source);
         AnnotatedNode parent = (AnnotatedNode) nodes[1];

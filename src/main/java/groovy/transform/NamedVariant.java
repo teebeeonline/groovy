@@ -124,4 +124,11 @@ public @interface NamedVariant {
      * @since 2.5.3
      */
     boolean autoDelegate() default false;
+
+    /**
+     * If true, will use {@code as} to convert map parameter to required class
+     *
+     * @since 3.0.6
+     */
+    boolean coerce() default false;
 }

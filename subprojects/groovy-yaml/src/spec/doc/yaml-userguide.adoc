@@ -18,6 +18,9 @@
   under the License.
 
 //////////////////////////////////////////
+ifndef::core-semantics[]
+:core-semantics: core-semantics.adoc
+endif::[]
 
 = Processing YAML
 
@@ -37,7 +40,7 @@ types.
 
 [source,groovy]
 ----
-include::{rootProjectDir}/subprojects/groovy-yaml/src/spec/test/groovy/yaml/YamlParserTest.groovy[tags=parse_text,indent=0]
+include::../test/groovy/yaml/YamlParserTest.groovy[tags=parse_text,indent=0]
 ----
 
 Notice the result is a plain map and can be handled like a normal Groovy object instance. `YamlSlurper` parses the
@@ -49,7 +52,7 @@ is transparent. In fact, `YamlSlurper` results conform to GPath expressions. GPa
 that is supported by multiple slurpers for different data formats (`XmlSlurper` for XML being one example).
 
 [NOTE]
-For more details please have a look at the section on <<core-semantics.adoc#gpath_expressions,GPath expressions>>.
+For more details please have a look at the section on <<{core-semantics}#gpath_expressions,GPath expressions>>.
 
 The following table gives an overview of the YAML types and the corresponding Groovy data types:
 
@@ -94,5 +97,5 @@ DSL which allows to formulate an object graph which is then converted to YAML.
 
 [source,groovy]
 ----
-include::{rootProjectDir}/subprojects/groovy-yaml/src/spec/test/groovy/yaml/YamlBuilderTest.groovy[tags=build_text,indent=0]
+include::../test/groovy/yaml/YamlBuilderTest.groovy[tags=build_text,indent=0]
 ----

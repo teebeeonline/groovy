@@ -21,17 +21,23 @@ package org.codehaus.groovy.ast;
 import org.apache.groovy.ast.tools.MethodNodeUtils;
 import org.codehaus.groovy.ast.stmt.BlockStatement;
 import org.codehaus.groovy.ast.stmt.Statement;
-import org.objectweb.asm.Opcodes;
 
 import java.util.List;
 import java.util.Optional;
 
+import static org.objectweb.asm.Opcodes.ACC_ABSTRACT;
+import static org.objectweb.asm.Opcodes.ACC_FINAL;
+import static org.objectweb.asm.Opcodes.ACC_PRIVATE;
+import static org.objectweb.asm.Opcodes.ACC_PROTECTED;
+import static org.objectweb.asm.Opcodes.ACC_PUBLIC;
+import static org.objectweb.asm.Opcodes.ACC_STATIC;
+
 /**
  * Represents a method declaration.
  */
-public class MethodNode extends AnnotatedNode implements Opcodes {
+public class MethodNode extends AnnotatedNode {
 
-    private String name;
+    private final String name;
     private int modifiers;
     private boolean syntheticPublic;
     private ClassNode returnType;
@@ -40,8 +46,8 @@ public class MethodNode extends AnnotatedNode implements Opcodes {
     private Statement code;
     private boolean dynamicReturnType;
     private VariableScope variableScope;
-    private ClassNode[] exceptions;
-    private boolean staticConstructor;
+    private final ClassNode[] exceptions;
+    private final boolean staticConstructor;
 
     // type spec for generics
     private GenericsType[] genericsTypes;
@@ -49,16 +55,20 @@ public class MethodNode extends AnnotatedNode implements Opcodes {
     // cached data
     private String typeDescriptor;
 
-    protected MethodNode() {}
+    protected MethodNode() {
+        this.name = null;
+        this.exceptions = null;
+        this.staticConstructor = false;
+    }
 
-    public MethodNode(String name, int modifiers, ClassNode returnType, Parameter[] parameters, ClassNode[] exceptions, Statement code) {
+    public MethodNode(final String name, final int modifiers, final ClassNode returnType, final Parameter[] parameters, final ClassNode[] exceptions, final Statement code) {
         this.name = name;
         this.modifiers = modifiers;
+        this.exceptions = exceptions;
         this.code = code;
         setReturnType(returnType);
         setParameters(parameters);
-        this.exceptions = exceptions;
-        this.staticConstructor = (name != null && name.equals("<clinit>"));
+        this.staticConstructor = "<clinit>".equals(name);
     }
 
     /**
@@ -132,7 +142,7 @@ public class MethodNode extends AnnotatedNode implements Opcodes {
 
     public void setReturnType(ClassNode returnType) {
         invalidateCachedData();
-        this.dynamicReturnType |= ClassHelper.DYNAMIC_TYPE == returnType;
+        this.dynamicReturnType |= ClassHelper.isDynamicTyped(returnType);
         this.returnType = returnType != null ? returnType : ClassHelper.OBJECT_TYPE;
     }
 
@@ -141,7 +151,7 @@ public class MethodNode extends AnnotatedNode implements Opcodes {
     }
 
     public boolean isVoidMethod() {
-        return ClassHelper.VOID_TYPE.equals(getReturnType());
+        return ClassHelper.isPrimitiveVoid(getReturnType());
     }
 
     public VariableScope getVariableScope() {

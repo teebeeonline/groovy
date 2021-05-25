@@ -74,8 +74,8 @@ public class StringEscapeUtils {
      * <p>
      * Example:
      * <pre>
-     * input string: He didn't say, "Stop!"
-     * output string: He didn't say, \"Stop!\"
+     * input string: They didn't say, "Stop!"
+     * output string: They didn't say, \"Stop!\"
      * </pre>
      *
      * @param str  String to escape values in, may be null
@@ -114,8 +114,8 @@ public class StringEscapeUtils {
      * <p>
      * Example:
      * <pre>
-     * input string: He didn't say, "Stop!"
-     * output string: He didn\'t say, \"Stop!\"
+     * input string: They didn't say, "Stop!"
+     * output string: They didn\'t say, \"Stop!\"
      * </pre>
      *
      * @param str  String to escape values in, may be null
@@ -190,7 +190,7 @@ public class StringEscapeUtils {
                 out.write("\\u" + hex(ch));
             } else if (ch > 0xff) {
                 out.write("\\u0" + hex(ch));
-            } else if (ch > 0x7f) {
+            } else if (ch >= 0x7f) {
                 out.write("\\u00" + hex(ch));
             } else if (ch < 32) {
                 switch (ch) {

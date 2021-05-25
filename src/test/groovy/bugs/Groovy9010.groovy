@@ -18,19 +18,34 @@
  */
 package groovy.bugs
 
+import groovy.test.NotYetImplemented
 import groovy.transform.CompileStatic
 import org.junit.Test
 
 import static groovy.test.GroovyAssert.assertScript
+import static groovy.test.GroovyAssert.shouldFail
 
 @CompileStatic
 final class Groovy9010 {
 
+    @NotYetImplemented @Test
+    void testASTTestWithArrowInClosure() {
+        assertScript '''\
+            @groovy.transform.ASTTest(phase=SEMANTIC_ANALYSIS, value={ -> assert true })
+            def x
+        '''
+    }
+
     @Test
     void testASTTestWithNoSpacesInClosure() {
         assertScript '''
-            @groovy.transform.ASTTest({assert 1==1})
+            @groovy.transform.ASTTest(phase=SEMANTIC_ANALYSIS, value={assert 1==1})
             def x
         '''
+        def err = shouldFail '''
+            @groovy.transform.ASTTest(phase=SEMANTIC_ANALYSIS, value={assert 0==1})
+            def x
+        '''
+        assert err =~ /(?s)Assertion failed:.*assert 0==1.*false\b/
     }
 }

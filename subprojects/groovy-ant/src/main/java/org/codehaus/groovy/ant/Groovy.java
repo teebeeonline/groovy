@@ -120,7 +120,6 @@ public class Groovy extends Java {
     private boolean includeAntRuntime = true;
     private boolean useGroovyShell = false;
 
-    private boolean indy = false;
     private String scriptBaseClass;
     private String configscript;
 
@@ -142,6 +141,7 @@ public class Groovy extends Java {
      *
      * @param fork true if the script should be executed in a forked process
      */
+    @Override
     public void setFork(boolean fork) {
         this.fork = fork;
     }
@@ -234,6 +234,7 @@ public class Groovy extends Java {
      *
      * @param output the output file
      */
+    @Override
     public void setOutput(File output) {
         this.output = output;
     }
@@ -244,6 +245,7 @@ public class Groovy extends Java {
      *
      * @param append set to true to append
      */
+    @Override
     public void setAppend(boolean append) {
         this.append = append;
     }
@@ -253,6 +255,7 @@ public class Groovy extends Java {
      *
      * @param classpath The classpath to set
      */
+    @Override
     public void setClasspath(final Path classpath) {
         this.classpath = classpath;
     }
@@ -263,6 +266,7 @@ public class Groovy extends Java {
      *
      * @return the resulting created path
      */
+    @Override
     public Path createClasspath() {
         if (this.classpath == null) {
             this.classpath = new Path(getProject());
@@ -276,6 +280,7 @@ public class Groovy extends Java {
      *
      * @param ref the refid to use
      */
+    @Override
     public void setClasspathRef(final Reference ref) {
         createClasspath().setRefid(ref);
     }
@@ -299,12 +304,15 @@ public class Groovy extends Java {
     }
 
     /**
-     * Sets the indy flag to enable or disable invokedynamic
+     * Legacy method to set the indy flag (only true is allowed)
      *
      * @param indy true means invokedynamic support is active
      */
+    @Deprecated
     public void setIndy(final boolean indy) {
-        this.indy = indy;
+        if (!indy) {
+            throw new BuildException("Disabling indy is no longer supported!", getLocation());
+        }
     }
 
     /**
@@ -335,6 +343,7 @@ public class Groovy extends Java {
     /**
      * Load the file and then execute it
      */
+    @Override
     public void execute() throws BuildException {
         log.debug("execute()");
 
@@ -431,6 +440,7 @@ public class Groovy extends Java {
         log.verbose("Statements executed successfully");
     }
 
+    @Override
     public Commandline.Argument createArg() {
         return cmdline.createArgument();
     }
@@ -567,10 +577,6 @@ public class Groovy extends Java {
     private void configureCompiler() {
         if (scriptBaseClass != null) {
             configuration.setScriptBaseClass(scriptBaseClass);
-        }
-        if (indy) {
-            configuration.getOptimizationOptions().put("indy", Boolean.TRUE);
-            configuration.getOptimizationOptions().put("int", Boolean.FALSE);
         }
         if (configscript != null) {
             Binding binding = new Binding();

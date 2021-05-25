@@ -27,7 +27,6 @@ import org.codehaus.groovy.runtime.InvokerInvocationException;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
-import java.util.Iterator;
 import java.util.Map;
 
 /**
@@ -68,6 +67,7 @@ public class GroovyResultSetExtension extends GroovyObjectSupport {
         resultSet = set;
     }
 
+    @Override
     public String toString() {
         try {
             StringBuilder sb = new StringBuilder("[");
@@ -94,6 +94,7 @@ public class GroovyResultSetExtension extends GroovyObjectSupport {
         }
     }
 
+    @Override
     public Object invokeMethod(String name, Object args) {
         try {
             return InvokerHelper.invokeMethod(getResultSet(), name, args);
@@ -112,6 +113,7 @@ public class GroovyResultSetExtension extends GroovyObjectSupport {
      * @see groovy.lang.GroovyObject#getProperty(java.lang.String)
      * @see ResultSet#getObject(java.lang.String)
      */
+    @Override
     public Object getProperty(String columnName) {
         try {
             return getResultSet().getObject(columnName);
@@ -130,6 +132,7 @@ public class GroovyResultSetExtension extends GroovyObjectSupport {
      * @see groovy.lang.GroovyObject#setProperty(java.lang.String, java.lang.Object)
      * @see ResultSet#updateObject(java.lang.String, java.lang.Object)
      */
+    @Override
     public void setProperty(String columnName, Object newValue) {
         try {
             getResultSet().updateObject(columnName, newValue);
@@ -179,8 +182,8 @@ public class GroovyResultSetExtension extends GroovyObjectSupport {
      */
     public void add(Map values) throws SQLException {
         getResultSet().moveToInsertRow();
-        for (Iterator iter = values.entrySet().iterator(); iter.hasNext();) {
-            Map.Entry entry = (Map.Entry) iter.next();
+        for (Object o : values.entrySet()) {
+            Map.Entry entry = (Map.Entry) o;
             getResultSet().updateObject(entry.getKey().toString(), entry.getValue());
         }
         getResultSet().insertRow();

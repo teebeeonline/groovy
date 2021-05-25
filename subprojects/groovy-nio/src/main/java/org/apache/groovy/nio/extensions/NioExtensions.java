@@ -24,6 +24,7 @@ import groovy.io.GroovyPrintWriter;
 import groovy.lang.Closure;
 import groovy.lang.MetaClass;
 import groovy.lang.Writable;
+import groovy.transform.NamedParam;
 import groovy.transform.stc.ClosureParams;
 import groovy.transform.stc.FromString;
 import groovy.transform.stc.PickFirstResolver;
@@ -59,6 +60,7 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.attribute.FileAttribute;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -66,9 +68,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import static java.lang.Boolean.FALSE;
 import static java.nio.file.StandardOpenOption.APPEND;
 import static java.nio.file.StandardOpenOption.CREATE;
-import static org.codehaus.groovy.runtime.DefaultGroovyMethods.get;
 
 /**
  * This class defines new groovy methods for Readers, Writers, InputStreams and
@@ -887,7 +889,7 @@ public class NioExtensions extends DefaultGroovyMethodsSupport {
      * @see #eachFile(Path, groovy.io.FileType, groovy.lang.Closure)
      * @since 2.3.0
      */
-    public static void eachFile(final Path self, final Closure closure) throws IOException { // throws FileNotFoundException, IllegalArgumentException {
+    public static void eachFile(final Path self, final Closure closure) throws IOException {
         eachFile(self, FileType.ANY, closure);
     }
 
@@ -902,7 +904,7 @@ public class NioExtensions extends DefaultGroovyMethodsSupport {
      * @see #eachFile(Path, groovy.io.FileType, groovy.lang.Closure)
      * @since 2.3.0
      */
-    public static void eachDir(Path self, @ClosureParams(value = SimpleType.class, options = "java.nio.file.Path") Closure closure) throws IOException { // throws FileNotFoundException, IllegalArgumentException {
+    public static void eachDir(Path self, @ClosureParams(value = SimpleType.class, options = "java.nio.file.Path") Closure closure) throws IOException {
         eachFile(self, FileType.DIRECTORIES, closure);
     }
 
@@ -920,7 +922,7 @@ public class NioExtensions extends DefaultGroovyMethodsSupport {
      * @throws IllegalArgumentException      if the provided Path object does not represent a directory
      * @since 2.3.0
      */
-    public static void eachFileRecurse(final Path self, final FileType fileType, @ClosureParams(value = SimpleType.class, options = "java.nio.file.Path") final Closure closure) throws IOException { // throws FileNotFoundException, IllegalArgumentException {
+    public static void eachFileRecurse(final Path self, final FileType fileType, @ClosureParams(value = SimpleType.class, options = "java.nio.file.Path") final Closure closure) throws IOException {
         // throws FileNotFoundException, IllegalArgumentException {
         checkDir(self);
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(self)) {
@@ -994,14 +996,29 @@ public class NioExtensions extends DefaultGroovyMethodsSupport {
      * @see groovy.io.FileType
      * @since 2.3.0
      */
-    public static void traverse(final Path self, final Map<String, Object> options, @ClosureParams(value = SimpleType.class, options = "java.nio.file.Path") final Closure closure)
-            throws IOException {
-        // throws FileNotFoundException, IllegalArgumentException {
+    public static void traverse(
+            final Path self,
+            @NamedParam(value = "type", type = FileType.class)
+            @NamedParam(value = "preDir", type = Closure.class)
+            @NamedParam(value = "preRoot", type = Boolean.class)
+            @NamedParam(value = "postDir", type = Closure.class)
+            @NamedParam(value = "postRoot", type = Boolean.class)
+            @NamedParam(value = "visitRoot", type = Boolean.class)
+            @NamedParam(value = "maxDepth", type = Integer.class)
+            @NamedParam(value = "filter")
+            @NamedParam(value = "nameFilter")
+            @NamedParam(value = "excludeFilter")
+            @NamedParam(value = "excludeNameFilter")
+            @NamedParam(value = "sort", type = Closure.class)
+            final Map<String, Object> options,
+            @ClosureParams(value = SimpleType.class, options = "java.nio.file.Path")
+            final Closure closure
+    ) throws IOException {
         Number maxDepthNumber = DefaultGroovyMethods.asType(options.remove("maxDepth"), Number.class);
         int maxDepth = maxDepthNumber == null ? -1 : maxDepthNumber.intValue();
-        Boolean visitRoot = DefaultGroovyMethods.asType(get(options, "visitRoot", false), Boolean.class);
-        Boolean preRoot = DefaultGroovyMethods.asType(get(options, "preRoot", false), Boolean.class);
-        Boolean postRoot = DefaultGroovyMethods.asType(get(options, "postRoot", false), Boolean.class);
+        Boolean visitRoot = DefaultGroovyMethods.asType(options.getOrDefault("visitRoot", FALSE), Boolean.class);
+        Boolean preRoot = DefaultGroovyMethods.asType(options.getOrDefault("preRoot", FALSE), Boolean.class);
+        Boolean postRoot = DefaultGroovyMethods.asType(options.getOrDefault("postRoot", FALSE), Boolean.class);
         final Closure pre = (Closure) options.get("preDir");
         final Closure post = (Closure) options.get("postDir");
         final FileType type = (FileType) options.get("type");
@@ -1090,8 +1107,22 @@ public class NioExtensions extends DefaultGroovyMethodsSupport {
      * @see #traverse(Path, java.util.Map, groovy.lang.Closure)
      * @since 2.3.0
      */
-    public static void traverse(final Path self, final Map<String, Object> options)
-            throws IOException {
+    public static void traverse(
+            final Path self,
+            @NamedParam(value = "type", type = FileType.class)
+            @NamedParam(value = "preDir", type = Closure.class)
+            @NamedParam(value = "preRoot", type = Boolean.class)
+            @NamedParam(value = "postDir", type = Closure.class)
+            @NamedParam(value = "postRoot", type = Boolean.class)
+            @NamedParam(value = "visitRoot", type = Boolean.class)
+            @NamedParam(value = "maxDepth", type = Integer.class)
+            @NamedParam(value = "filter")
+            @NamedParam(value = "nameFilter")
+            @NamedParam(value = "excludeFilter")
+            @NamedParam(value = "excludeNameFilter")
+            @NamedParam(value = "sort", type = Closure.class)
+            final Map<String, Object> options
+    ) throws IOException {
         final Closure visit = (Closure) options.remove("visit");
         traverse(self, options, visit);
     }
@@ -1170,7 +1201,7 @@ public class NioExtensions extends DefaultGroovyMethodsSupport {
      * @see #eachFileRecurse(Path, groovy.io.FileType, groovy.lang.Closure)
      * @since 2.3.0
      */
-    public static void eachFileRecurse(Path self, @ClosureParams(value = SimpleType.class, options = "java.nio.file.Path") Closure closure) throws IOException { // throws FileNotFoundException, IllegalArgumentException {
+    public static void eachFileRecurse(Path self, @ClosureParams(value = SimpleType.class, options = "java.nio.file.Path") Closure closure) throws IOException {
         eachFileRecurse(self, FileType.ANY, closure);
     }
 
@@ -1187,7 +1218,7 @@ public class NioExtensions extends DefaultGroovyMethodsSupport {
      * @see #eachFileRecurse(Path, groovy.io.FileType, groovy.lang.Closure)
      * @since 2.3.0
      */
-    public static void eachDirRecurse(final Path self, @ClosureParams(value = SimpleType.class, options = "java.nio.file.Path") final Closure closure) throws IOException { //throws FileNotFoundException, IllegalArgumentException {
+    public static void eachDirRecurse(final Path self, @ClosureParams(value = SimpleType.class, options = "java.nio.file.Path") final Closure closure) throws IOException {
         eachFileRecurse(self, FileType.DIRECTORIES, closure);
     }
 
@@ -1269,7 +1300,7 @@ public class NioExtensions extends DefaultGroovyMethodsSupport {
      * @see #eachFileMatch(Path, groovy.io.FileType, Object, groovy.lang.Closure)
      * @since 2.3.0
      */
-    public static void eachDirMatch(final Path self, final Object nameFilter, @ClosureParams(value = SimpleType.class, options = "java.nio.file.Path") final Closure closure) throws IOException {  // throws FileNotFoundException, IllegalArgumentException {
+    public static void eachDirMatch(final Path self, final Object nameFilter, @ClosureParams(value = SimpleType.class, options = "java.nio.file.Path") final Closure closure) throws IOException {
         eachFileMatch(self, FileType.DIRECTORIES, nameFilter, closure);
     }
 
@@ -1793,7 +1824,7 @@ public class NioExtensions extends DefaultGroovyMethodsSupport {
      * @throws java.io.FileNotFoundException if the file is not found.
      * @since 2.3.0
      */
-    public static BufferedInputStream newInputStream(Path self) throws IOException { // throws FileNotFoundException {
+    public static BufferedInputStream newInputStream(Path self) throws IOException {
         return new BufferedInputStream(Files.newInputStream(self));
     }
 
@@ -1805,7 +1836,7 @@ public class NioExtensions extends DefaultGroovyMethodsSupport {
      * @throws java.io.FileNotFoundException if the file is not found.
      * @since 2.3.0
      */
-    public static DataInputStream newDataInputStream(Path self) throws IOException { // throws FileNotFoundException {
+    public static DataInputStream newDataInputStream(Path self) throws IOException {
         return new DataInputStream(Files.newInputStream(self));
     }
 
@@ -1852,6 +1883,18 @@ public class NioExtensions extends DefaultGroovyMethodsSupport {
      */
     public static Writable filterLine(Path self, @ClosureParams(value = SimpleType.class, options = "java.lang.String") Closure closure) throws IOException {
         return IOGroovyMethods.filterLine(newReader(self), closure);
+    }
+
+    /**
+     * Creates, if needed, any parent directories for the file associated with this Path.
+     *
+     * @param self a Path
+     * @return itself
+     * @throws IOException if the parent directories couldn't be created
+     */
+    public static Path createParentDirectories(Path self, FileAttribute<?>... attrs) throws IOException {
+        Files.createDirectories(self.getParent(), attrs);
+        return self;
     }
 
     /**

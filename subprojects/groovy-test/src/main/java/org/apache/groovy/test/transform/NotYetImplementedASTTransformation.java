@@ -26,6 +26,7 @@ import org.codehaus.groovy.ast.ConstructorNode;
 import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.Parameter;
 import org.codehaus.groovy.ast.stmt.BlockStatement;
+import org.codehaus.groovy.ast.stmt.EmptyStatement;
 import org.codehaus.groovy.ast.stmt.ReturnStatement;
 import org.codehaus.groovy.ast.stmt.ThrowStatement;
 import org.codehaus.groovy.ast.stmt.TryCatchStatement;
@@ -54,6 +55,7 @@ public class NotYetImplementedASTTransformation extends AbstractASTTransformatio
     private static final ClassNode CATCH_TYPE = ClassHelper.make(Throwable.class);
     private static final ClassNode DEFAULT_THROW_TYPE = ClassHelper.make(AssertionError.class);
 
+    @Override
     public void visit(ASTNode[] nodes, SourceUnit source) {
         init(nodes, source);
         AnnotationNode anno = (AnnotationNode) nodes[0];
@@ -71,8 +73,10 @@ public class NotYetImplementedASTTransformation extends AbstractASTTransformatio
         if (methodNode.getCode() instanceof BlockStatement && !methodNode.getCode().isEmpty()) {
             // wrap code in try/catch with return for failure path followed by throws for success path
 
-            TryCatchStatement tryCatchStatement = tryCatchS(methodNode.getCode());
-            tryCatchStatement.addCatch(catchS(param(CATCH_TYPE, "ignore"), ReturnStatement.RETURN_NULL_OR_VOID));
+            TryCatchStatement tryCatchStatement = tryCatchS(
+                    methodNode.getCode(),
+                    EmptyStatement.INSTANCE,
+                    catchS(param(CATCH_TYPE, "ignore"), ReturnStatement.RETURN_NULL_OR_VOID));
 
             ThrowStatement throwStatement = throwS(ctorX(exception, args(constX("Method is marked with @NotYetImplemented but passes unexpectedly"))));
 

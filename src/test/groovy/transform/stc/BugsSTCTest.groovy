@@ -18,10 +18,13 @@
  */
 package groovy.transform.stc
 
+import static groovy.test.GroovyAssert.isAtLeastJdk
+
 /**
  * Unit tests for static type checking : bug fixes.
  */
 class BugsSTCTest extends StaticTypeCheckingTestCase {
+
     // GROOVY-5456
     void testShouldNotAllowDivOnUntypedVariable() {
         shouldFailWithMessages '''
@@ -168,7 +171,7 @@ class BugsSTCTest extends StaticTypeCheckingTestCase {
             L<String> items = ['foo', 'bar'] as L<String>
             items.removeIf({a, b -> 1} as Comparator<?>)
             assert items
-        ''', 'Cannot call L <String>#removeIf(java.util.Comparator <? super java.lang.String>) with arguments [java.util.Comparator <?>]'
+        ''', 'Cannot call L#removeIf(java.util.Comparator<? super java.lang.String>) with arguments [java.util.Comparator<?>]'
     }
 
     void testGroovy5482ListsAndFlowTyping() {
@@ -190,70 +193,87 @@ class BugsSTCTest extends StaticTypeCheckingTestCase {
         new StaticGroovy2()'''
     }
 
-    void testClosureDelegateThisOwner() {
+    void testClosureThisObjectDelegateOwnerProperty() {
         assertScript '''
-            class A {
-                A that = this
+            class C {
                 void m() {
-                    def cl = {
-                        @ASTTest(phase=INSTRUCTION_SELECTION, value= {
-                            assert node.getNodeMetaData(INFERRED_TYPE)?.name == 'A'
+                    C that = this;
+
+                    { ->
+                        @ASTTest(phase=INSTRUCTION_SELECTION, value={
+                            assert node.getNodeMetaData(INFERRED_TYPE)?.name == 'C'
                         })
-                        def foo = this
-                        assert this == that
-                    }
-                    cl()
-                    cl = {
-                        @ASTTest(phase=INSTRUCTION_SELECTION, value= {
-                            assert node.getNodeMetaData(INFERRED_TYPE)?.name == 'A'
+                        def ref = thisObject
+                        assert ref == that
+                    }();
+
+                    { ->
+                        @ASTTest(phase=INSTRUCTION_SELECTION, value={
+                            assert node.getNodeMetaData(INFERRED_TYPE)?.name == 'C'
                         })
-                        def foo = delegate
-                        assert delegate == that
-                    }
-                    cl()
-                    cl = {
-                        @ASTTest(phase=INSTRUCTION_SELECTION, value= {
-                            assert node.getNodeMetaData(INFERRED_TYPE)?.name == 'A'
+                        def ref = delegate
+                        assert ref == that
+                    }();
+
+                    { ->
+                        @ASTTest(phase=INSTRUCTION_SELECTION, value={
+                            assert node.getNodeMetaData(INFERRED_TYPE)?.name == 'C'
                         })
-                        def foo = owner
-                        assert owner == that
-                    }
+                        def ref = owner
+                        assert ref == that
+                    }();
                 }
             }
-            new A().m()
+            new C().m()
         '''
     }
-    void testClosureDelegateThisOwnerUsingGetters() {
+
+    void testClosureThisObjectDelegateOwnerAccessor() {
         assertScript '''
-            class A {
-                A that = this
+            class C {
                 void m() {
-                    def cl = {
-                        @ASTTest(phase=INSTRUCTION_SELECTION, value= {
-                            assert node.getNodeMetaData(INFERRED_TYPE)?.name == 'A'
+                    C that = this;
+
+                    { ->
+                        @ASTTest(phase=INSTRUCTION_SELECTION, value={
+                            assert node.getNodeMetaData(INFERRED_TYPE)?.name == 'C'
                         })
-                        def foo = getThisObject()
-                        assert getThisObject() == that
-                    }
-                    cl()
-                    cl = {
-                        @ASTTest(phase=INSTRUCTION_SELECTION, value= {
-                            assert node.getNodeMetaData(INFERRED_TYPE)?.name == 'A'
+                        def ref = getThisObject()
+                        assert ref == that
+                    }();
+
+                    { ->
+                        @ASTTest(phase=INSTRUCTION_SELECTION, value={
+                            assert node.getNodeMetaData(INFERRED_TYPE)?.name == 'C'
                         })
-                        def foo = getDelegate()
-                        assert getDelegate() == that
-                    }
-                    cl()
-                    cl = {
-                        @ASTTest(phase=INSTRUCTION_SELECTION, value= {
-                            assert node.getNodeMetaData(INFERRED_TYPE)?.name == 'A'
+                        def ref = getDelegate()
+                        assert ref == that
+                    }();
+
+                    { ->
+                        @ASTTest(phase=INSTRUCTION_SELECTION, value={
+                            assert node.getNodeMetaData(INFERRED_TYPE)?.name == 'C'
                         })
-                        def foo = getOwner()
-                        assert getOwner() == that
-                    }
+                        def ref = getOwner()
+                        assert ref == that
+                    }();
                 }
             }
-            new A().m()
+            new C().m()
+        '''
+    }
+
+    // GROOVY-9604
+    void testClosureResolveStrategy() {
+        assertScript '''
+            class C {
+                def m() {
+                    return { ->
+                        resolveStrategy + getResolveStrategy()
+                    }();
+                }
+            }
+            assert new C().m() == 0
         '''
     }
 
@@ -335,7 +355,7 @@ class BugsSTCTest extends StaticTypeCheckingTestCase {
         execute()'''
     }
 
-    // GROOVY-5874-part-1
+    // GROOVY-5874 (pt.1)
     void testClosureSharedVariableInBinExp() {
         shouldFailWithMessages '''
             def sum = 0
@@ -593,7 +613,7 @@ Printer
     }
 
     // GROOVY-6970
-    void testShouldBeAbleToChooseBetweenTwoEquivalentInterfaceMethods() {
+    void testShouldBeAbleToChooseBetweenTwoEquivalentInterfaceMethods1() {
         assertScript '''
             interface A { void m() }
             interface B { void m() }
@@ -611,7 +631,8 @@ Printer
             new D(new CImpl())
         '''
     }
-    void testShouldBeAbleToChooseBetweenTwoEquivalentInterfaceMethodsVariant() {
+
+    void testShouldBeAbleToChooseBetweenTwoEquivalentInterfaceMethods2() {
         assertScript '''
             interface A { void m() }
             interface B { void m() }
@@ -628,7 +649,7 @@ Printer
         '''
     }
 
-    void testShouldBeAbleToChooseBetweenTwoEquivalentInterfaceMethodsVariant2() {
+    void testShouldBeAbleToChooseBetweenTwoEquivalentInterfaceMethods3() {
         assertScript '''
             interface A { void m() }
             interface B { void m() }
@@ -646,7 +667,8 @@ Printer
         '''
     }
 
-    void testAmbiguousMethodResolutionGroovy6849() {
+    // GROOVY-6849
+    void testAmbiguousMethodResolution() {
         assertScript '''
             interface ObservableList<E> extends List<E> {
                 public boolean addAll(E... elements)
@@ -657,13 +679,31 @@ Printer
         '''
     }
 
-    void testAmbiguousMethodResolutionGroovy7710NoArgsOverloaded() {
+    // GROOVY-7160
+    void testAmbiguousMethodResolutionObjectVsEnums() {
+        // Currently preferring JDK9+ Set.of(E, E, E, E, E, E) ahead of EnumSet.of(E, E[])
+        // TODO clarify behavior for this edge case
+        if (!isAtLeastJdk('9.0')) {
+            assertScript '''
+            import static java.nio.file.AccessMode.*
+            def test() {
+                // more than 5 to match of(E first, E[] rest) variant
+                EnumSet.of(READ, WRITE, EXECUTE, READ, WRITE, EXECUTE)
+            }
+            assert test() == [READ, WRITE, EXECUTE].toSet()
+            '''
+        }
+    }
+
+    // GROOVY-7710
+    void testAmbiguousMethodResolutionNoArgsOverload() {
         shouldFailWithMessages '''
             Arrays.sort()
         ''', 'Reference to method is ambiguous. Cannot choose between '
     }
 
-    void testAmbiguousMethodResolutionGroovy7711NoArgsCovariantOverride() {
+    // GROOVY-7711
+    void testAmbiguousMethodResolutionNoArgsCovariantOverride() {
         assertScript '''
             class A {}
             class B {
@@ -756,7 +796,7 @@ Printer
         '''
     }
 
-    // GROOVY-8255 and GROOVY-8382
+    // GROOVY-8255, GROOVY-8382
     void testTargetTypingEmptyCollectionLiterals() {
         assertScript '''
             class Foo {
@@ -803,7 +843,7 @@ Printer
         '''
     }
 
-    //GROOVY-8590
+    // GROOVY-8590
     void testNestedMethodCallInferredTypeInReturnStmt() {
         assertScript '''
             class Source {
@@ -816,4 +856,104 @@ Printer
         '''
     }
 
+    // GROOVY-9463
+    void testMethodPointerUnknownReference() {
+        shouldFailWithMessages '''
+            def ptr = String.&toLowerCaseX
+        ''', 'Cannot find matching method java.lang.String#toLowerCaseX.'
+    }
+
+    // GROOVY-9938
+    void testInnerClassImplementsInterfaceMethod() {
+        assertScript '''
+            class Main {
+                interface I {
+                    def m(@DelegatesTo(value=D, strategy=Closure.DELEGATE_FIRST) Closure c)
+                }
+                static class C implements I {
+                    def m(@DelegatesTo(value=D, strategy=Closure.DELEGATE_FIRST) Closure c) {
+                        new D().with(c)
+                    }
+                }
+                static class D {
+                    def f() {
+                        return 'retval'
+                    }
+                }
+                static main(args) {
+                    def result = new C().m { f() }
+                    assert result == 'retval'
+                }
+            }
+        '''
+    }
+    void testInnerClassImplementsInterfaceMethodWithTrait() {
+        assertScript '''
+            class Main {
+                interface I {
+                    def m(@DelegatesTo(value=D, strategy=Closure.DELEGATE_FIRST) Closure c)
+                }
+                trait T {
+                    def m(@DelegatesTo(value=D, strategy=Closure.DELEGATE_FIRST) Closure c) {
+                        new D().with(c)
+                    }
+                }
+                static class C implements T { // generates m(Closure) that delegates to T#m(Closure)
+                }
+                static class D {
+                    def f() {
+                        return 'retval'
+                    }
+                }
+                static main(args) {
+                    def result = new C().m { f() }
+                    assert result == 'retval'
+                }
+            }
+        '''
+    }
+    void testInnerClassImplementsInterfaceMethodWithDelegate() {
+        assertScript '''
+            class Main {
+                interface I {
+                    def m(@DelegatesTo(value=D, strategy=Closure.DELEGATE_FIRST) Closure c)
+                }
+                static class T implements I {
+                    def m(@DelegatesTo(value=D, strategy=Closure.DELEGATE_FIRST) Closure c) {
+                        new D().with(c)
+                    }
+                }
+                static class C implements I {
+                    @Delegate(parameterAnnotations=true) T t = new T() // generates m(Closure) that delegates to T#m(Closure)
+                }
+                static class D {
+                    def f() {
+                        return 'retval'
+                    }
+                }
+                static main(args) {
+                    def result = new C().m { f() }
+                    assert result == 'retval'
+                }
+            }
+        '''
+    }
+
+    // GROOVY-9951
+    void testInnerImmutablePOJO() {
+        assertScript '''
+            import groovy.transform.Immutable
+            import groovy.transform.stc.POJO
+
+            class Outer {
+                @Immutable @POJO
+                static class Inner {
+                    String proper
+                }
+            }
+
+            def obj = new Outer.Inner('value')
+            assert obj.proper == 'value'
+        '''
+    }
 }

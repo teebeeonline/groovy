@@ -56,7 +56,9 @@ import java.util.LinkedList;
 import java.util.function.BiConsumer;
 
 import static java.lang.reflect.Modifier.isFinal;
+import static java.lang.reflect.Modifier.isStatic;
 import static org.apache.groovy.ast.tools.MethodNodeUtils.getPropertyName;
+import static org.codehaus.groovy.ast.ClassHelper.isObjectType;
 
 /**
  * Initializes the variable scopes for an AST.
@@ -165,36 +167,42 @@ public class VariableScopeVisitor extends ClassCodeVisitorSupport {
         currentScope.putDeclaredVariable(variable);
     }
 
-    private Variable findClassMember(final ClassNode cn, final String name) {
-        if (cn == null) return null;
+    private Variable findClassMember(final ClassNode node, final String name) {
+        final boolean abstractType = node.isAbstract();
 
-        if (cn.isScript()) {
-            return new DynamicVariable(name, false);
-        }
+        for (ClassNode cn = node; cn != null && !isObjectType(cn); cn = cn.getSuperClass()) {
+            if (cn.isScript()) {
+                return new DynamicVariable(name, false);
+            }
 
-        for (FieldNode fn : cn.getFields()) {
-            if (name.equals(fn.getName())) return fn;
-        }
+            for (FieldNode fn : cn.getFields()) {
+                if (name.equals(fn.getName())) return fn;
+            }
 
-        for (MethodNode mn : cn.getMethods()) {
-            if (name.equals(getPropertyName(mn))) {
-                PropertyNode property = new PropertyNode(name, mn.getModifiers(), ClassHelper.OBJECT_TYPE, cn, null, null, null);
-                property.getField().setHasNoRealSourcePosition(true);
-                property.getField().setSynthetic(true);
-                property.getField().setDeclaringClass(cn);
-                property.setDeclaringClass(cn);
-                return property;
+            for (PropertyNode pn : cn.getProperties()) {
+                if (name.equals(pn.getName())) return pn;
+            }
+
+            for (MethodNode mn : cn.getMethods()) {
+                if ((abstractType || !mn.isAbstract()) && name.equals(getPropertyName(mn))) {
+                    FieldNode fn = new FieldNode(name, mn.getModifiers() & 0xF, ClassHelper.OBJECT_TYPE, cn, null);
+                    fn.setHasNoRealSourcePosition(true);
+                    fn.setDeclaringClass(cn);
+                    fn.setSynthetic(true);
+
+                    PropertyNode pn = new PropertyNode(fn, fn.getModifiers(), null, null);
+                    pn.setDeclaringClass(cn);
+                    return pn;
+                }
+            }
+
+            for (ClassNode face : cn.getAllInterfaces()) {
+                FieldNode fn = face.getDeclaredField(name);
+                if (fn != null) return fn;
             }
         }
 
-        for (PropertyNode pn : cn.getProperties()) {
-            if (pn.getName().equals(name)) return pn;
-        }
-
-        Variable ret = findClassMember(cn.getSuperClass(), name);
-        if (ret != null) return ret;
-        if (isAnonymous(cn)) return null;
-        return findClassMember(cn.getOuterClass(), name);
+        return null;
     }
 
     private Variable findVariableDeclaration(final String name) {
@@ -225,9 +233,13 @@ public class VariableScopeVisitor extends ClassCodeVisitorSupport {
                 break;
             }
 
-            ClassNode classScope = scope.getClassScope();
-            if (classScope != null) {
-                Variable member = findClassMember(classScope, name);
+            ClassNode node = scope.getClassScope();
+            if (node != null) {
+                Variable member = findClassMember(node, name);
+                while (member == null && node.getOuterClass() != null && !isAnonymous(node)) {
+                    crossingStaticContext = (crossingStaticContext || isStatic(node.getModifiers()));
+                    member = findClassMember((node = node.getOuterClass()), name);
+                }
                 if (member != null) {
                     boolean staticScope = (crossingStaticContext || inSpecialConstructorCall), staticMember = member.isInStaticContext();
                     // prevent a static context (e.g. a static method) from accessing a non-static variable (e.g. a non-static field)
@@ -236,7 +248,7 @@ public class VariableScopeVisitor extends ClassCodeVisitorSupport {
                     }
                 }
                 // GROOVY-5961
-                if (!isAnonymous(classScope)) break;
+                if (!isAnonymous(scope.getClassScope())) break;
             }
             scope = scope.getParent();
         }
@@ -324,6 +336,13 @@ public class VariableScopeVisitor extends ClassCodeVisitorSupport {
     }
 
     //--------------------------------------------------------------------------
+    /**
+     * Sets the current class node context.
+     */
+    public void prepareVisit(ClassNode node) {
+        currentClass = node;
+        currentScope.setClassScope(node);
+    }
 
     @Override
     public void visitClass(final ClassNode node) {
@@ -458,14 +477,6 @@ public class VariableScopeVisitor extends ClassCodeVisitorSupport {
         markClosureSharedVariables();
 
         popState();
-    }
-
-    /**
-     * Sets the current class node context.
-     */
-    public void prepareVisit(ClassNode node) {
-        currentClass = node;
-        currentScope.setClassScope(node);
     }
 
     @Override

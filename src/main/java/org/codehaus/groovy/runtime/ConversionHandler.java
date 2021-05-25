@@ -91,6 +91,7 @@ public abstract class ConversionHandler implements InvocationHandler, Serializab
      * @see #invokeCustom(Object, Method, Object[])
      * @see InvocationHandler#invoke(java.lang.Object, java.lang.reflect.Method, java.lang.Object[])
      */
+    @Override
     public Object invoke(final Object proxy, Method method, Object[] args) throws Throwable {
         if (isDefaultMethod(method) && !defaultOverridden(method)) {
             final VMPlugin plugin = VMPluginFactory.getPlugin();
@@ -156,6 +157,7 @@ public abstract class ConversionHandler implements InvocationHandler, Serializab
      *
      * @see java.lang.Object#equals(java.lang.Object)
      */
+    @Override
     public boolean equals(Object obj) {
         if (obj instanceof Proxy) {
             obj = Proxy.getInvocationHandler(obj);
@@ -173,6 +175,7 @@ public abstract class ConversionHandler implements InvocationHandler, Serializab
      *
      * @see java.lang.Object#hashCode()
      */
+    @Override
     public int hashCode() {
         return delegate.hashCode();
     }
@@ -182,6 +185,7 @@ public abstract class ConversionHandler implements InvocationHandler, Serializab
      *
      * @see java.lang.Object#toString()
      */
+    @Override
     public String toString() {
         return delegate.toString();
     }

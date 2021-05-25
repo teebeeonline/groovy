@@ -80,6 +80,10 @@ import static org.codehaus.groovy.ast.tools.GeneralUtils.returnS;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.stmt;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.ternaryX;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.varX;
+import static org.codehaus.groovy.ast.ClassHelper.isObjectType;
+import static org.objectweb.asm.Opcodes.ACC_FINAL;
+import static org.objectweb.asm.Opcodes.ACC_PROTECTED;
+import static org.objectweb.asm.Opcodes.ACC_PUBLIC;
 
 /**
  * Handles generation of code for the @AutoClone annotation.
@@ -96,6 +100,7 @@ public class AutoCloneASTTransformation extends AbstractASTTransformation {
     private static final ClassNode OIS_TYPE = make(ObjectInputStream.class);
     private static final ClassNode INVOKER_TYPE = make(InvokerHelper.class);
 
+    @Override
     public void visit(ASTNode[] nodes, SourceUnit source) {
         init(nodes, source);
         AnnotatedNode parent = (AnnotatedNode) nodes[1];
@@ -180,7 +185,7 @@ public class AutoCloneASTTransformation extends AbstractASTTransformation {
             BlockStatement initBody = new BlockStatement();
             Parameter initParam = param(GenericsUtils.nonGeneric(cNode), "other");
             final Expression other = varX(initParam);
-            boolean hasParent = cNode.getSuperClass() != ClassHelper.OBJECT_TYPE;
+            boolean hasParent = !isObjectType(cNode.getSuperClass());
             if (hasParent) {
                 initBody.addStatement(stmt(ctorX(ClassNode.SUPER, other)));
             }
@@ -240,7 +245,7 @@ public class AutoCloneASTTransformation extends AbstractASTTransformation {
     private static void addSimpleCloneHelperMethod(ClassNode cNode, List<FieldNode> fieldNodes, List<String> excludes) {
         Parameter methodParam = new Parameter(GenericsUtils.nonGeneric(cNode), "other");
         final Expression other = varX(methodParam);
-        boolean hasParent = cNode.getSuperClass() != ClassHelper.OBJECT_TYPE;
+        boolean hasParent = !isObjectType(cNode.getSuperClass());
         BlockStatement methodBody = new BlockStatement();
         if (hasParent) {
             methodBody.addStatement(stmt(callSuperX("cloneOrCopyMembers", args(other))));

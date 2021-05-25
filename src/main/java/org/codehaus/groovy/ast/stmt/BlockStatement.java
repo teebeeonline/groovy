@@ -65,6 +65,7 @@ public class BlockStatement extends Statement {
         this.scope = scope;
     }
 
+    @Override
     public void visit(GroovyCodeVisitor visitor) {
         visitor.visitBlockStatement(this);
     }
@@ -81,10 +82,12 @@ public class BlockStatement extends Statement {
         statements.addAll(listOfStatements);
     }
 
+    @Override
     public String toString() {
         return super.toString() + statements;
     }
 
+    @Override
     public String getText() {
         StringBuilder buffer = new StringBuilder("{ ");
         boolean first = true;
@@ -101,6 +104,7 @@ public class BlockStatement extends Statement {
         return buffer.toString();
     }
 
+    @Override
     public boolean isEmpty() {
         return statements.isEmpty();
     }

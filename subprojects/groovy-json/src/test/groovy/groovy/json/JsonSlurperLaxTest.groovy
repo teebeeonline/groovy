@@ -18,9 +18,6 @@
  */
 package groovy.json
 
-/**
- * Created by Richard on 2/2/14.
- */
 class JsonSlurperLaxTest extends JsonSlurperTest {
 
     void setUp() {
@@ -98,7 +95,7 @@ class JsonSlurperLaxTest extends JsonSlurperTest {
             flag : true,
             flag2 : false,
             strings : [we, are, string, here, us, roar],
-            he said : '"fire all your guns at once baby, and explode into the night"',
+            they said : '"fire all your guns at once baby, and explode into the night"',
             "going deeper" : [
                 "nestedArrays", // needs comments
                 "anotherThing" // commented
@@ -119,7 +116,7 @@ class JsonSlurperLaxTest extends JsonSlurperTest {
         assert map.flag == true
         assert map.flag2 == false
         assert map.strings == ["we", "are", "string", "here", "us", "roar"]
-        assert map["he said"] == '"fire all your guns at once baby, and explode into the night"'
+        assert map["they said"] == '"fire all your guns at once baby, and explode into the night"'
         assert map.the == "end"
     }
 
@@ -166,6 +163,27 @@ class JsonSlurperLaxTest extends JsonSlurperTest {
             }
         '''
         assert !parser.parseText(jsonString).containsKey('appUserId')
+    }
+
+    void testGroovy9954() {
+        String jsonString = """
+// first comment
+{
+// comment before foo
+foo:bar,
+/* comment before foo1 */'foo1': 'bar1',
+# comment before foo2
+"foo2": "bar2",
+array: [/* comment in array */"a"/* comment in array */,"b"]
+}
+// last comment
+"""
+
+        Map<String, Object> map = parser.parseText(jsonString)
+        assert map.foo == "bar"
+        assert map.foo1 == "bar1"
+        assert map.foo2 == "bar2"
+        assert map.array == ["a", "b"]
     }
 
 }

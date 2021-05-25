@@ -29,21 +29,18 @@ import java.io.IOException;
  * provides common functionality.
  */
 public abstract class AbstractReaderSource implements ReaderSource {
-    protected CompilerConfiguration configuration;   // Configuration data
 
-    public AbstractReaderSource(CompilerConfiguration configuration) {
-        if (configuration == null) {
-            throw new IllegalArgumentException("Compiler configuration must not be null!");
-            // ... or more relaxed?
-            // configuration = CompilerConfiguration.DEFAULT;
-        }
-        this.configuration = configuration;
+    protected CompilerConfiguration configuration;
+
+    public AbstractReaderSource(final CompilerConfiguration configuration) {
+        this.configuration = configuration != null ? configuration : CompilerConfiguration.DEFAULT;
     }
 
     /**
      * Returns true if the source can be restarted (ie. if getReader()
      * will return non-null on subsequent calls.
      */
+    @Override
     public boolean canReopenSource() {
         return true;
     }
@@ -56,6 +53,7 @@ public abstract class AbstractReaderSource implements ReaderSource {
      * Returns a line from the source, or null, if unavailable.  If
      * you supply a Janitor, resources will be cached.
      */
+    @Override
     public String getLine(int lineNumber, Janitor janitor) {
         // If the source is already open and is passed the line we
         // want, close it.
@@ -100,6 +98,7 @@ public abstract class AbstractReaderSource implements ReaderSource {
     /**
      * Cleans up any cached resources used by getLine().
      */
+    @Override
     public void cleanup() {
         if (lineSource != null) {
             try {

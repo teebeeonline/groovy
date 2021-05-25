@@ -63,6 +63,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
 
+import static org.apache.groovy.ast.tools.ExpressionUtils.isThisExpression;
 import static org.codehaus.groovy.ast.ClassHelper.BigDecimal_TYPE;
 import static org.codehaus.groovy.ast.ClassHelper.GROOVY_INTERCEPTABLE_TYPE;
 import static org.codehaus.groovy.ast.ClassHelper.OBJECT_TYPE;
@@ -79,6 +80,8 @@ import static org.codehaus.groovy.ast.tools.WideningCategories.isIntCategory;
 import static org.codehaus.groovy.ast.tools.WideningCategories.isLongCategory;
 import static org.codehaus.groovy.classgen.asm.BinaryExpressionMultiTypeDispatcher.typeMap;
 import static org.codehaus.groovy.classgen.asm.BinaryExpressionMultiTypeDispatcher.typeMapKeyNames;
+import static org.codehaus.groovy.ast.ClassHelper.isBigDecimalType;
+import static org.codehaus.groovy.ast.ClassHelper.isPrimitiveBoolean;
 import static org.objectweb.asm.Opcodes.ACC_FINAL;
 import static org.objectweb.asm.Opcodes.GETSTATIC;
 import static org.objectweb.asm.Opcodes.GOTO;
@@ -705,7 +708,7 @@ public class OptimizingStatementWriter extends StatementWriter {
                     case Types.LOGICAL_AND_EQUAL:
                     case Types.LOGICAL_OR:
                     case Types.LOGICAL_OR_EQUAL:
-                        if (boolean_TYPE.equals(leftType) && boolean_TYPE.equals(rightType)) {
+                        if (isPrimitiveBoolean(leftType) && isPrimitiveBoolean(rightType)) {
                             opt.chainShouldOptimize(true);
                         } else {
                             opt.chainCanOptimize(true);
@@ -804,7 +807,7 @@ public class OptimizingStatementWriter extends StatementWriter {
             if (expression.getNodeMetaData(StatementMeta.class) != null) return;
             super.visitMethodCallExpression(expression);
 
-            if (AsmClassGenerator.isThisExpression(expression.getObjectExpression())) {
+            if (isThisExpression(expression.getObjectExpression())) {
                 setMethodTarget(expression, expression.getMethodAsString(), expression.getArguments(), true);
             }
         }
@@ -865,7 +868,7 @@ public class OptimizingStatementWriter extends StatementWriter {
             if (op != Types.DIVIDE && op != Types.DIVIDE_EQUAL) return null;
 
             ClassNode originalResultType = typeChooser.resolveType(binExp, node);
-            if (!originalResultType.equals(BigDecimal_TYPE)
+            if (!isBigDecimalType(originalResultType)
                     || !(isLongCategory(assignmentTartgetType) || isFloatingCategory(assignmentTartgetType))) {
                 return null;
             }

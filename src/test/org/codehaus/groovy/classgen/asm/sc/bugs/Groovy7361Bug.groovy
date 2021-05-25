@@ -16,47 +16,91 @@
  *  specific language governing permissions and limitations
  *  under the License.
  */
-
-
 package org.codehaus.groovy.classgen.asm.sc.bugs
 
 import groovy.transform.stc.StaticTypeCheckingTestCase
 import org.codehaus.groovy.classgen.asm.sc.StaticCompilationTestSupport
 
-class Groovy7361Bug extends StaticTypeCheckingTestCase implements StaticCompilationTestSupport {
+final class Groovy7361Bug extends StaticTypeCheckingTestCase implements StaticCompilationTestSupport {
+
     void testShouldNotThrowVerifyError() {
         assertScript '''
-                class TaskManager {
-                    private final Map<Long, String> map = [1L:'a',2L:'b']
-                    void doh() {
-                        def list = [1L]
-                        list.each {
-                            synchronized (map) {
-                                map.remove(it)
-                            }
+            class A {
+                private final Map<Long, String> map = [1L:'x', 2L:'y']
+                def m() {
+                    def list = [1L]
+                    list.each {
+                        synchronized (map) {
+                            map.remove(it)
                         }
                     }
+                    map
                 }
-                new TaskManager().doh()
-            '''
+            }
+            assert new A().m() == [2L:'y']
+        '''
     }
 
     void testShouldNotThrowClassCastException() {
         assertScript '''
             class A {
                 private final Map map = [:]
-                Map foo() {
+                def m() {
                     new Runnable() {
                         @Override
-                        void run(){
-                            { -> map['a']='b'}.call()
+                        void run() {
+                            { -> map['x'] = 'y' }.call()
                         }
                     }.run()
                     map
                 }
             }
-            def a = new A()
-            assert a.foo() == [a:'b']
+            assert new A().m() == [x:'y']
+        '''
+    }
+
+    // GROOVY-9699
+    void testShouldNotEmitErrorForSubscriptPrivateAccess() {
+        assertScript '''
+            class A {
+                private static final java.util.regex.Pattern PATTERN = ~/.*/
+                void checkList() {
+                    def list = []
+                    def closure = { ->
+                        list << PATTERN.pattern()
+                    }
+                    closure()
+                }
+                void checkMap() {
+                    def map = [:]
+                    def closure = { ->
+                        map[PATTERN.pattern()] = 1
+                    }
+                    closure()
+                }
+            }
+            class B extends A {
+            }
+            new A().checkList()
+            new B().checkList()
+            new A().checkMap()
+            new B().checkMap()
+        '''
+    }
+
+    // GROOVY-9771
+    void testShouldNotThrowClassCastExceptionForSubscriptPrivateAccess() {
+        assertScript '''
+            class C {
+                private final Map<String, Boolean> map = [:]
+                void checkMap() {
+                    { ->
+                        map['key'] = true
+                    }.call()
+                    assert map == [key: true]
+                }
+            }
+            new C().checkMap()
         '''
     }
 }

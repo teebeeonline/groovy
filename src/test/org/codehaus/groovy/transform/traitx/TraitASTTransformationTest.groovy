@@ -284,14 +284,13 @@ final class TraitASTTransformationTest {
     void testPrivateFieldInTraitShouldBeRemapped() {
         assertScript '''
             import groovy.transform.ASTTest
-            import org.codehaus.groovy.control.CompilePhase
 
             trait Foo {
                 private int i = 0
                 int sum(int x) { x+i }
                 void setIndex(int index) { this.i = index }
             }
-            @ASTTest(phase=CompilePhase.INSTRUCTION_SELECTION, value={
+            @ASTTest(phase=INSTRUCTION_SELECTION, value={
                 assert node.fields.any { it.name == 'Foo__i' }
             })
             class Bob implements Foo {
@@ -399,6 +398,7 @@ final class TraitASTTransformationTest {
         '''
     }
 
+    @Test
     void testTraitOnEnum() {
         assertScript '''
             trait WithBar { int bar }
@@ -550,6 +550,33 @@ final class TraitASTTransformationTest {
             class StringProvider implements Provider<String> {}
             def c = new StringProvider()
             assert c.get('foo') == 'foo'
+        '''
+    }
+
+    @Test // GROOVY-9760
+    void testTraitWithGenerics3() {
+        assertScript '''
+            trait Provider<T> {
+                T get(T ref) {
+                    ref
+                }
+            }
+            class UnspecifiedProvider implements Provider {
+            }
+            assert new UnspecifiedProvider().get('foo') == 'foo'
+        '''
+
+        assertScript '''
+            @groovy.transform.CompileStatic
+            trait Provider<T> {
+                T get(T ref) {
+                    ref
+                }
+            }
+            @groovy.transform.CompileStatic
+            class UnspecifiedProvider implements Provider {
+            }
+            assert new UnspecifiedProvider().get('foo') == 'foo'
         '''
     }
 
@@ -1014,8 +1041,294 @@ final class TraitASTTransformationTest {
         '''
     }
 
+    @Test // GROOVY-9255
+    void testTraitSuperPropertyGet() {
+        assertScript '''
+            trait T {
+                def x = 'value'
+            }
+            class C implements T {
+                def test() {
+                    T.super.x
+                }
+            }
+            assert new C().test() == 'value'
+        '''
+
+        assertScript '''
+            trait T {
+                boolean x = true
+            }
+            class C implements T {
+                def test() {
+                    T.super.x
+                }
+            }
+            assert new C().test() == true
+        '''
+
+        assertScript '''
+            trait T {
+                def getX() { 'value' }
+            }
+            class C implements T {
+                def test() {
+                    T.super.x
+                }
+            }
+            assert new C().test() == 'value'
+        '''
+
+        assertScript '''
+            trait T {
+                boolean isX() { true }
+            }
+            class C implements T {
+                def test() {
+                    T.super.x
+                }
+            }
+            assert new C().test() == true
+        '''
+    }
+
+    @Test // GROOVY-9672
+    void testTraitSuperPropertyGetStatic() {
+        assertScript '''
+            trait T {
+                static x = 'value'
+            }
+            class C implements T {
+                def test() {
+                    T.super.x
+                }
+            }
+            assert new C().test() == 'value'
+        '''
+
+        assertScript '''
+            trait T {
+                static boolean x = true
+            }
+            class C implements T {
+                def test() {
+                    T.super.x
+                }
+            }
+            assert new C().test() == true
+        '''
+
+        assertScript '''
+            trait T {
+                static getX() { 'value' }
+            }
+            class C implements T {
+                def test() {
+                    T.super.x
+                }
+            }
+            assert new C().test() == 'value'
+        '''
+
+        assertScript '''
+            trait T {
+                static boolean isX() { true }
+            }
+            class C implements T {
+                def test() {
+                    T.super.x
+                }
+            }
+            assert new C().test() == true
+        '''
+
+        assertScript '''
+            trait A {
+                static getX() { 'A' }
+            }
+            trait B {
+                static getX() { 'B' }
+            }
+            class C implements A, B {
+                def test() {
+                    A.super.x + B.super.x
+                }
+            }
+            assert new C().test() == 'AB'
+        '''
+    }
+
     @Test
-    void testSuperCallInTraitExtendingAnotherTrait() {
+    void testTraitSuperPropertySet() {
+        assertScript '''
+            trait T {
+                def x
+            }
+            class C implements T {
+                def test() {
+                    T.super.x = 'value'
+                    return x
+                }
+            }
+            assert new C().test() == 'value'
+        '''
+
+        def err = shouldFail '''
+            trait T {
+                final x = 'const'
+            }
+            class C implements T {
+                def test() {
+                    T.super.x = 'value'
+                    return x
+                }
+            }
+            assert new C().test() == 'value'
+        '''
+        assert err =~ /No such property: super for class: T/
+
+        // TODO: add support for compound assignment
+        shouldFail MissingPropertyException, '''
+            trait T {
+                def x = 'value'
+            }
+            class C implements T {
+                def test() {
+                    T.super.x -= ~/e\b/
+                    T.super.x += 'able'
+                    return x
+                }
+            }
+            assert new C().test() == 'valuable'
+        '''
+
+        assertScript '''
+            trait T {
+                def setX(value) { 'retval' }
+            }
+            class C implements T {
+                def test() {
+                    T.super.x = 'value'
+                }
+            }
+            assert new C().test() == 'retval'
+        '''
+    }
+
+    @Test // GROOVY-9672
+    void testTraitSuperPropertySetStatic() {
+        assertScript '''
+            trait T {
+                static x
+            }
+            class C implements T {
+                def test() {
+                    T.super.x = 'value'
+                    return x
+                }
+            }
+            assert new C().test() == 'value'
+        '''
+
+        def err = shouldFail '''
+            trait T {
+                static final x = 'const'
+            }
+            class C implements T {
+                def test() {
+                    T.super.x = 'value'
+                    return x
+                }
+            }
+            assert new C().test() == 'value'
+        '''
+        assert err =~ /No such property: super for class: T/
+
+        assertScript '''
+            trait T {
+                static setX(value) { 'retval' }
+            }
+            class C implements T {
+                def test() {
+                    T.super.x = 'value'
+                }
+            }
+            assert new C().test() == 'retval'
+        '''
+
+        assertScript '''
+            trait A {
+                static setX(value) { 'A' }
+            }
+            trait B {
+                static setX(value) { 'B' }
+            }
+            class C implements A, B {
+                def test() {
+                    (A.super.x = 'a') + (B.super.x = 'b')
+                }
+            }
+            assert new C().test() == 'AB'
+        '''
+    }
+
+    @Test // GROOVY-9673
+    void testTraitSuperPropertySetWithOverloads() {
+        assertScript '''
+            trait T {
+                def setX(Number n) {
+                    'Number'
+                }
+                def setX(String s) {
+                    'String'
+                }
+            }
+            class C implements T {
+                def test() {
+                    T.super.x = 42
+                }
+            }
+            assert new C().test() == 'Number'
+        '''
+
+        assertScript '''
+            trait T {
+                def setX(Number n) {
+                    'Number'
+                }
+                def setX(String s) {
+                    'String'
+                }
+            }
+            class C implements T {
+                def test() {
+                    T.super.x = 'x'
+                }
+            }
+            assert new C().test() == 'String'
+        '''
+    }
+
+    @Test // GROOVY-9672
+    void testTraitSuperCallStatic() {
+        assertScript '''
+            trait A {
+                static m() { 'A' }
+            }
+            trait B {
+                static m() { 'B' }
+            }
+            class C implements A, B {
+                def test() {
+                    m() + A.super.m() + B.super.m()
+                }
+            }
+            assert new C().test() == 'BAB'
+        '''
+    }
+
+    @Test
+    void testTraitSuperCallWhenExtendingAnotherTrait() {
         assertScript '''
             trait Foo {
                 int foo() { 1 }
@@ -1045,6 +1358,37 @@ final class TraitASTTransformationTest {
             class Baz implements Bar {}
             def b = new Baz()
             assert b.foo() == 2
+        '''
+    }
+
+    @Test // GROOVY-9256
+    void testTraitSuperCallWithinClosure() {
+        assertScript '''
+            trait T {
+              int getX() { 42 }
+            }
+            class C implements T {
+              def test() {
+                { ->
+                  T.super.getX()
+                }()
+              }
+            }
+            assert new C().test() == 42
+        '''
+
+        assertScript '''
+            trait T {
+              int getX() { 42 }
+            }
+            class C implements T {
+              def test() {
+                { p = T.super.getX() ->
+                  return p
+                }()
+              }
+            }
+            assert new C().test() == 42
         '''
     }
 
@@ -1416,6 +1760,62 @@ final class TraitASTTransformationTest {
         '''
     }
 
+    @Test // GROOVY-9739
+    void testTraitExtendsTraitWithDelegate() {
+        assertScript '''
+            class Main implements ClientSupport {
+                static main(args) {
+                    def tester = new Main(client: new Client())
+
+                    assert tester.isReady()
+                    assert tester.client.getValue() == 'works'
+                }
+            }
+
+            class Client {
+                def getValue() { 'works' }
+                boolean waitForServer(int seconds) { true }
+            }
+
+            trait ClientDelegate {
+                @Delegate Client client
+            }
+
+            trait ClientSupport implements ClientDelegate {
+                boolean isReady() {
+                    boolean ready = client.waitForServer(60)
+                    // assert, log, etc.
+                    return ready
+                }
+            }
+        '''
+    }
+
+    @Test // GROOVY-9901
+    void testTraitWithMemozied() {
+        assertScript '''
+            trait Foo {
+                @groovy.transform.Memoized
+                double method() {
+                    Math.random()
+                }
+            }
+            class Bar implements Foo {}
+            class Baz implements Foo {}
+
+            def bar = new Bar()
+            def a = bar.method()
+            def b = bar.method()
+            def c = new Bar().method()
+            def d = new Baz().method()
+
+            assert a == b
+            assert a != c
+            assert a != d
+            assert c != d
+        '''
+    }
+
     @Test
     void testAnnotationShouldBeCarriedOver() {
         assertScript '''
@@ -1700,6 +2100,7 @@ final class TraitASTTransformationTest {
         '''
     }
 
+    @Test
     void testIncrementPropertyOfTraitUsingPlusPlus() {
         def err = shouldFail '''
             trait Level {
@@ -2125,7 +2526,7 @@ final class TraitASTTransformationTest {
     void testFieldInTraitModifiers() {
         assertScript '''
             import groovy.transform.ASTTest
-            import static org.codehaus.groovy.control.CompilePhase.INSTRUCTION_SELECTION
+
             trait A {
                 public int foo
             }
@@ -2141,7 +2542,6 @@ final class TraitASTTransformationTest {
             import groovy.transform.ASTTest
             import java.lang.reflect.Modifier
 
-            import static org.codehaus.groovy.control.CompilePhase.INSTRUCTION_SELECTION
             trait A {
                 private int foo
             }
@@ -2580,16 +2980,36 @@ final class TraitASTTransformationTest {
 
     @Test // GROOVY-7297
     void testMethodlevelGenericsFromPrecompiledClass() {
-        //SomeTrait needs to be outside the script
+        // TODO: T needs to be outside the script
         assertScript '''
-            trait SomeTrait {
+            trait T {
                 String title
-                public <T> List<T> someMethod(T data) {}
+                public <U> List<U> m(U data) {
+                }
             }
-            class Foo implements SomeTrait {}
+            class C implements T {
+            }
+            def c = new C(title: 'some title')
+            assert c.title == 'some title'
+            // TODO: assert c.m(...) == ?
+        '''
+    }
 
-            def sc = new Foo(title: 'some title')
-            assert 'some title' == sc.title
+    @Test // GROOVY-9763
+    void testTraitWithStaticMethodGenericsSC() {
+        assertScript '''
+            trait T {
+                static <U> U m(Closure<U> callable) {
+                    callable.call()
+                }
+            }
+            class C implements T {
+            }
+            @groovy.transform.CompileStatic
+            def test() {
+                C.m({ -> 'works' })
+            }
+            assert test() == 'works'
         '''
     }
 
@@ -2846,6 +3266,83 @@ final class TraitASTTransformationTest {
             class Main implements Bar {}
 
             assert new Main().doIt() == 'GO!'
+        '''
+    }
+
+    @Test // GROOVY-9386
+    void testTraitPropertyInitializedByTap() {
+        assertScript '''
+            class P {
+                int prop
+            }
+            trait T {
+                P pogo = new P().tap {
+                    prop = 42 // MissingPropertyException: No such property: prop for class: C
+                }
+            }
+            class C implements T {
+            }
+
+            def pogo = new C().pogo
+            assert pogo.prop == 42
+        '''
+    }
+
+    @Test // GROOVY-9386
+    void testTraitPropertyInitializedByWith() {
+        assertScript '''
+            class P {
+                int prop
+            }
+            trait T {
+                P pogo = new P().with {
+                    prop = 42 // MissingPropertyException: No such property: prop for class: C
+                    return it
+                }
+            }
+            class C implements T {
+            }
+            def pogo = new C().pogo
+            assert pogo.prop == 42
+        '''
+    }
+
+    @Test // GROOVY-8000
+    void testTraitMultiLevelGenerics() {
+        assertScript '''
+            trait TopTrait<X> { X getSomeThing() {}
+            }
+            trait MiddleTrait<Y> implements TopTrait<Y> {
+            }
+            trait BottomTrait<Z> implements MiddleTrait<Z> {
+            }
+            class Implementation implements BottomTrait<String> {
+            }
+
+            assert new Implementation().getSomeThing() == null
+        '''
+
+        assertScript '''
+            trait TopTrait<T> { T getSomeThing() {}
+            }
+            trait MiddleTrait<T> implements TopTrait<T> {
+            }
+            trait BottomTrait<T> implements MiddleTrait<T> {
+            }
+            class Implementation implements BottomTrait<String> {
+            }
+
+            assert new Implementation().getSomeThing() == null
+        '''
+    }
+
+    @Test // GROOVY-9660
+    void testAsGenericsParam() {
+        assertScript '''
+            trait Data {}
+            class TestData implements Data {}
+            class AbstractData<D extends Data>{ D data }
+            new AbstractData<TestData>()
         '''
     }
 }

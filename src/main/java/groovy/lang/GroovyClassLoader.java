@@ -109,6 +109,7 @@ public class GroovyClassLoader extends URLClassLoader {
     private static int scriptNameCounter = 1000000;
 
     private GroovyResourceLoader resourceLoader = new GroovyResourceLoader() {
+        @Override
         public URL loadGroovySource(final String filename) throws MalformedURLException {
             return AccessController.doPrivileged((PrivilegedAction<URL>) () -> {
                 for (String extension : config.getScriptExtensions()) {
@@ -169,7 +170,7 @@ public class GroovyClassLoader extends URLClassLoader {
 
     private void initSourceEncoding(CompilerConfiguration config) {
         sourceEncoding = config.getSourceEncoding();
-        if (null ==  sourceEncoding) {
+        if (null == sourceEncoding) {
             // Keep the same default source encoding with the one used by #parseClass(InputStream, String)
             // TODO should we use org.codehaus.groovy.control.CompilerConfiguration.DEFAULT_SOURCE_ENCODING instead?
             sourceEncoding = CharsetToolkit.getDefaultSystemCharset().name();
@@ -413,6 +414,7 @@ public class GroovyClassLoader extends URLClassLoader {
         return ret;
     }
 
+    @Override
     protected PermissionCollection getPermissions(CodeSource codeSource) {
         PermissionCollection perms;
         try {
@@ -424,6 +426,7 @@ public class GroovyClassLoader extends URLClassLoader {
             }
 
             ProtectionDomain myDomain = AccessController.doPrivileged(new PrivilegedAction<ProtectionDomain>() {
+                @Override
                 public ProtectionDomain run() {
                     return getClass().getProtectionDomain();
                 }
@@ -689,6 +692,7 @@ public class GroovyClassLoader extends URLClassLoader {
             return createClass(code, classNode);
         }
 
+        @Override
         public void call(ClassVisitor classWriter, ClassNode classNode) {
             onClassNode((ClassWriter) classWriter, classNode);
         }
@@ -761,6 +765,7 @@ public class GroovyClassLoader extends URLClassLoader {
      *
      * @param url the new classpath element
      */
+    @Override
     public void addURL(URL url) {
         super.addURL(url);
     }
@@ -947,6 +952,7 @@ public class GroovyClassLoader extends URLClassLoader {
      * @throws ClassNotFoundException     if the class was not found
      * @see java.lang.ClassLoader#loadClass(java.lang.String, boolean)
      */
+    @Override
     protected Class loadClass(final String name, boolean resolve) throws ClassNotFoundException {
         return loadClass(name, true, true, resolve);
     }
@@ -1003,22 +1009,31 @@ public class GroovyClassLoader extends URLClassLoader {
         try {
             /* fix for GROOVY-5809 */
             path = new File(ret.toURI());
-        } catch(URISyntaxException e) {
+        } catch (URISyntaxException e) {
             path = new File(decodeFileName(ret.getFile()));
         }
         path = path.getParentFile();
-        if (path.exists() && path.isDirectory()) {
-            File file = new File(path, fileWithoutPackage);
-            if (file.exists()) {
-                // file.exists() might be case insensitive. Let's do
-                // case sensitive match for the filename
-                File parent = file.getParentFile();
-                for (String child : parent.list()) {
-                    if (child.equals(fileWithoutPackage)) return file;
+
+        File file = new File(path, fileWithoutPackage);
+        if (file.exists()) {
+            // file.exists() might be case insensitive.
+            // Let's do case sensitive match for the filename
+            try {
+                String caseSensitiveName = file.getCanonicalPath();
+                int index = caseSensitiveName.lastIndexOf(File.separator);
+                if (index != -1) {
+                    caseSensitiveName = caseSensitiveName.substring(index + 1);
                 }
+                if (fileWithoutPackage.equals(caseSensitiveName)) {
+                    return file;
+                }
+            } catch (IOException ignore) {
+                // assume doesn't really exist if we can't read the file
             }
+
         }
-        //file does not exist!
+
+        // file does not exist!
         return null;
     }
 

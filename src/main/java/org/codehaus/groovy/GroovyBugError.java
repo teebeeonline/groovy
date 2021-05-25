@@ -66,6 +66,7 @@ public class GroovyBugError extends AssertionError {
      *
      * @see #getMessage()
      */
+    @Override
     public String toString() {
         return getMessage();
     }
@@ -79,6 +80,7 @@ public class GroovyBugError extends AssertionError {
      *
      * @return the detail message string of this error.
      */
+    @Override
     public String getMessage() {
         if (message != null) {
             return "BUG! " + message;
@@ -87,6 +89,7 @@ public class GroovyBugError extends AssertionError {
         }
     }
 
+    @Override
     public Throwable getCause() {
         return this.exception;
     }

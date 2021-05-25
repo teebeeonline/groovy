@@ -26,13 +26,13 @@ import org.codehaus.groovy.control.Phases
 import javax.swing.tree.TreeNode
 
 /**
- * Unit test for ScriptToTreeNodeAdapter.
+ * Unit test for {@link ScriptToTreeNodeAdapter}.
  *
  * The assertions in this test case often assert against the toString() representation of
  * an object. Normally, this is bad form. However, the class under test is meant to display
  * toString() forms in a user interface. So in this case it is appropriate.
  */
-class ScriptToTreeNodeAdapterTest extends GroovyTestCase {
+final class ScriptToTreeNodeAdapterTest extends GroovyTestCase {
 
      private final classLoader = new GroovyClassLoader()
 
@@ -143,7 +143,7 @@ class ScriptToTreeNodeAdapterTest extends GroovyTestCase {
                 [
                         eq('ClassNode - Foo'),
                         eq('Fields'),
-                        eq('FieldNode - aField : java.lang.Object'),
+                        startsWith('FieldNode - aField : java.lang.Object'),
                 ]
         )
     }
@@ -245,6 +245,7 @@ class ScriptToTreeNodeAdapterTest extends GroovyTestCase {
                         startsWith('ClassNode'),
                         eq('Methods'),
                         startsWith('MethodNode - run'),
+                        eq('Body'),
                         startsWith('BlockStatement'),
                         startsWith('ExpressionStatement'),
                         startsWith('Constant - foo'),
@@ -284,8 +285,9 @@ class ScriptToTreeNodeAdapterTest extends GroovyTestCase {
                         startsWith('ClassNode'),
                         eq('Methods'),
                         eq('MethodNode - main'),
+                        eq('Body'),
                         startsWith('ExpressionStatement'),  //notice, there is only one ExpressionStatement
-                        startsWith('MethodCall'),
+                        startsWith('StaticMethodCallExpression'),
                 ]
         )
     }
@@ -316,7 +318,8 @@ class ScriptToTreeNodeAdapterTest extends GroovyTestCase {
                 [
                         startsWith('InnerClassNode - Outer\$Inner'),
                         eq('Methods'),
-                        startsWith('MethodNode - someMethod'),
+                        eq('MethodNode - someMethod'),
+                        eq('Body'),
                         startsWith('BlockStatement'),
                 ]
         )
@@ -448,7 +451,7 @@ class ScriptToTreeNodeAdapterTest extends GroovyTestCase {
         }
     }
 
-   void testScriptWithAdapterThatLoadsNitherFreeFormNorClass() {
+   void testScriptWithAdapterThatLoadsNeitherFreeFormNorClass() {
         ScriptToTreeNodeAdapter adapter = createAdapter(false, false, false)
 
         // since free standing script is not being loaded, it should fail
@@ -611,7 +614,7 @@ class ScriptToTreeNodeAdapterTest extends GroovyTestCase {
                 void test() {}
             }
 
-        ''', Phases.CLASS_GENERATION, true) as TreeNode
+        ''', Phases.CLASS_GENERATION) as TreeNode
 
         def classNodeTest = root.children().find { it.toString() == 'ClassNode - Test' }
         def methods = classNodeTest.children().find { it.toString() == 'Methods' }

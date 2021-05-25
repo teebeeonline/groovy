@@ -324,6 +324,152 @@ class DesignPatternsTest extends CompilableTestSupport {
         '''
     }
 
+    void testCommand() {
+        shouldCompile '''
+            // tag::command_traditional[]
+            interface Command {
+                void execute()
+            }
+
+            // invoker class
+            class Switch {
+                private final Map<String, Command> commandMap = new HashMap<>()
+                
+                void register(String commandName, Command command) {
+                    commandMap[commandName] = command
+                }
+                
+                void execute(String commandName) {
+                    Command command = commandMap[commandName]
+                    if (!command) {
+                        throw new IllegalStateException("no command registered for " + commandName)
+                    }
+                    command.execute()
+                }
+            }
+
+            // receiver class
+            class Light {
+                void turnOn() {
+                    println "The light is on"
+                }
+            
+                void turnOff() {
+                    println "The light is off"
+                }
+            }
+
+            class SwitchOnCommand implements Command {
+                Light light
+            
+                @Override // Command
+                void execute() {
+                    light.turnOn()
+                }
+            }
+
+            class SwitchOffCommand implements Command {
+                Light light
+            
+                @Override // Command
+                void execute() {
+                    light.turnOff()
+                }
+            }
+
+            Light lamp = new Light()
+            Command switchOn = new SwitchOnCommand(light: lamp)
+            Command switchOff = new SwitchOffCommand(light: lamp)
+
+            Switch mySwitch = new Switch()
+            mySwitch.register("on", switchOn)
+            mySwitch.register("off", switchOff)
+
+            mySwitch.execute("on")
+            mySwitch.execute("off")
+            // end::command_traditional[]
+        '''
+        shouldCompile '''
+            // tag::command_closures[]
+            interface Command {
+                void execute()
+            }
+
+            // invoker class
+            class Switch {
+                private final Map<String, Command> commandMap = [:]
+                
+                void register(String commandName, Command command) {
+                    commandMap[commandName] = command
+                }
+                
+                void execute(String commandName) {
+                    Command command = commandMap[commandName]
+                    if (!command) {
+                        throw new IllegalStateException("no command registered for $commandName")
+                    }
+                    command.execute()
+                }
+            }
+
+            // receiver class
+            class Light {
+                void turnOn() {
+                    println 'The light is on'
+                }
+            
+                void turnOff() {
+                    println 'The light is off'
+                }
+            }
+
+            Light lamp = new Light()
+
+            Switch mySwitch = new Switch()
+            mySwitch.register("on", lamp.&turnOn)       // <1>
+            mySwitch.register("off", lamp.&turnOff)     // <1>
+
+            mySwitch.execute("on")
+            mySwitch.execute("off")
+            // end::command_closures[]
+        '''
+        shouldCompile '''
+            // tag::command_lambda[]
+            class Light {
+                void turnOn() {
+                    println 'The light is on'
+                }
+            
+                void turnOff() {
+                    println 'The light is off'
+                }
+            }
+
+            class Door {
+                static void unlock() {
+                    println 'The door is unlocked'
+                }
+            }
+
+            Light lamp = new Light()
+            Map<String, Runnable> mySwitch = [
+                on: lamp::turnOn,
+                off: lamp::turnOff,
+                unlock: Door::unlock
+            ]
+
+            mySwitch.on()
+            mySwitch.off()
+            mySwitch.unlock()
+            // end::command_lambda[]
+            // tag::command_lambda_variant[]
+            // ...
+            List<Runnable> tasks = [lamp::turnOn, lamp::turnOff, Door::unlock]
+            tasks.each{ it.run() }
+            // end::command_lambda_variant[]
+        '''
+    }
+
     void testChainOfResponsibility() {
         shouldCompile '''
             // tag::chain_of_responsibility[]
@@ -343,7 +489,7 @@ class DesignPatternsTest extends CompilableTestSupport {
                 private nextInLine
                 WindowsLister(next) { nextInLine = next }
                 def listFiles(dir) {
-                    if (System.getProperty('os.name') == 'Windows XP') {
+                    if (System.getProperty('os.name').startsWith('Windows')) {
                         println "cmd.exe /c dir $dir".execute().text
                     } else {
                         nextInLine.listFiles(dir)
@@ -361,6 +507,185 @@ class DesignPatternsTest extends CompilableTestSupport {
 
             lister.listFiles('Downloads')
             // end::chain_of_responsibility[]
+        '''
+        shouldCompile '''
+            // tag::chain_of_responsibility_elvis[]
+            String unixListFiles(dir) {
+                if (System.getProperty('os.name') == 'Linux') {
+                    "ls $dir".execute().text
+                }
+            }
+
+            String windowsListFiles(dir) {
+                if (System.getProperty('os.name').startsWith('Windows')) {
+                    "cmd.exe /c dir $dir".execute().text
+                }
+            }
+
+            String defaultListFiles(dir) {
+                new File(dir).listFiles().collect{ f -> f.name }.join('\\n')
+            }
+
+            def dir = 'Downloads'
+            println unixListFiles(dir) ?: windowsListFiles(dir) ?: defaultListFiles(dir)
+            // end::chain_of_responsibility_elvis[]
+        '''
+        shouldCompile '''
+            // tag::chain_of_responsibility_switch[]
+            String listFiles(dir) {
+                switch(dir) {
+                case { System.getProperty('os.name') == 'Linux' }:
+                    return "ls $dir".execute().text
+                case { System.getProperty('os.name').startsWith('Windows') }:
+                    return "cmd.exe /c dir $dir".execute().text
+                default:
+                    new File(dir).listFiles().collect{ f -> f.name }.join('\\n')
+                }
+            }
+
+            println listFiles('Downloads')
+            // end::chain_of_responsibility_switch[]
+        '''
+        shouldCompile '''
+            // tag::chain_of_responsibility_lambda[]
+            Optional<String> unixListFiles(String dir) {
+                Optional.ofNullable(dir)
+                    .filter(d -> System.getProperty('os.name') == 'Linux')
+                    .map(d -> "ls $d".execute().text)
+            }
+
+            Optional<String> windowsListFiles(String dir) {
+                Optional.ofNullable(dir)
+                    .filter(d -> System.getProperty('os.name').startsWith('Windows'))
+                    .map(d -> "cmd.exe /c dir $d".execute().text)
+            }
+
+            Optional<String> defaultListFiles(String dir) {
+                Optional.ofNullable(dir)
+                    .map(d -> new File(d).listFiles().collect{ f -> f.name }.join('\\n'))
+            }
+
+            def dir = 'Downloads'
+            def handlers = [this::unixListFiles, this::windowsListFiles, this::defaultListFiles]
+            println handlers.stream()
+                .map(f -> f(dir))
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .findFirst()
+                .get()
+            // end::chain_of_responsibility_lambda[]
+        '''
+        shouldCompile '''
+            // tag::chain_of_responsibility_shape[]
+            import static Math.PI as π
+            abstract class Shape {
+                String name
+            }
+            class Polygon extends Shape {
+                String name
+                double lengthSide
+                int numSides
+            }
+            class Circle extends Shape {
+                double radius
+            }
+
+            class CircleAreaCalculator {
+                def next
+                def area(shape) {
+                    if (shape instanceof Circle) {            // <1>
+                        return shape.radius ** 2 * π
+                    } else {
+                        next.area(shape)
+                    }
+                }
+            }
+            class SquareAreaCalculator {
+                def next
+                def area(shape) {
+                    if (shape instanceof Polygon && shape.numSides == 4) {      // <1>
+                        return shape.lengthSide ** 2
+                    } else {
+                        next.area(shape)
+                    }
+                }
+            }
+            class DefaultAreaCalculator {
+                def area(shape) {
+                    throw new IllegalArgumentException("Don't know how to calculate area for $shape")
+                }
+            }
+
+            def chain = new CircleAreaCalculator(next: new SquareAreaCalculator(next: new DefaultAreaCalculator()))
+            def shapes = [
+                new Circle(name: 'Circle', radius: 5.0),
+                new Polygon(name: 'Square', lengthSide: 10.0, numSides: 4)
+            ]
+            shapes.each { println chain.area(it) }
+            // end::chain_of_responsibility_shape[]
+        '''
+        shouldCompile '''
+            import static Math.PI as π
+            abstract class Shape {
+            }
+            class Polygon extends Shape {
+                double lengthSide
+                int numSides
+            }
+            class Circle extends Shape {
+                double radius
+            }
+            // tag::chain_of_responsibility_shape_multimethods[]
+            // ...
+            class Square extends Polygon {
+                // ...
+            }
+
+            double area(Circle c) {
+                c.radius ** 2 * π
+            }
+
+            double area(Square s) {
+                s.lengthSide ** 2
+            }
+
+            def shapes = [
+                new Circle(radius: 5.0),
+                new Square(lengthSide: 10.0, numSides: 4)
+            ]
+            shapes.each { println area(it) }
+            // end::chain_of_responsibility_shape_multimethods[]
+        '''
+        shouldCompile '''
+            // tag::chain_of_responsibility_shape_oo[]
+            import static Math.PI as π
+            interface Shape {
+                double area()
+            }
+            abstract class Polygon implements Shape {
+                double lengthSide
+                int numSides
+                abstract double area()
+            }
+            class Circle implements Shape {
+                double radius
+                double area() {
+                    radius ** 2 * π
+                }
+            }
+            class Square extends Polygon {
+                // ...
+                double area() {
+                    lengthSide ** 2
+                }
+            }
+
+            def shapes = [
+                new Circle(radius: 5.0),
+                new Square(lengthSide: 10.0, numSides: 4)
+            ]
+            shapes.each { println it.area() }
+            // end::chain_of_responsibility_shape_oo[]
         '''
     }
 
@@ -484,6 +809,42 @@ class DesignPatternsTest extends CompilableTestSupport {
             // => message: X
             // end::decorator_runtime_behaviour[]
         '''
+        shouldCompile '''
+            // tag::decorating_logger_closure[]
+            class DecoratingLogger {
+                def decoration = Closure.IDENTITY
+
+                def log(String message) {
+                    println decoration(message)
+                }
+            }
+
+            def upper = { it.toUpperCase() }
+            def stamp = { "$Calendar.instance.time: $it" }
+            def logger = new DecoratingLogger(decoration: stamp << upper)
+            logger.log("G'day Mate")
+            // Sat Aug 29 15:28:29 AEST 2020: G'DAY MATE
+            // end::decorating_logger_closure[]
+        '''
+        shouldCompile '''
+            // tag::decorating_logger_lambda[]
+            import java.util.function.Function
+
+            class DecoratingLogger {
+                Function<String, String> decoration = Function.identity()
+
+                def log(String message) {
+                    println decoration.apply(message)
+                }
+            }
+
+            Function<String, String> upper = s -> s.toUpperCase()
+            Function<String, String> stamp = s -> "$Calendar.instance.time: $s"
+            def logger = new DecoratingLogger(decoration: upper.andThen(stamp))
+            logger.log("G'day Mate")
+            // => Sat Aug 29 15:38:28 AEST 2020: G'DAY MATE
+            // end::decorating_logger_lambda[]
+        '''
     }
 
     void testDecoratorCalc() {
@@ -569,6 +930,7 @@ class DesignPatternsTest extends CompilableTestSupport {
 
     void testDecoratorSpring() {
         shouldCompile '''
+            package util // to match bean wiring
             // tag::decorator_spring_calc[]
             interface Calc {
                 def add(a, b)
@@ -582,7 +944,7 @@ class DesignPatternsTest extends CompilableTestSupport {
             // end::decorator_spring_calc_impl[]
 
             // tag::decorator_spring_context[]
-            @Grab('org.springframework:spring-context:3.2.2.RELEASE')
+            @Grab('org.springframework:spring-context:5.2.8.RELEASE')
             import org.springframework.context.support.ClassPathXmlApplicationContext
 
             def ctx = new ClassPathXmlApplicationContext('beans.xml')
@@ -880,6 +1242,116 @@ class DesignPatternsTest extends CompilableTestSupport {
         '''
     }
 
+    void testMonoids() {
+        assertScript '''
+        // tag::monoids_intro[]
+        def nums = [1, 2, 3, 4]
+        
+        def sum = 0    // <1>
+        for (num in nums) { sum += num }    // <2>
+        assert sum == 10
+        
+        def product = 1    // <1>
+        for (num in nums) { product *= num }    // <2>
+        assert product == 24
+        
+        def letters = ['a', 'b', 'c']
+        
+        def concat = ''    // <1>
+        for (letter in letters) { concat += letter }    // <2>
+        assert concat == 'abc'
+        // end::monoids_intro[]
+        // tag::monoids_inject[]
+        assert nums.inject(0){ total, next -> total + next } == 10
+        assert nums.inject(1){ total, next -> total * next } == 24
+        assert letters.inject(''){ total, next -> total + next } == 'abc'
+        // end::monoids_inject[]
+        // tag::monoids_lambdas[]
+        assert nums.stream().reduce(0, (total, next) -> total + next) == 10
+        assert nums.stream().reduce(1, (total, next) -> total * next) == 24
+        assert letters.stream().reduce('', (total, next) -> total + next) == 'abc'
+        // end::monoids_lambdas[]
+        '''
+        assertScript '''
+        import groovyx.gpars.GParsPool
+
+        // tag::monoids_gpars[]
+        def nums = 10..16
+        GParsPool.withPool {
+            assert 91 == nums.injectParallel(0){ total, next -> total + next }
+            assert 91 == nums.parallel.reduce(0, (total, next) -> total + next)
+        }
+        // end::monoids_gpars[]
+        // tag::monoids_average_1to10[]
+        assert (1..10).average() == 5.5
+        // end::monoids_average_1to10[]
+        // tag::monoids_average_0to10[]
+        assert (0..10).average() == 5
+        // end::monoids_average_0to10[]
+        '''
+        assertScript '''
+        // tag::monoids_average_bad[]
+        def avg = { a, b -> (a + b) / 2 }
+        // end::monoids_average_bad[]
+        // tag::monoids_average_assoc[]
+        assert 6 == avg(avg(10, 2), 6)
+        assert 7 == avg(10, avg(2, 6))
+        // end::monoids_average_assoc[]
+        '''
+        assertScript '''
+        // tag::monoids_average_split[]
+        def nums = 1..10
+        def total = nums.sum()
+        def avg = total / nums.size()
+        assert avg == 5.5
+        // end::monoids_average_split[]
+        import static groovyx.gpars.GParsPool.withPool
+        // tag::monoids_average_split_gpars[]
+        withPool {
+            assert 5.5 == nums.sumParallel() / nums.size()
+        }
+        // end::monoids_average_split_gpars[]
+        '''
+        assertScript '''
+        def nums = 1..10
+        // tag::monoids_average_reworked_simple[]
+        def holder = nums
+            .collect{ [it, 1] }
+            .inject{ a, b -> [a[0] + b[0], a[1] + b[1]] }
+        def avg = holder[0] / holder[1]
+        assert avg == 5.5
+        // end::monoids_average_reworked_simple[]
+        '''
+        assertScript '''
+        import static groovyx.gpars.GParsPool.withPool
+        def nums = 1..10
+        // tag::monoids_average_reworked_gpars[]
+        class AverageHolder {
+            int total
+            int count
+            AverageHolder plus(AverageHolder other) {
+                return new AverageHolder(total: total + other.total,
+                                         count: count + other.count)
+            }
+            static final AverageHolder ZERO =
+                new AverageHolder(total: 0, count: 0)
+        }
+
+        def asHolder = {
+            it instanceof Integer ? new AverageHolder(total: it, count : 1) : it
+        }
+        def pairwiseAggregate = { aggregate, next ->
+            asHolder(aggregate) + asHolder(next)
+        }
+        withPool {
+            def holder = nums.injectParallel(AverageHolder.ZERO, pairwiseAggregate)
+            def avg = holder.with{ total / count }
+            assert avg == 5.5
+        }
+        // end::monoids_average_reworked_gpars[]
+        '''
+    }
+
     void testNullObjectSimpleExample() {
         shouldCompile '''
             // tag::null_object_simple_example[]
@@ -994,6 +1466,165 @@ class DesignPatternsTest extends CompilableTestSupport {
             println root.sum()
             println root.product()
             // end::null_object_tree_example2[]
+        '''
+    }
+
+    void testObserverExample() {
+        assertScript '''
+            // tag::observer_classic[]
+            interface Observer {
+                void update(message)
+            }
+
+            class Subject {
+                private List observers = []
+                void register(observer) {
+                    observers << observer
+                }
+                void unregister(observer) {
+                    observers -= observer
+                }
+                void notifyAll(message) {
+                    observers.each{ it.update(message) }
+                }
+            }
+
+            class ConcreteObserver1 implements Observer {
+                def messages = []
+                void update(message) {
+                    messages << message
+                }
+            }
+
+            class ConcreteObserver2 implements Observer {
+                def messages = []
+                void update(message) {
+                    messages << message.toUpperCase()
+                }
+            }
+
+            def o1a = new ConcreteObserver1()
+            def o1b = new ConcreteObserver1()
+            def o2 = new ConcreteObserver2()
+            def observers = [o1a, o1b, o2]
+            new Subject().with {
+                register(o1a)
+                register(o2)
+                notifyAll('one')
+            }
+            new Subject().with {
+                register(o1b)
+                register(o2)
+                notifyAll('two')
+            }
+            def expected = [['one'], ['two'], ['ONE', 'TWO']]
+            assert observers*.messages == expected
+            // end::observer_classic[]
+        '''
+        assertScript '''
+            // tag::observer_closures[]
+            interface Observer {
+                void update(message)
+            }
+
+            class Subject {
+                private List observers = []
+                void register(Observer observer) {
+                    observers << observer
+                }
+                void unregister(observer) {
+                    observers -= observer
+                }
+                void notifyAll(message) {
+                    observers.each{ it.update(message) }
+                }
+            }
+
+            def messages1a = [], messages1b = [], messages2 = []
+            def o2 = { messages2 << it.toUpperCase() }
+            new Subject().with {
+                register{ messages1a << it }
+                register(o2)
+                notifyAll('one')
+            }
+            new Subject().with {
+                register{ messages1b << it }
+                register(o2)
+                notifyAll('two')
+            }
+            def expected = [['one'], ['two'], ['ONE', 'TWO']]
+            assert [messages1a, messages1b, messages2] == expected
+            // end::observer_closures[]
+        '''
+        assertScript '''
+            // tag::observer_lambdas[]
+            import java.util.function.Consumer
+
+            class Subject {
+                private List<Consumer> observers = []
+                void register(Consumer observer) {
+                    observers << observer
+                }
+                void unregister(observer) {
+                    observers -= observer
+                }
+                void notifyAll(message) {
+                    observers.each{ it.accept(message) }
+                }
+            }
+
+            def messages1a = [], messages1b = [], messages2 = []
+            def o2 = { messages2 << it.toUpperCase() }
+            new Subject().with {
+                register(s -> messages1a << s)
+                register(s -> messages2 << s.toUpperCase())
+                notifyAll('one')
+            }
+            new Subject().with {
+                register(s -> messages1b << s)
+                register(s -> messages2 << s.toUpperCase())
+                notifyAll('two')
+            }
+            def expected = [['one'], ['two'], ['ONE', 'TWO']]
+            assert [messages1a, messages1b, messages2] == expected
+            // end::observer_lambdas[]
+        '''
+        assertScript '''
+            // tag::observer_bindable[]
+            import groovy.beans.*
+            import java.beans.*
+
+            class PersonBean {
+                @Bindable String first
+                @Bindable String last
+                @Vetoable Integer age
+            }
+
+            def messages = [:].withDefault{[]}
+            new PersonBean().with {
+                addPropertyChangeListener{ PropertyChangeEvent ev ->
+                    messages[ev.propertyName] << "prop: $ev.newValue"
+                }
+                addVetoableChangeListener{ PropertyChangeEvent ev ->
+                    def name = ev.propertyName
+                    if (name == 'age' && ev.newValue > 40)
+                        throw new PropertyVetoException()
+                    messages[name] << "veto: $ev.newValue"
+                }
+                first = 'John'
+                age = 35
+                last = 'Smith'
+                first = 'Jane'
+                age = 42
+            }
+
+            def expected = [
+                first:['prop: John', 'prop: Jane'],
+                age:['veto: 35'],
+                last:['prop: Smith']
+            ]
+            assert messages == expected
+            // end::observer_bindable[]
         '''
     }
 
@@ -1211,7 +1842,7 @@ class DesignPatternsTest extends CompilableTestSupport {
     void testSingletonSpring() {
         shouldCompile '''
             // tag::singleton_spring[]
-            @Grapes([@Grab('org.springframework:spring-core:3.2.2.RELEASE'), @Grab('org.springframework:spring-beans:3.2.2.RELEASE')])
+            @Grapes([@Grab('org.springframework:spring-core:5.2.8.RELEASE'), @Grab('org.springframework:spring-beans:5.2.8.RELEASE')])
             import org.springframework.beans.factory.support.*
 
             interface Calculator {
@@ -1604,7 +2235,7 @@ class DesignPatternsTest extends CompilableTestSupport {
     }
 
     void testStrategyTraditional() {
-        shouldCompile '''
+        assertScript '''
             // tag::strategy_traditional[]
             interface Calc {
                 def execute(n, m)
@@ -1645,7 +2276,7 @@ class DesignPatternsTest extends CompilableTestSupport {
     }
 
     void testStrategyGroovyWay() {
-        shouldCompile '''
+        assertScript '''
             // tag::strategy_groovy_way[]
             def multiplicationStrategies = [
                 { n, m -> n * m },
@@ -1666,8 +2297,58 @@ class DesignPatternsTest extends CompilableTestSupport {
         '''
     }
 
+    void testStrategyLambdaWithSAMInterface() {
+        assertScript '''
+            // tag::strategy_lambdas_with_explicit_interface[]
+            interface Calc {
+                def execute(n, m)
+            }
+
+            List<Calc> multiplicationStrategies = [
+                (n, m) -> n * m,
+                (n, m) -> { def result = 0; n.times{ result += m }; result }
+            ]
+
+            def sampleData = [
+                [3, 4, 12],
+                [5, -5, -25]
+            ]
+
+            sampleData.each{ data ->
+                multiplicationStrategies.each { calc ->
+                    assert data[2] == calc(data[0], data[1])
+                }
+            }
+            // end::strategy_lambdas_with_explicit_interface[]
+        '''
+    }
+
+    void testStrategyLambdaBiFunction() {
+        assertScript '''
+            // tag::strategy_lambdas_using_bifunction[]
+            import java.util.function.BiFunction
+
+            List<BiFunction<Integer, Integer, Integer>> multiplicationStrategies = [
+                (n, m) -> n * m,
+                (n, m) -> { def result = 0; n.times{ result += m }; result }
+            ]
+
+            def sampleData = [
+                [3, 4, 12],
+                [5, -5, -25]
+            ]
+
+            sampleData.each{ data ->
+                multiplicationStrategies.each { calc ->
+                    assert data[2] == calc(data[0], data[1])
+                }
+            }
+            // end::strategy_lambdas_using_bifunction[]
+        '''
+    }
+
     void testTemplateMethod() {
-        shouldCompile '''
+        assertScript '''
             // tag::template_method_example[]
             abstract class Accumulator {
                 protected initial
@@ -1689,51 +2370,61 @@ class DesignPatternsTest extends CompilableTestSupport {
                 def doAccumulate(total, v) { total * v }
             }
 
-            println new Sum().accumulate([1,2,3,4])
-            println new Product().accumulate([1,2,3,4])
+            assert 10 == new Sum().accumulate([1,2,3,4])
+            assert 24 == new Product().accumulate([1,2,3,4])
             // end::template_method_example[]
         '''
     }
 
     void testTemplateMethod2() {
-        shouldCompile '''
+        assertScript '''
             // tag::template_method_example2[]
             Closure addAll = { total, item -> total += item }
             def accumulated = [1, 2, 3, 4].inject(0, addAll)
-            println accumulated    // => 10
+            assert accumulated == 10
             // end::template_method_example2[]
 
             // tag::template_method_example3[]
             accumulated = [ "1", "2", "3", "4" ].inject("", addAll)
-            println accumulated    // => "1234"
+            assert accumulated == "1234"
             // end::template_method_example3[]
 
             // tag::template_method_example4[]
-            Closure multAll = { total, item -> total *= item }
-            accumulated = [1, 2, 3, 4].inject(1, multAll)
-            println accumulated    // => 24
+            assert 24 == [1, 2, 3, 4].inject(1) { total, item -> total *= item }
             // end::template_method_example4[]
         '''
     }
 
+    void testTemplateMethod3() {
+        assertScript '''
+            // tag::template_method_example5[]
+            assert 10 == [1, 2, 3, 4].stream().reduce(0, (l, r) -> l + r)
+            assert 24 == [1, 2, 3, 4].stream().reduce(1, (l, r) -> l * r)
+            assert '1234' == ['1', '2', '3', '4'].stream().reduce('', (l, r) -> l + r)
+            // end::template_method_example5[]
+        '''
+    }
+
     void testVisitorSimpleExample() {
-        shouldCompile '''
+        assertScript '''
+            import groovy.transform.ToString
             // tag::visitor_simple_example[]
             abstract class Shape { }
 
+            @ToString(includeNames=true)
             class Rectangle extends Shape {
-                def x, y, width, height
+                def x, y, w, h
 
-                Rectangle(x, y, width, height) {
-                    this.x = x; this.y = y; this.width = width; this.height = height
+                Rectangle(x, y, w, h) {
+                    this.x = x; this.y = y; this.w = w; this.h = h
                 }
 
                 def union(rect) {
                     if (!rect) return this
                     def minx = [rect.x, x].min()
-                    def maxx = [rect.x + width, x + width].max()
+                    def maxx = [rect.x + rect.w, x + w].max()
                     def miny = [rect.y, y].min()
-                    def maxy = [rect.y + height, y + height].max()
+                    def maxy = [rect.y + rect.h, y + h].max()
                     new Rectangle(minx, miny, maxx - minx, maxy - miny)
                 }
 
@@ -1774,7 +2465,10 @@ class DesignPatternsTest extends CompilableTestSupport {
                 }
 
                 def visit_line(line) {
-                    def line_bounds = new Rectangle(line.x1, line.y1, line.x2-line.y1, line.x2-line.y2)
+                    def line_bounds = new Rectangle([line.x1, line.x2].min(),
+                                                    [line.y1, line.y2].min(),
+                                                    line.x2 - line.y1,
+                                                    line.x2 - line.y2)
                     if (bounds)
                         bounds = bounds.union(line_bounds)
                     else
@@ -1793,27 +2487,29 @@ class DesignPatternsTest extends CompilableTestSupport {
             def visitor = new BoundingRectangleVisitor()
             group.accept(visitor)
             bounding_box = visitor.bounds
-            println bounding_box.dump()
+            assert bounding_box.toString() == 'Rectangle(x:60, y:5, w:50, h:70)'
             // end::visitor_simple_example[]
         '''
     }
 
     void testVisitorSimpleExample2() {
-        shouldCompile '''
+        assertScript '''
+            import groovy.transform.ToString
             // tag::visitor_simple_example2[]
             abstract class Shape {
                 def accept(Closure yield) { yield(this) }
             }
 
+            @ToString(includeNames=true)
             class Rectangle extends Shape {
                 def x, y, w, h
                 def bounds() { this }
                 def union(rect) {
                     if (!rect) return this
                     def minx = [ rect.x, x ].min()
-                    def maxx = [ rect.x + w, x + w ].max()
+                    def maxx = [ rect.x + rect.w, x + w ].max()
                     def miny = [ rect.y, y ].min()
-                    def maxy = [ rect.y + h, y + h ].max()
+                    def maxy = [ rect.y + rect.h, y + h ].max()
                     new Rectangle(x:minx, y:miny, w:maxx - minx, h:maxy - miny)
                 }
             }
@@ -1821,7 +2517,8 @@ class DesignPatternsTest extends CompilableTestSupport {
             class Line extends Shape {
                 def x1, y1, x2, y2
                 def bounds() {
-                    new Rectangle(x:[x1, x2].min(), y:[y1, y2].min(), w:(x2 - x1).abs(), h:(y2 - y1).abs())
+                    new Rectangle(x:[x1, x2].min(), y:[y1, y2].min(),
+                                  w:(x2 - x1).abs(), h:(y2 - y1).abs())
                 }
             }
 
@@ -1837,13 +2534,70 @@ class DesignPatternsTest extends CompilableTestSupport {
             group << new Line(x1:90, y1:30, x2:60, y2:5)
             def bounds
             group.accept{ bounds = it.bounds().union(bounds) }
-            println bounds.dump()
+            assert bounds.toString() == 'Rectangle(x:60, y:5, w:50, h:70)'
             // end::visitor_simple_example2[]
         '''
     }
 
+    void testVisitorSimpleExample3() {
+        assertScript '''
+            import groovy.transform.ToString
+            import java.util.function.Function
+            // tag::visitor_simple_example3[]
+            abstract class Shape {
+                def accept(Function<Shape, Shape> yield) { yield.apply(this) }
+            }
+
+            @ToString(includeNames=true)
+            class Rectangle extends Shape {
+            // end::visitor_simple_example3[]
+                def x, y, w, h
+                def bounds() { this }
+                def union(rect) {
+                    if (!rect) return this
+                    def minx = [ rect.x, x ].min()
+                    def maxx = [ rect.x + rect.w, x + w ].max()
+                    def miny = [ rect.y, y ].min()
+                    def maxy = [ rect.y + rect.h, y + h ].max()
+                    new Rectangle(x:minx, y:miny, w:maxx - minx, h:maxy - miny)
+                }
+            // tag::visitor_simple_example3[]
+                /* ... same as with Closures ... */
+            }
+
+            class Line extends Shape {
+            // end::visitor_simple_example3[]
+                def x1, y1, x2, y2
+                def bounds() {
+                    new Rectangle(x:[x1, x2].min(), y:[y1, y2].min(),
+                                  w:(x2 - x1).abs(), h:(y2 - y1).abs())
+                }
+                /*
+            // tag::visitor_simple_example3[]
+                /* ... same as with Closures ... */
+            }
+
+            class Group {
+                def shapes = []
+                def leftShift(shape) { shapes += shape }
+                def accept(Function<Shape, Shape> yield) {
+                    shapes.stream().forEach(s -> s.accept(yield))
+                }
+            }
+
+            def group = new Group()
+            group << new Rectangle(x:100, y:40, w:10, h:5)
+            group << new Rectangle(x:100, y:70, w:10, h:5)
+            group << new Line(x1:90, y1:30, x2:60, y2:5)
+            def bounds
+            group.accept(s -> { bounds = s.bounds().union(bounds) })
+            assert bounds.toString() == 'Rectangle(x:60, y:5, w:50, h:70)'
+            // end::visitor_simple_example3[]
+        '''
+    }
+
     void testVisitorAdvancedExample() {
-        shouldCompile '''
+        assertScript '''
             // tag::visitor_advanced_example[]
             interface Visitor {
                 void visit(NodeType1 n1)
@@ -1885,15 +2639,17 @@ class DesignPatternsTest extends CompilableTestSupport {
 
             // tag::visitor_advanced_example2[]
             NodeType1 root = new NodeType1()
-            root.children = new Visitable[2]
-            root.children[0] = new NodeType1()
-            root.children[1] = new NodeType2()
+            root.children = new Visitable[]{new NodeType1(), new NodeType2()}
+
+            def counter = new NodeType1Counter()
+            root.accept(counter)
+            assert counter.count == 2
             // end::visitor_advanced_example2[]
         '''
     }
 
     void testVisitorAdvancedExample3() {
-        shouldCompile '''
+        assertScript '''
             // tag::visitor_advanced_example3[]
             interface Visitor {
                 void visit(NodeType1 n1)
@@ -1939,11 +2695,17 @@ class DesignPatternsTest extends CompilableTestSupport {
                 }
             }
             // end::visitor_advanced_example3[]
+            NodeType1 root = new NodeType1()
+            root.children = new Visitable[]{new NodeType1(), new NodeType2()}
+
+            def counter = new NodeType1Counter()
+            root.accept(counter)
+            assert counter.count == 2
         '''
     }
 
     void testVisitorAdvancedExample4() {
-        shouldCompile '''
+        assertScript '''
             // tag::visitor_advanced_example4[]
             class DefaultVisitor {
                 void visit(NodeType1 n1) {
@@ -1973,17 +2735,23 @@ class DesignPatternsTest extends CompilableTestSupport {
                 }
             }
             // end::visitor_advanced_example4[]
-        '''
+            NodeType1 root = new NodeType1()
+            root.children = new Visitable[]{new NodeType1(), new NodeType2()}
+
+            def counter = new NodeType1Counter()
+            counter.visit(root)
+            assert counter.count == 2
+      '''
     }
 
     void testVisitorAdvancedExample5() {
-        shouldCompile '''
+        assertScript '''
             // tag::visitor_advanced_example5[]
             class DefaultVisitor {
                 void visit(Visitable v) {
-                    doIteraton(v)
+                    doIteration(v)
                 }
-                void doIteraton(Visitable v) {
+                void doIteration(Visitable v) {
                     v.children.each {
                         visit(it)
                     }
@@ -2010,6 +2778,12 @@ class DesignPatternsTest extends CompilableTestSupport {
                 }
             }
             // end::visitor_advanced_example5[]
+            NodeType1 root = new NodeType1()
+            root.children = new Visitable[]{new NodeType1(), new NodeType2()}
+
+            def counter = new NodeType1Counter()
+            counter.visit(root)
+            assert counter.count == 2
         '''
     }
 }

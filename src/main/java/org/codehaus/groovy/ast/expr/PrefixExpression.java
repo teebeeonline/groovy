@@ -35,14 +35,17 @@ public class PrefixExpression extends Expression {
         this.expression = expression;
     }
 
+    @Override
     public String toString() {
         return super.toString() + "[" + operation + expression + "]";
     }
 
+    @Override
     public void visit(GroovyCodeVisitor visitor) {
         visitor.visitPrefixExpression(this);
     }
 
+    @Override
     public Expression transformExpression(ExpressionTransformer transformer) {
         Expression ret = new PrefixExpression(operation, transformer.transform(expression)); 
         ret.setSourcePosition(this);
@@ -62,10 +65,12 @@ public class PrefixExpression extends Expression {
         return expression;
     }
 
+    @Override
     public String getText() {
         return "(" + operation.getText() + expression.getText() + ")";
     }
 
+    @Override
     public ClassNode getType() {
         return expression.getType();
     }

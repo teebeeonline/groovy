@@ -25,6 +25,7 @@ import groovy.lang.GroovySystem;
 import groovy.lang.MetaClass;
 import groovy.lang.MetaClassRegistry;
 import groovy.lang.MetaMethod;
+import org.apache.groovy.util.concurrent.ManagedIdentityConcurrentMap;
 import org.codehaus.groovy.reflection.GroovyClassValue.ComputeValue;
 import org.codehaus.groovy.reflection.stdclasses.ArrayCachedClass;
 import org.codehaus.groovy.reflection.stdclasses.BigDecimalCachedClass;
@@ -46,7 +47,6 @@ import org.codehaus.groovy.util.Finalizable;
 import org.codehaus.groovy.util.LazyReference;
 import org.codehaus.groovy.util.LockableObject;
 import org.codehaus.groovy.util.ManagedConcurrentLinkedQueue;
-import org.codehaus.groovy.util.ManagedConcurrentMap;
 import org.codehaus.groovy.util.ManagedReference;
 import org.codehaus.groovy.util.ReferenceBundle;
 import org.codehaus.groovy.vmplugin.VMPluginFactory;
@@ -82,7 +82,7 @@ public class ClassInfo implements Finalizable {
     private ManagedReference<MetaClass> weakMetaClass;
     MetaMethod[] dgmMetaMethods = MetaMethod.EMPTY_ARRAY;
     MetaMethod[] newMetaMethods = MetaMethod.EMPTY_ARRAY;
-    private ManagedConcurrentMap<Object, MetaClass> perInstanceMetaClassMap;
+    private ManagedIdentityConcurrentMap<Object, MetaClass> perInstanceMetaClassMap;
 
     private static final ReferenceBundle softBundle = ReferenceBundle.getSoftBundle();
     private static final ReferenceBundle weakBundle = ReferenceBundle.getWeakBundle();
@@ -409,7 +409,7 @@ public class ClassInfo implements Finalizable {
 
         if (metaClass != null) {
             if (perInstanceMetaClassMap == null)
-              perInstanceMetaClassMap = new ManagedConcurrentMap<Object, MetaClass>(ReferenceBundle.getWeakBundle());
+              perInstanceMetaClassMap = new ManagedIdentityConcurrentMap<>();
 
             perInstanceMetaClassMap.put(obj, metaClass);
         }
@@ -433,6 +433,7 @@ public class ClassInfo implements Finalizable {
             this.info = info;
         }
 
+        @Override
         public CachedClass initValue() {
             return createCachedClass(info.classRef.get(), info);
         }
@@ -447,6 +448,7 @@ public class ClassInfo implements Finalizable {
             this.info = info;
         }
 
+        @Override
         public ClassLoaderForClassArtifacts initValue() {
             return AccessController.doPrivileged((PrivilegedAction<ClassLoaderForClassArtifacts>) () -> new ClassLoaderForClassArtifacts(info.classRef.get()));
         }

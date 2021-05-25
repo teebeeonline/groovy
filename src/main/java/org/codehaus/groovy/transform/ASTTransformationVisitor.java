@@ -28,6 +28,7 @@ import org.codehaus.groovy.ast.AnnotationNode;
 import org.codehaus.groovy.ast.ClassCodeVisitorSupport;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.GroovyClassVisitor;
+import org.codehaus.groovy.ast.PropertyNode;
 import org.codehaus.groovy.ast.expr.Expression;
 import org.codehaus.groovy.classgen.GeneratorContext;
 import org.codehaus.groovy.control.ASTTransformationsContext;
@@ -88,6 +89,7 @@ public final class ASTTransformationVisitor extends ClassCodeVisitorSupport {
         this.context = context;
     }
 
+    @Override
     protected SourceUnit getSourceUnit() {
         return source;
     }
@@ -103,6 +105,7 @@ public final class ASTTransformationVisitor extends ClassCodeVisitorSupport {
      *
      * @param classNode the class to visit
      */
+    @Override
     public void visitClass(ClassNode classNode) {
         // only descend if we have annotations to look for
         Map<Class<? extends ASTTransformation>, Set<ASTNode>> baseTransforms = classNode.getTransforms(phase);
@@ -151,6 +154,7 @@ public final class ASTTransformationVisitor extends ClassCodeVisitorSupport {
      *
      * @param node the node to be processed
      */
+    @Override
     public void visitAnnotations(final AnnotatedNode node) {
         super.visitAnnotations(node);
         for (AnnotationNode annotation : distinctAnnotations(node)) {
@@ -196,6 +200,10 @@ public final class ASTTransformationVisitor extends ClassCodeVisitorSupport {
         return result;
     }
 
+    @Override
+    public void visitProperty(PropertyNode node) {
+        // ignore: we'll already have allocated to field or accessor method by now
+    }
 
     public static void addPhaseOperations(final CompilationUnit compilationUnit) {
         ASTTransformationsContext context = compilationUnit.getASTTransformationsContext();
@@ -205,6 +213,7 @@ public final class ASTTransformationVisitor extends ClassCodeVisitorSupport {
             GroovyClassVisitor visitor = new ASTTransformationCollectorCodeVisitor(source, compilationUnit.getTransformLoader());
             visitor.visitClass(classNode);
         }, Phases.SEMANTIC_ANALYSIS);
+
         for (CompilePhase phase : CompilePhase.values()) {
             switch (phase) {
                 case INITIALIZATION:
@@ -223,6 +232,29 @@ public final class ASTTransformationVisitor extends ClassCodeVisitorSupport {
 
             }
         }
+    }
+
+    /**
+     * Enables transforms for class that was added during current phase.
+     */
+    public static void addNewPhaseOperation(final CompilationUnit compilationUnit, final SourceUnit sourceUnit, final ClassNode classNode) {
+        int phase = compilationUnit.getPhase();
+        if (phase < Phases.SEMANTIC_ANALYSIS) {
+            return;
+        }
+
+        {
+            GroovyClassVisitor visitor = new ASTTransformationCollectorCodeVisitor(sourceUnit, compilationUnit.getTransformLoader());
+            visitor.visitClass(classNode);
+        }
+
+        compilationUnit.addNewPhaseOperation(source -> {
+            if (source == sourceUnit) {
+                ASTTransformationVisitor visitor = new ASTTransformationVisitor(CompilePhase.fromPhaseNumber(phase), compilationUnit.getASTTransformationsContext());
+                visitor.source = source;
+                visitor.visitClass(classNode);
+            }
+        }, phase);
     }
 
     public static void addGlobalTransformsAfterGrab(ASTTransformationsContext context) {

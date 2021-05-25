@@ -18,6 +18,7 @@
  */
 package groovy.transform.stc
 
+import groovy.test.NotYetImplemented
 import groovy.transform.CompileStatic
 import org.junit.Test
 
@@ -41,7 +42,7 @@ final class LambdaTest {
                 }
 
                 public static void p() {
-                    assert [2, 3, 4] == [1, 2, 3].stream().map(e -> e.plus 1).collect(Collectors.toList());
+                    assert [2, 3, 4] == [1, 2, 3].stream().map(e -> e.plus(1)).collect(Collectors.toList());
                 }
             }
         '''
@@ -61,7 +62,7 @@ final class LambdaTest {
 
                 @CompileStatic
                 public static void p() {
-                    assert [2, 3, 4] == [1, 2, 3].stream().map(e -> e.plus 1).collect(Collectors.toList());
+                    assert [2, 3, 4] == [1, 2, 3].stream().map(e -> e.plus(1)).collect(Collectors.toList());
                 }
             }
         '''
@@ -92,7 +93,7 @@ final class LambdaTest {
 
             @CompileStatic
             void p() {
-                assert [2, 3, 4] == [1, 2, 3].stream().map(e -> e.plus 1).collect(Collectors.toList());
+                assert [2, 3, 4] == [1, 2, 3].stream().map(e -> e.plus(1)).collect(Collectors.toList());
             }
 
             p()
@@ -161,36 +162,16 @@ final class LambdaTest {
         '''
     }
 
-    @Test
-    void testConsumer() {
+    @Test @NotYetImplemented
+    void testBiFunctionAndBinaryOperatorWithSharedTypeParameter() {
         assertScript '''
             @groovy.transform.CompileStatic
-            class Test1 {
-                static main(args) {
-                    p()
-                }
-
-                static void p() {
-                    [1, 2, 3].stream().forEach(e -> { System.out.println(e + 1); })
-                }
+            void test() {
+                String string = java.util.stream.IntStream.range(0, 10)
+                    .boxed().reduce('', (s, i) -> s + '-', String::concat)
+                assert string == '----------'
             }
-        '''
-    }
-
-    @Test // GROOVY-9340
-    void testConsumerWithSelfType() {
-        assertScript '''
-            @groovy.transform.CompileStatic
-            class Test1 {
-                static main(args) {
-                    p()
-                }
-
-                static void p() {
-                    java.util.function.Consumer<Test1> c = t -> null
-                    c.accept(this.newInstance())
-                }
-            }
+            test()
         '''
     }
 
@@ -294,6 +275,58 @@ final class LambdaTest {
     }
 
     @Test
+    void testComparator1() {
+        assertScript '''
+            @groovy.transform.CompileStatic class T {
+                Comparator<Integer> c = (Integer a, Integer b) -> Integer.compare(a, b)
+            }
+            def t = new T()
+            assert t.c.compare(0,0) == 0
+        '''
+
+        def err = shouldFail '''
+            @groovy.transform.CompileStatic class T {
+                Comparator<Integer> c = (int a, int b) -> Integer.compare(a, b)
+            }
+        '''
+        assert err =~ /Cannot assign java.util.Comparator<int> to: java.util.Comparator<java.lang.Integer>/
+    }
+
+    @Test // GROOVY-9977
+    void testComparator2() {
+        assertScript '''
+            @groovy.transform.CompileStatic
+            class T {
+                Comparator<Integer> c = (a, b) -> Integer.compare(a, b)
+
+                static void m1() {
+                    Comparator<Integer> x = (a, b) -> Integer.compare(a, b)
+                }
+                void m2() {
+                    Comparator<Integer> y = (a, b) -> Integer.compare(a, b)
+                }
+            }
+            def t = new T()
+            assert t.c.compare(0,0) == 0
+        '''
+    }
+
+    @Test // GROOVY-9997
+    void testComparator3() {
+        assertScript '''
+            @groovy.transform.TypeChecked
+            void test() {
+                def cast = (Comparator<Integer>) (a, b) -> Integer.compare(a, b)
+                assert cast.compare(0,0) == 0
+
+                def coerce = ((a, b) -> Integer.compare(a, b)) as Comparator<Integer>
+                assert coerce.compare(0,0) == 0
+            }
+            test()
+        '''
+    }
+
+    @Test
     void testFunctionWithLocalVariables() {
         assertScript '''
             import groovy.transform.CompileStatic
@@ -336,6 +369,7 @@ final class LambdaTest {
         '''
     }
 
+    @Test
     void testFunctionWithLocalVariables4() {
         assertScript '''
             import groovy.transform.CompileStatic
@@ -755,6 +789,58 @@ final class LambdaTest {
         '''
     }
 
+    @Test // GROOVY-9340
+    void testConsumer8() {
+        assertScript '''
+            @groovy.transform.CompileStatic
+            class Test1 {
+                static main(args) {
+                    p()
+                }
+
+                static void p() {
+                    java.util.function.Consumer<Test1> c = t -> null
+                    c.accept(this.newInstance())
+                }
+            }
+        '''
+    }
+
+    @Test
+    void testConsumer9() {
+        assertScript '''
+            @groovy.transform.CompileStatic
+            class Test1 {
+                static main(args) {
+                    p()
+                }
+
+                static void p() {
+                    [1, 2, 3].stream().forEach(e -> { System.out.println(e + 1); })
+                }
+            }
+        '''
+    }
+
+    @Test // GROOVY-10056
+    void testConsumer10() {
+        ['CompileStatic', 'TypeChecked'].each { xform ->
+            assertScript """
+                @groovy.transform.${xform}
+                void test() {
+                    String[][] arrayArray = new String[][] {
+                        new String[] {'a','b','c'},
+                        new String[] {'d','e','f'}
+                    }
+                    Arrays.stream(arrayArray).limit(1).forEach(array -> {
+                        assert Arrays.asList(array) == ['a','b','c']
+                    })
+                }
+                test()
+            """
+        }
+    }
+
     @Test
     void testFunctionalInterface1() {
         assertScript '''
@@ -830,6 +916,36 @@ final class LambdaTest {
             abstract class SamCallable {
                 abstract int call(int p);
             }
+        '''
+    }
+
+    @Test // GROOVY-9881
+    void testFunctionalInterface4() {
+        assertScript '''
+            import java.util.function.*
+
+            class Value<V> {
+                final V val
+                Value(V v) {
+                    this.val = v
+                }
+                String toString() {
+                    val as String
+                }
+                def <T> Value<T> replace(Supplier<T> supplier) {
+                    new Value<>(supplier.get())
+                }
+                def <T> Value<T> replace(Function<? super V, ? extends T> function) {
+                    new Value(function.apply(val))
+                }
+            }
+
+            @groovy.transform.CompileStatic
+            void test() {
+                assert new Value(123).replace(() -> 'foo').toString() == 'foo'
+                assert new Value(123).replace((Integer v) -> 'bar').toString() == 'bar'
+            }
+            test()
         '''
     }
 
@@ -921,7 +1037,7 @@ final class LambdaTest {
                     Function<Integer, String> f = (Integer e) -> 'a' + e
                     assert ['a1', 'a2', 'a3'] == [1, 2, 3].stream().map(f).collect(Collectors.toList())
 
-                    assert [2, 3, 4] == [1, 2, 3].stream().map(e -> e.plus 1).collect(Collectors.toList());
+                    assert [2, 3, 4] == [1, 2, 3].stream().map(e -> e.plus(1)).collect(Collectors.toList());
                 }
             }
         '''
@@ -1016,7 +1132,7 @@ final class LambdaTest {
             @groovy.transform.CompileStatic
             void p() {
                 assert ['1', '2', '3'] == [1, 2, 3].stream().map(Object::toString).collect(Collectors.toList())
-                assert [2, 3, 4] == [1, 2, 3].stream().map(e -> e.plus 1).collect(Collectors.toList())
+                assert [2, 3, 4] == [1, 2, 3].stream().map(e -> e.plus(1)).collect(Collectors.toList())
                 assert ['1', '2', '3'] == [1, 2, 3].stream().map(Object::toString).collect(Collectors.toList())
             }
 
@@ -1809,6 +1925,17 @@ final class LambdaTest {
             new ByteArrayInputStream(serializedLambdaBytes3).withObjectInputStream(Test1.class.classLoader) {
                 SerializableFunction<Integer, String> f = (SerializableFunction<Integer, String>) it.readObject()
                 assert 'cn1' == f.apply(1)
+            }
+        '''
+    }
+
+    @Test // GROOVY-9146
+    void testScriptWithExistingMainCS() {
+        assertScript '''
+            @groovy.transform.CompileStatic
+            static void main(args) {
+                java.util.function.Function<String, String> lower = String::toLowerCase
+                assert lower.toString().contains('$$Lambda$')
             }
         '''
     }

@@ -76,6 +76,8 @@ import static org.codehaus.groovy.ast.tools.GeneralUtils.returnS;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.stmt;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.varX;
 import static org.codehaus.groovy.ast.tools.GenericsUtils.correctToGenericsSpecRecurse;
+import static org.codehaus.groovy.ast.ClassHelper.isClassType;
+import static org.codehaus.groovy.ast.ClassHelper.isObjectType;
 
 /**
  * This class contains a static utility method {@link #doExtendTraits(org.codehaus.groovy.ast.ClassNode, org.codehaus.groovy.control.SourceUnit, org.codehaus.groovy.control.CompilationUnit)}
@@ -118,7 +120,7 @@ public abstract class TraitComposer {
 
     private static void checkTraitAllowed(final ClassNode bottomTrait, final SourceUnit unit) {
         ClassNode superClass = bottomTrait.getSuperClass();
-        if (superClass==null || ClassHelper.OBJECT_TYPE.equals(superClass)) return;
+        if (superClass==null || isObjectType(superClass)) return;
         if (!Traits.isTrait(superClass)) {
             unit.addError(new SyntaxException("A trait can only inherit from another trait", superClass.getLineNumber(), superClass.getColumnNumber()));
         }
@@ -141,9 +143,11 @@ public abstract class TraitComposer {
                 Parameter[] origParams = new Parameter[nParams - 1];
                 Parameter[] params = new Parameter[nParams - 1];
                 System.arraycopy(methodNode.getParameters(), 1, params, 0, params.length);
+
                 MethodNode originalMethod = trait.getMethod(name, params);
-                Map<String, ClassNode> methodGenericsSpec = Optional.ofNullable(originalMethod)
-                    .map(m -> GenericsUtils.addMethodGenerics(m, genericsSpec)).orElse(genericsSpec);
+                Map<String, ClassNode> methodGenericsSpec = GenericsUtils.addMethodGenerics(
+                        Optional.ofNullable(originalMethod).orElse(methodNode), genericsSpec);
+
                 for (int i = 1; i < nParams; i += 1) {
                     Parameter parameter = helperMethodParams[i];
                     ClassNode originType = parameter.getOriginType();
@@ -329,15 +333,13 @@ public abstract class TraitComposer {
         );
         mce.setImplicitThis(false);
 
-        genericsSpec = GenericsUtils.addMethodGenerics(helperMethod, genericsSpec);
-
         ClassNode[] exceptionNodes = correctToGenericsSpecRecurse(genericsSpec, copyExceptions(helperMethod.getExceptions()));
         ClassNode fixedReturnType = correctToGenericsSpecRecurse(genericsSpec, helperMethod.getReturnType());
         boolean noCastRequired = genericsSpec.isEmpty() || fixedReturnType.getName().equals(ClassHelper.VOID_TYPE.getName());
         Expression forwardExpression = noCastRequired ? mce : new CastExpression(fixedReturnType,mce);
         // we could rely on the first parameter name ($static$self) but that information is not
         // guaranteed to be always present
-        boolean isHelperForStaticMethod = helperMethodParams[0].getOriginType().equals(ClassHelper.CLASS_Type);
+        boolean isHelperForStaticMethod = isClassType(helperMethodParams[0].getOriginType());
         if (helperMethod.isPrivate() && !isHelperForStaticMethod) {
             // GROOVY-7213: do not create forwarder for private methods
             return;
@@ -517,7 +519,7 @@ public abstract class TraitComposer {
         superCall.setImplicitThis(false);
         CastExpression proxyReceiver = new CastExpression(Traits.GENERATED_PROXY_CLASSNODE, new VariableExpression("this"));
         MethodCallExpression getProxy = new MethodCallExpression(proxyReceiver, "getProxyTarget", ArgumentListExpression.EMPTY_ARGUMENTS);
-        getProxy.setImplicitThis(true);
+        getProxy.setImplicitThis(false);
         StaticMethodCallExpression proxyCall = new StaticMethodCallExpression(
                 ClassHelper.make(InvokerHelper.class),
                 "invokeMethod",
@@ -546,7 +548,7 @@ public abstract class TraitComposer {
                 args
         );
         Statement result;
-        if (ClassHelper.VOID_TYPE.equals(forwarderMethod.getReturnType())) {
+        if (ClassHelper.isPrimitiveVoid(forwarderMethod.getReturnType())) {
             BlockStatement stmt = new BlockStatement();
             stmt.addStatement(new ExpressionStatement(delegateCall));
             stmt.addStatement(new ReturnStatement(new ConstantExpression(null)));

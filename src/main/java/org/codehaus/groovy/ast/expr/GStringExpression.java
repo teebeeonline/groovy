@@ -48,10 +48,12 @@ public class GStringExpression extends Expression {
         super.setType(ClassHelper.GSTRING_TYPE);
     }
 
+    @Override
     public void visit(GroovyCodeVisitor visitor) {
         visitor.visitGStringExpression(this);
     }
 
+    @Override
     public Expression transformExpression(ExpressionTransformer transformer) {
         Expression ret = new GStringExpression(
                 verbatimText,
@@ -62,10 +64,12 @@ public class GStringExpression extends Expression {
         return ret;        
     }
 
+    @Override
     public String toString() {
         return super.toString() + "[strings: " + strings + " values: " + values + "]";
     }
 
+    @Override
     public String getText() {
         return verbatimText;
     }

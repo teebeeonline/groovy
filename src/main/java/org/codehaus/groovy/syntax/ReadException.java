@@ -43,6 +43,7 @@ public class ReadException extends GroovyException {
         return this.cause;
     }
 
+    @Override
     public String toString() {
         String message = super.getMessage();
         if (message == null || message.trim().isEmpty()) {
@@ -52,6 +53,7 @@ public class ReadException extends GroovyException {
         return message;
     }
 
+    @Override
     public String getMessage() {
         return toString();
     }

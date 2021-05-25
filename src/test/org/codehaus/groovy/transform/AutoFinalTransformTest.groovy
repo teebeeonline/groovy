@@ -28,12 +28,10 @@ class AutoFinalTransformTest extends CompilableTestSupport {
     void testAutoFinalOnClass() {
         // use ASTTest here since final modifier isn't put into bytecode so not available via reflection
         assertScript '''
-            import groovy.transform.AutoFinal
-            import groovy.transform.ASTTest
-            import static org.codehaus.groovy.control.CompilePhase.SEMANTIC_ANALYSIS
+            import groovy.transform.*
             import static java.lang.reflect.Modifier.isFinal
 
-            @ASTTest(phase=SEMANTIC_ANALYSIS, value = {
+            @ASTTest(phase=SEMANTIC_ANALYSIS, value={
                 assert node.methods.size() == 1
                 node.methods[0].with {
                     assert it.name == 'fullName'
@@ -65,12 +63,10 @@ class AutoFinalTransformTest extends CompilableTestSupport {
     void testAutoFinalOnClassButDisabledOnMethod() {
         // use ASTTest here since final modifier isn't put into bytecode so not available via reflection
         assertScript '''
-            import groovy.transform.AutoFinal
-            import groovy.transform.ASTTest
-            import static org.codehaus.groovy.control.CompilePhase.SEMANTIC_ANALYSIS
+            import groovy.transform.*
             import static java.lang.reflect.Modifier.isFinal
 
-            @ASTTest(phase=SEMANTIC_ANALYSIS, value = {
+            @ASTTest(phase=SEMANTIC_ANALYSIS, value={
                 assert node.methods.size() == 2
                 node.methods[0].with {
                     assert it.name == 'fullName'

@@ -46,7 +46,6 @@ options {
     import java.util.HashSet;
     import java.util.Collections;
     import java.util.Arrays;
-    import java.util.stream.IntStream;
     import java.util.logging.Logger;
     import java.util.logging.Level;
     import java.util.EmptyStackException;
@@ -56,9 +55,10 @@ options {
 
 @members {
     private static final Logger LOGGER = Logger.getLogger(GroovyLexer.class.getName());
-    private long tokenIndex     = 0;
-    private int  lastTokenType  = 0;
-    private int  invalidDigitCount = 0;
+
+    private long tokenIndex;
+    private int  lastTokenType;
+    private int  invalidDigitCount;
 
     /**
      * Record the index and token type of the current token while emitting tokens.
@@ -79,18 +79,27 @@ options {
         super.emit(token);
     }
 
-    private static final int[] REGEX_CHECK_ARRAY =
-                                    IntStream.of(
-                                        Identifier, CapitalizedIdentifier, NullLiteral, BooleanLiteral, THIS, RPAREN, RBRACK, RBRACE,
-                                        IntegerLiteral, FloatingPointLiteral, StringLiteral, GStringEnd, INC, DEC
-                                    ).sorted().toArray();
+    private static final int[] REGEX_CHECK_ARRAY = {
+        DEC,
+        INC,
+        THIS,
+        RBRACE,
+        RBRACK,
+        RPAREN,
+        GStringEnd,
+        NullLiteral,
+        StringLiteral,
+        BooleanLiteral,
+        IntegerLiteral,
+        FloatingPointLiteral,
+        Identifier, CapitalizedIdentifier
+    };
+    static {
+        Arrays.sort(REGEX_CHECK_ARRAY);
+    }
 
     private boolean isRegexAllowed() {
-        if (Arrays.binarySearch(REGEX_CHECK_ARRAY, this.lastTokenType) >= 0) {
-            return false;
-        }
-
-        return true;
+        return (Arrays.binarySearch(REGEX_CHECK_ARRAY, this.lastTokenType) < 0);
     }
 
     /**
@@ -168,14 +177,16 @@ options {
     private boolean isInsideParens() {
         Paren paren = parenStack.peek();
 
-        // We just care about "(" and "[", inside which the new lines will be ignored.
+        // We just care about "(", "[" and "?[", inside which the new lines will be ignored.
         // Notice: the new lines between "{" and "}" can not be ignored.
         if (null == paren) {
             return false;
         }
 
-        return ("(".equals(paren.getText()) && TRY != paren.getLastTokenType()) // we don't treat try-paren(i.e. try (....)) as parenthesis
-                    || "[".equals(paren.getText());
+        String text = paren.getText();
+
+        return ("(".equals(text) && TRY != paren.getLastTokenType()) // we don't treat try-paren(i.e. try (....)) as parenthesis
+                    || "[".equals(text) || "?[".equals(text);
     }
     private void ignoreTokenInsideParens() {
         if (!this.isInsideParens()) {
@@ -219,23 +230,28 @@ options {
 
         return Integer.MIN_VALUE;
     }
+
+    private static boolean isJavaIdentifierStartAndNotIdentifierIgnorable(int codePoint) {
+        return Character.isJavaIdentifierStart(codePoint) && !Character.isIdentifierIgnorable(codePoint);
+    }
+
+    private static boolean isJavaIdentifierPartAndNotIdentifierIgnorable(int codePoint) {
+        return Character.isJavaIdentifierPart(codePoint) && !Character.isIdentifierIgnorable(codePoint);
+    }
 }
 
 
 // §3.10.5 String Literals
 StringLiteral
-    :   GStringQuotationMark    DqStringCharacter* GStringQuotationMark
-    |   SqStringQuotationMark   SqStringCharacter* SqStringQuotationMark
+    :   GStringQuotationMark  DqStringCharacter*  GStringQuotationMark
+    |   SqStringQuotationMark  SqStringCharacter*  SqStringQuotationMark
+    |   Slash { this.isRegexAllowed() && _input.LA(1) != '*' }?  SlashyStringCharacter+  Slash
 
-    |   Slash      { this.isRegexAllowed() && _input.LA(1) != '*' }?
-                 SlashyStringCharacter+       Slash
-
-    |   TdqStringQuotationMark  TdqStringCharacter*    TdqStringQuotationMark
-    |   TsqStringQuotationMark  TsqStringCharacter*    TsqStringQuotationMark
-    |   DollarSlashyGStringQuotationMarkBegin   DollarSlashyStringCharacter+   DollarSlashyGStringQuotationMarkEnd
+    |   TdqStringQuotationMark  TdqStringCharacter*  TdqStringQuotationMark
+    |   TsqStringQuotationMark  TsqStringCharacter*  TsqStringQuotationMark
+    |   DollarSlashyGStringQuotationMarkBegin  DollarSlashyStringCharacter+  DollarSlashyGStringQuotationMarkEnd
     ;
 
-// Groovy gstring
 GStringBegin
     :   GStringQuotationMark DqStringCharacter* Dollar -> pushMode(DQ_GSTRING_MODE), pushMode(GSTRING_TYPE_SELECTOR_MODE)
     ;
@@ -355,9 +371,9 @@ fragment SlashyStringCharacter
     |   ~[/$\u0000]
     ;
 
-// character in the collar slashy string. e.g. $/a/$
+// character in the dollar slashy string. e.g. $/a/$
 fragment DollarSlashyStringCharacter
-    :   SlashEscape | DollarSlashEscape | DollarDollarEscape
+    :   DollarSlashEscape | DollarDollarEscape
     |   Slash { _input.LA(1) != '$' }?
     |   Dollar { !isFollowedByJavaLetterInGString(_input) }?
     |   ~[/$\u0000]
@@ -779,7 +795,7 @@ DollarSlashyGStringQuotationMarkEnd
 
 fragment
 DollarSlashEscape
-    :   '$/$'
+    :   '$/'
     ;
 
 fragment
@@ -794,22 +810,25 @@ NullLiteral
 
 // Groovy Operators
 
-RANGE_INCLUSIVE     : '..';
-RANGE_EXCLUSIVE     : '..<';
-SPREAD_DOT          : '*.';
-SAFE_DOT            : '?.';
-SAFE_CHAIN_DOT      : '??.';
-ELVIS               : '?:';
-METHOD_POINTER      : '.&';
-METHOD_REFERENCE    : '::';
-REGEX_FIND          : '=~';
-REGEX_MATCH         : '==~';
-POWER               : '**';
-POWER_ASSIGN        : '**=';
-SPACESHIP           : '<=>';
-IDENTICAL           : '===';
-NOT_IDENTICAL       : '!==';
-ARROW               : '->';
+RANGE_INCLUSIVE         : '..';
+RANGE_EXCLUSIVE_LEFT    : '<..';
+RANGE_EXCLUSIVE_RIGHT   : '..<';
+RANGE_EXCLUSIVE_FULL    : '<..<';
+SPREAD_DOT              : '*.';
+SAFE_DOT                : '?.';
+SAFE_INDEX              : '?[' { this.enterParen();     } -> pushMode(DEFAULT_MODE);
+SAFE_CHAIN_DOT          : '??.';
+ELVIS                   : '?:';
+METHOD_POINTER          : '.&';
+METHOD_REFERENCE        : '::';
+REGEX_FIND              : '=~';
+REGEX_MATCH             : '==~';
+POWER                   : '**';
+POWER_ASSIGN            : '**=';
+SPACESHIP               : '<=>';
+IDENTICAL               : '===';
+NOT_IDENTICAL           : '!==';
+ARROW                   : '->';
 
 // !internalPromise will be parsed as !in ternalPromise, so semantic predicates are necessary
 NOT_INSTANCEOF      : '!instanceof' { isFollowedBy(_input, ' ', '\t', '\r', '\n') }?;
@@ -874,7 +893,7 @@ ELVIS_ASSIGN    : '?=';
 
 // §3.8 Identifiers (must appear after all keywords in the grammar)
 CapitalizedIdentifier
-    :   [A-Z] JavaLetterOrDigit*
+    :   JavaLetter {Character.isUpperCase(_input.LA(-1))}? JavaLetterOrDigit*
     ;
 
 Identifier
@@ -891,7 +910,7 @@ JavaLetter
     :   [a-zA-Z$_] // these are the "java letters" below 0x7F
     |   // covers all characters above 0x7F which are not a surrogate
         ~[\u0000-\u007F\uD800-\uDBFF]
-        { Character.isJavaIdentifierStart(_input.LA(-1)) && !Character.isIdentifierIgnorable(_input.LA(-1)) }?
+        { isJavaIdentifierStartAndNotIdentifierIgnorable(_input.LA(-1)) }?
     |   // covers UTF-16 surrogate pairs encodings for U+10000 to U+10FFFF
         [\uD800-\uDBFF] [\uDC00-\uDFFF]
         { Character.isJavaIdentifierStart(Character.toCodePoint((char) _input.LA(-2), (char) _input.LA(-1))) }?
@@ -907,7 +926,7 @@ JavaLetterOrDigit
     :   [a-zA-Z0-9$_] // these are the "java letters or digits" below 0x7F
     |   // covers all characters above 0x7F which are not a surrogate
         ~[\u0000-\u007F\uD800-\uDBFF]
-        { Character.isJavaIdentifierPart(_input.LA(-1)) && !Character.isIdentifierIgnorable(_input.LA(-1)) }?
+        { isJavaIdentifierPartAndNotIdentifierIgnorable(_input.LA(-1)) }?
     |   // covers UTF-16 surrogate pairs encodings for U+10000 to U+10FFFF
         [\uD800-\uDBFF] [\uDC00-\uDFFF]
         { Character.isJavaIdentifierPart(Character.toCodePoint((char) _input.LA(-2), (char) _input.LA(-1))) }?

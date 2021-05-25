@@ -28,7 +28,7 @@ import java.util.Map;
 
 /**
  * This ClassLoader should be used as root of class loaders. Any
- * RootLoader does have it's own classpath. When searching for a
+ * RootLoader does have its own classpath. When searching for a
  * class or resource this classpath will be used. Parent
  * Classloaders are ignored first. If a class or resource
  * can't be found in the classpath of the RootLoader, then parent is
@@ -45,7 +45,7 @@ import java.util.Map;
  * classloader does know a class which depends on a class only
  * a child of this loader does know, then you won't be able to
  * load the class. To load the class the child is not allowed
- * to redirect it's search for the class to the parent first.
+ * to redirect its search for the class to the parent first.
  * That way the child can load the class. If the child does not
  * have all classes to do this, this fails of course.
  * <p>
@@ -136,6 +136,7 @@ public class RootLoader extends URLClassLoader {
     /**
      * loads a class using the name of the class
      */
+    @Override
     protected synchronized Class loadClass(final String name, boolean resolve) throws ClassNotFoundException {
         Class c = this.findLoadedClass(name);
         if (c != null) return c;
@@ -157,6 +158,7 @@ public class RootLoader extends URLClassLoader {
     /**
      * returns the URL of a resource, or null if it is not found
      */
+    @Override
     public URL getResource(String name) {
         URL url = findResource(name);
         if (url == null) url = super.getResource(name);
@@ -166,6 +168,7 @@ public class RootLoader extends URLClassLoader {
     /**
      * adds an url to the classpath of this classloader
      */
+    @Override
     public void addURL(URL url) {
         super.addURL(url);
     }
@@ -174,6 +177,7 @@ public class RootLoader extends URLClassLoader {
         return super.findClass(name);
     }
 
+    @Override
     protected Class findClass(String name) throws ClassNotFoundException {
         throw new ClassNotFoundException(name);
     }

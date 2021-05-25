@@ -114,6 +114,7 @@ public abstract class GPathResult extends GroovyObjectSupport implements Writabl
      * </ul>
      * @param property the Property to fetch
      */
+    @Override
     public Object getProperty(final String property) {
         if ("..".equals(property)) {
             return parent();
@@ -144,6 +145,7 @@ public abstract class GPathResult extends GroovyObjectSupport implements Writabl
      * @param property the property of this GPathResult to replace
      * @param newValue the new value of the property
      */
+    @Override
     public void setProperty(final String property, final Object newValue) {
         if (property.startsWith("@")) {
             if (newValue instanceof String || newValue instanceof GString) {
@@ -202,6 +204,13 @@ public abstract class GPathResult extends GroovyObjectSupport implements Writabl
         });
 
         return this;
+    }
+
+    // GROOVY-9852: so that XmlSlurper plus (shorthand for replaceNode)
+    // is preferred ahead of the DGM plus(Iterable, Iterable) method
+    // since GPathResult is Iterable
+    public Object plus(final Closure newValue) {
+        return plus((Object) newValue);
     }
 
     protected abstract void replaceNode(Closure newValue);
@@ -269,6 +278,7 @@ public abstract class GPathResult extends GroovyObjectSupport implements Writabl
      *
      * @return the GPathResult, converted to a <code>String</code>
      */
+    @Override
     public String toString() {
         return text();
     }
@@ -496,10 +506,12 @@ public abstract class GPathResult extends GroovyObjectSupport implements Writabl
             private Iterator iter = iterator();
             private GPathResult next = getNextByDepth();
 
+            @Override
             public boolean hasNext() {
                 return this.next != null;
             }
 
+            @Override
             public Object next() {
                 try {
                     return this.next;
@@ -508,6 +520,7 @@ public abstract class GPathResult extends GroovyObjectSupport implements Writabl
                 }
             }
 
+            @Override
             public void remove() {
                 throw new UnsupportedOperationException();
             }
@@ -543,10 +556,12 @@ public abstract class GPathResult extends GroovyObjectSupport implements Writabl
             private Iterator iter = iterator();
             private GPathResult next = getNextByBreadth();
 
+            @Override
             public boolean hasNext() {
                 return this.next != null;
             }
 
+            @Override
             public Object next() {
                 try {
                     return this.next;
@@ -555,6 +570,7 @@ public abstract class GPathResult extends GroovyObjectSupport implements Writabl
                 }
             }
 
+            @Override
             public void remove() {
                 throw new UnsupportedOperationException();
             }
@@ -666,6 +682,7 @@ public abstract class GPathResult extends GroovyObjectSupport implements Writabl
      */
     public abstract Iterator childNodes();
 
+    @Override
     public abstract Iterator iterator();
 
     /**
@@ -690,10 +707,12 @@ public abstract class GPathResult extends GroovyObjectSupport implements Writabl
         return new Iterator() {
             private boolean hasNext = true;
 
+            @Override
             public boolean hasNext() {
                 return this.hasNext;
             }
 
+            @Override
             public Object next() {
                 try {
                     return (this.hasNext) ? obj : null;
@@ -702,6 +721,7 @@ public abstract class GPathResult extends GroovyObjectSupport implements Writabl
                 }
             }
 
+            @Override
             public void remove() {
                 throw new UnsupportedOperationException();
             }

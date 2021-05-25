@@ -61,8 +61,7 @@ import static java.lang.reflect.Modifier.isStrict;
 import static java.lang.reflect.Modifier.isSynchronized;
 import static java.lang.reflect.Modifier.isTransient;
 import static java.lang.reflect.Modifier.isVolatile;
-import static org.apache.groovy.util.BeanUtils.capitalize;
-import static org.codehaus.groovy.ast.ClassHelper.VOID_TYPE;
+import static org.codehaus.groovy.ast.ClassHelper.isPrimitiveVoid;
 import static org.objectweb.asm.Opcodes.ACC_ABSTRACT;
 import static org.objectweb.asm.Opcodes.ACC_FINAL;
 import static org.objectweb.asm.Opcodes.ACC_INTERFACE;
@@ -101,6 +100,7 @@ public class ClassCompletionVerifier extends ClassCodeVisitorSupport {
         return currentClass;
     }
 
+    @Override
     public void visitClass(ClassNode node) {
         ClassNode oldClass = currentClass;
         currentClass = node;
@@ -293,6 +293,10 @@ public class ClassCompletionVerifier extends ClassCodeVisitorSupport {
         return "field '" + node.getName() + "'";
     }
 
+    private static String getDescription(PropertyNode node) {
+        return "property '" + node.getName() + "'";
+    }
+
     private static String getDescription(Parameter node) {
         return "parameter '" + node.getName() + "'";
     }
@@ -428,10 +432,12 @@ public class ClassCompletionVerifier extends ClassCodeVisitorSupport {
         return true;
     }
 
+    @Override
     protected SourceUnit getSourceUnit() {
         return source;
     }
 
+    @Override
     public void visitMethod(MethodNode node) {
         inConstructor = false;
         inStaticConstructor = node.isStaticConstructor();
@@ -442,7 +448,7 @@ public class ClassCompletionVerifier extends ClassCodeVisitorSupport {
         checkGenericsUsage(node, node.getParameters());
         checkGenericsUsage(node, node.getReturnType());
         for (Parameter param : node.getParameters()) {
-            if (param.getType().equals(VOID_TYPE)) {
+            if (isPrimitiveVoid(param.getType())) {
                 addError("The " + getDescription(param) + " in " +  getDescription(node) + " has invalid type void", param);
             }
         }
@@ -519,19 +525,25 @@ public class ClassCompletionVerifier extends ClassCodeVisitorSupport {
         }
     }
 
+    @Override
     public void visitField(FieldNode node) {
         if (currentClass.getDeclaredField(node.getName()) != node) {
             addError("The " + getDescription(node) + " is declared multiple times.", node);
         }
         checkInterfaceFieldModifiers(node);
+        checkInvalidFieldModifiers(node);
         checkGenericsUsage(node, node.getType());
-        if (node.getType().equals(VOID_TYPE)) {
+        if (isPrimitiveVoid(node.getType())) {
             addError("The " + getDescription(node) + " has invalid type void", node);
         }
         super.visitField(node);
     }
 
+    @Override
     public void visitProperty(PropertyNode node) {
+        if (currentClass.getProperty(node.getName()) != node) {
+            addError("The " + getDescription(node) + " is declared multiple times.", node);
+        }
         checkDuplicateProperties(node);
         checkGenericsUsage(node, node.getType());
         super.visitProperty(node);
@@ -540,12 +552,11 @@ public class ClassCompletionVerifier extends ClassCodeVisitorSupport {
     private void checkDuplicateProperties(PropertyNode node) {
         ClassNode cn = node.getDeclaringClass();
         String name = node.getName();
-        String getterName = "get" + capitalize(name);
+        String getterName = node.getGetterNameOrDefault();
         if (Character.isUpperCase(name.charAt(0))) {
-            for (PropertyNode propNode : cn.getProperties()) {
-                String otherName = propNode.getField().getName();
-                String otherGetterName = "get" + capitalize(otherName);
-                if (node != propNode && getterName.equals(otherGetterName)) {
+            for (PropertyNode otherNode : cn.getProperties()) {
+                String otherName = otherNode.getName();
+                if (node != otherNode && getterName.equals(otherNode.getGetterNameOrDefault())) {
                     String msg = "The field " + name + " and " + otherName + " on the class " +
                             cn.getName() + " will result in duplicate JavaBean properties, which is not allowed";
                     addError(msg, node);
@@ -563,6 +574,13 @@ public class ClassCompletionVerifier extends ClassCodeVisitorSupport {
         }
     }
 
+    private void checkInvalidFieldModifiers(FieldNode node) {
+        if ((node.getModifiers() & (ACC_FINAL | ACC_VOLATILE)) == (ACC_FINAL | ACC_VOLATILE)) {
+            addError("Illegal combination of modifiers, final and volatile, for field '" + node.getName() + "'", node);
+        }
+    }
+
+    @Override
     public void visitBinaryExpression(BinaryExpression expression) {
         if (expression.getOperation().getType() == Types.LEFT_SQUARE_BRACKET &&
                 expression.getRightExpression() instanceof MapEntryExpression) {
@@ -620,6 +638,7 @@ public class ClassCompletionVerifier extends ClassCodeVisitorSupport {
         }
     }
 
+    @Override
     public void visitConstructor(ConstructorNode node) {
         inConstructor = true;
         inStaticConstructor = node.isStaticConstructor();
@@ -627,6 +646,7 @@ public class ClassCompletionVerifier extends ClassCodeVisitorSupport {
         super.visitConstructor(node);
     }
 
+    @Override
     public void visitCatchStatement(CatchStatement cs) {
         if (!(cs.getExceptionType().isDerivedFrom(ClassHelper.make(Throwable.class)))) {
             addError("Catch statement parameter type is not a subclass of Throwable.", cs);
@@ -634,6 +654,7 @@ public class ClassCompletionVerifier extends ClassCodeVisitorSupport {
         super.visitCatchStatement(cs);
     }
 
+    @Override
     public void visitMethodCallExpression(MethodCallExpression mce) {
         super.visitMethodCallExpression(mce);
         Expression aexp = mce.getArguments();
@@ -661,7 +682,7 @@ public class ClassCompletionVerifier extends ClassCodeVisitorSupport {
         checkInvalidDeclarationModifier(expression, ACC_SYNCHRONIZED, "synchronized");
         checkInvalidDeclarationModifier(expression, ACC_TRANSIENT, "transient");
         checkInvalidDeclarationModifier(expression, ACC_VOLATILE, "volatile");
-        if (expression.getVariableExpression().getOriginType().equals(VOID_TYPE)) {
+        if (isPrimitiveVoid(expression.getVariableExpression().getOriginType())) {
             addError("The variable '" + expression.getVariableExpression().getName() + "' has invalid type void", expression);
         }
     }
@@ -677,11 +698,13 @@ public class ClassCompletionVerifier extends ClassCodeVisitorSupport {
         addError("Invalid use of declaration inside method call.", exp);
     }
 
+    @Override
     public void visitConstantExpression(ConstantExpression expression) {
         super.visitConstantExpression(expression);
         checkStringExceedingMaximumLength(expression);
     }
 
+    @Override
     public void visitGStringExpression(GStringExpression expression) {
         super.visitGStringExpression(expression);
         for (ConstantExpression ce : expression.getStrings()) {

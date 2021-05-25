@@ -20,7 +20,6 @@ package org.codehaus.groovy.ast.expr;
 
 import groovy.lang.Closure;
 import org.codehaus.groovy.ast.ClassHelper;
-import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.GroovyCodeVisitor;
 
 /**
@@ -38,6 +37,7 @@ public class MethodPointerExpression extends Expression {
     public MethodPointerExpression(Expression expression, Expression methodName) {
         this.expression = expression;
         this.methodName = methodName;
+        setType(ClassHelper.CLOSURE_TYPE.getPlainNodeReference());
     }
 
     public Expression getExpression() {
@@ -51,10 +51,12 @@ public class MethodPointerExpression extends Expression {
         return methodName;
     }
 
+    @Override
     public void visit(GroovyCodeVisitor visitor) {
         visitor.visitMethodPointerExpression(this);
     }
 
+    @Override
     public Expression transformExpression(ExpressionTransformer transformer) {
         Expression ret;
         Expression mname = transformer.transform(methodName);
@@ -68,16 +70,13 @@ public class MethodPointerExpression extends Expression {
         return ret;
     }
 
+    @Override
     public String getText() {
         if (expression == null) {
             return "&" + methodName;
         } else {
             return expression.getText() + ".&" + methodName.getText();
         }
-    }
-
-    public ClassNode getType() {
-        return ClassHelper.CLOSURE_TYPE.getPlainNodeReference();
     }
 
     public boolean isDynamic() {

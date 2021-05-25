@@ -57,6 +57,9 @@ public class CompilerConfiguration {
     /** Optimization Option for enabling attaching {@link groovy.lang.Groovydoc} annotation. */
     public static final String RUNTIME_GROOVYDOC = "runtimeGroovydoc";
 
+    /** Optimization Option for enabling parallel parsing. */
+    public static final String PARALLEL_PARSE = "parallelParse";
+
     /** Joint Compilation Option for enabling generating stubs in memory. */
     public static final String MEM_STUB = "memStub";
 
@@ -84,6 +87,10 @@ public class CompilerConfiguration {
     public static final String JDK14 = "14";
     /** This (<code>"15"</code>) is the value for targetBytecode to compile for a JDK 15. */
     public static final String JDK15 = "15";
+    /** This (<code>"16"</code>) is the value for targetBytecode to compile for a JDK 16. */
+    public static final String JDK16 = "16";
+    /** This (<code>"17"</code>) is the value for targetBytecode to compile for a JDK 17. */
+    public static final String JDK17 = "17";
 
     /**
      * This constant is for comparing targetBytecode to ensure it is set to JDK 1.5 or later.
@@ -114,7 +121,9 @@ public class CompilerConfiguration {
             JDK12, Opcodes.V12,
             JDK13, Opcodes.V13,
             JDK14, Opcodes.V14,
-            JDK15, Opcodes.V15
+            JDK15, Opcodes.V15,
+            JDK16, Opcodes.V16,
+            JDK17, Opcodes.V17
     );
 
     /**
@@ -123,8 +132,8 @@ public class CompilerConfiguration {
     public static final String[] ALLOWED_JDKS = JDK_TO_BYTECODE_VERSION_MAP.keySet().toArray(new String[JDK_TO_BYTECODE_VERSION_MAP.size()]);
 
     /**
-    * The ASM api version to use when loading/parsing classes, and generating proxy adapter classes.
-    */
+     * The ASM API version used when loading/parsing classes and generating proxy adapter classes.
+     */
     public static final int ASM_API_VERSION = Opcodes.ASM8;
 
     /**
@@ -430,26 +439,20 @@ public class CompilerConfiguration {
         parameters = getBooleanSafe("groovy.parameters");
         previewFeatures = getBooleanSafe("groovy.preview.features");
         sourceEncoding = getSystemPropertySafe("groovy.source.encoding",
-            getSystemPropertySafe("file.encoding", DEFAULT_SOURCE_ENCODING));
+                getSystemPropertySafe("file.encoding", DEFAULT_SOURCE_ENCODING));
         setTargetDirectorySafe(getSystemPropertySafe("groovy.target.directory"));
         setTargetBytecodeIfValid(getSystemPropertySafe("groovy.target.bytecode", JDK8));
         defaultScriptExtension = getSystemPropertySafe("groovy.default.scriptExtension", ".groovy");
 
         optimizationOptions = new HashMap<>(4);
-        handleOptimizationOption(optimizationOptions, INVOKEDYNAMIC, "groovy.target.indy");
-        handleOptimizationOption(optimizationOptions, GROOVYDOC, "groovy.attach.groovydoc");
-        handleOptimizationOption(optimizationOptions, RUNTIME_GROOVYDOC, "groovy.attach.runtime.groovydoc");
+        handleOptimizationOption(INVOKEDYNAMIC, getSystemPropertySafe("groovy.target.indy", "true"));
+        handleOptimizationOption(GROOVYDOC, getSystemPropertySafe("groovy.attach.groovydoc"));
+        handleOptimizationOption(RUNTIME_GROOVYDOC, getSystemPropertySafe("groovy.attach.runtime.groovydoc"));
+        handleOptimizationOption(PARALLEL_PARSE, getSystemPropertySafe("groovy.parallel.parse", "true"));
     }
 
-    private void handleOptimizationOption(final Map<String, Boolean> options, final String optionName, final String sysOptionName) {
-        String propValue = getSystemPropertySafe(sysOptionName);
-        boolean optionEnabled = propValue == null
-                ? (DEFAULT != null && Boolean.TRUE.equals(DEFAULT.getOptimizationOptions().get(optionName)))
-                : Boolean.parseBoolean(propValue);
-
-        if (optionEnabled) {
-            options.put(optionName, Boolean.TRUE);
-        }
+    private void handleOptimizationOption(String key, String val) {
+        if (val != null) optimizationOptions.put(key, Boolean.valueOf(val));
     }
 
     /**
@@ -487,6 +490,8 @@ public class CompilerConfiguration {
         if (jointCompilationOptions != null) {
             jointCompilationOptions = new HashMap<>(jointCompilationOptions);
         }
+        // TODO GROOVY-9585: add line below once gradle build issues fixed
+//        compilationCustomizers.addAll(configuration.getCompilationCustomizers());
         setJointCompilationOptions(jointCompilationOptions);
         setPluginFactory(configuration.getPluginFactory());
         setDisabledGlobalASTTransformations(configuration.getDisabledGlobalASTTransformations());
@@ -680,8 +685,8 @@ public class CompilerConfiguration {
         text = configuration.getProperty("groovy.disabled.global.ast.transformations");
         if (text != null) {
             String[] classNames = text.split(",\\s*}");
-            Set<String> blacklist = new HashSet<>(Arrays.asList(classNames));
-            setDisabledGlobalASTTransformations(blacklist);
+            Set<String> disabledTransforms = new HashSet<>(Arrays.asList(classNames));
+            setDisabledGlobalASTTransformations(disabledTransforms);
         }
     }
 
@@ -1062,7 +1067,7 @@ public class CompilerConfiguration {
      */
     public boolean isIndyEnabled() {
         Boolean indyEnabled = getOptimizationOptions().get(INVOKEDYNAMIC);
-        return Optional.ofNullable(indyEnabled).orElse(Boolean.FALSE);
+        return Optional.ofNullable(indyEnabled).orElse(Boolean.TRUE).booleanValue();
     }
 
     /**
@@ -1070,7 +1075,7 @@ public class CompilerConfiguration {
      */
     public boolean isGroovydocEnabled() {
         Boolean groovydocEnabled = getOptimizationOptions().get(GROOVYDOC);
-        return Optional.ofNullable(groovydocEnabled).orElse(Boolean.FALSE);
+        return Optional.ofNullable(groovydocEnabled).orElse(Boolean.FALSE).booleanValue();
     }
 
     /**
@@ -1078,6 +1083,6 @@ public class CompilerConfiguration {
      */
     public boolean isRuntimeGroovydocEnabled() {
         Boolean runtimeGroovydocEnabled = getOptimizationOptions().get(RUNTIME_GROOVYDOC);
-        return Optional.ofNullable(runtimeGroovydocEnabled).orElse(Boolean.FALSE);
+        return Optional.ofNullable(runtimeGroovydocEnabled).orElse(Boolean.FALSE).booleanValue();
     }
 }

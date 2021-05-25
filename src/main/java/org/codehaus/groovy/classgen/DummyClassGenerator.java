@@ -32,7 +32,12 @@ import org.codehaus.groovy.ast.PropertyNode;
 import org.codehaus.groovy.classgen.asm.BytecodeHelper;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.MethodVisitor;
-import org.objectweb.asm.Opcodes;
+
+import static org.objectweb.asm.Opcodes.ATHROW;
+import static org.objectweb.asm.Opcodes.DUP;
+import static org.objectweb.asm.Opcodes.INVOKESPECIAL;
+import static org.objectweb.asm.Opcodes.NEW;
+import static org.objectweb.asm.Opcodes.V1_3;
 
 /**
  * To generate a class that has all the fields and methods, except that fields are not initialized
@@ -62,6 +67,7 @@ public class DummyClassGenerator extends ClassGenerator {
 
     // GroovyClassVisitor interface
     //-------------------------------------------------------------------------
+    @Override
     public void visitClass(ClassNode classNode) {
         try {
             this.classNode = classNode;
@@ -72,7 +78,7 @@ public class DummyClassGenerator extends ClassGenerator {
             this.internalBaseClassName = BytecodeHelper.getClassInternalName(classNode.getSuperClass());
 
             cv.visit(
-                    Opcodes.V1_3,
+                    V1_3,
                     classNode.getModifiers(),
                     internalClassName,
                     null,
@@ -105,6 +111,7 @@ public class DummyClassGenerator extends ClassGenerator {
         }
     }
 
+    @Override
     public void visitConstructor(ConstructorNode node) {
 
         visitParameters(node, node.getParameters());
@@ -119,6 +126,7 @@ public class DummyClassGenerator extends ClassGenerator {
         mv.visitMaxs(0, 0);
     }
 
+    @Override
     public void visitMethod(MethodNode node) {
 
         visitParameters(node, node.getParameters());
@@ -135,6 +143,7 @@ public class DummyClassGenerator extends ClassGenerator {
         mv.visitMaxs(0, 0);
     }
 
+    @Override
     public void visitField(FieldNode fieldNode) {
 
         cv.visitField(
@@ -148,6 +157,7 @@ public class DummyClassGenerator extends ClassGenerator {
     /**
      * Creates a getter, setter and field
      */
+    @Override
     public void visitProperty(PropertyNode statement) {
     }
 
@@ -169,6 +179,7 @@ public class DummyClassGenerator extends ClassGenerator {
     }
 
 
+    @Override
     public void visitAnnotations(AnnotatedNode node) {
     }
 }

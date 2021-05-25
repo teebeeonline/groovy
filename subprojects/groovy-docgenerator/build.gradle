@@ -16,13 +16,24 @@
  *  specific language governing permissions and limitations
  *  under the License.
  */
+plugins {
+    id 'org.apache.groovy-library'
+}
+
 dependencies {
     implementation rootProject
     implementation project(':groovy-templates')
+    implementation "com.thoughtworks.qdox:qdox:${versions.qdox}"
+
     testImplementation project(':groovy-test')
-    implementation "com.thoughtworks.qdox:qdox:$qdoxVersion"
 }
 
-eclipse.classpath.file.whenMerged {
-    entries.removeAll { entry -> entry.path == '/groovy-xml' }
+plugins.withId('eclipse') {
+    eclipse.classpath.file.whenMerged {
+        entries.removeAll { entry -> entry.path == '/groovy-xml' }
+    }
+}
+
+tasks.named('rat') {
+    excludes << '**/stylesheet.css' // MIT license as per NOTICE/LICENSE files
 }

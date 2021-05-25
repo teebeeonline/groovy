@@ -23,9 +23,10 @@ import groovy.transform.stc.BugsSTCTest
 /**
  * Unit tests for static type checking : bugs.
  */
-class BugsStaticCompileTest extends BugsSTCTest implements StaticCompilationTestSupport {
+final class BugsStaticCompileTest extends BugsSTCTest implements StaticCompilationTestSupport {
 
-    void testGroovy5498PropertyAccess() {
+    // GROOVY-5498
+    void testPropertyAccess() {
         assertScript '''
             class Test {
 
@@ -114,6 +115,24 @@ class BugsStaticCompileTest extends BugsSTCTest implements StaticCompilationTest
                     if (pluginDir?.exists()) { true } else { false }
                 }
                 assert getDescriptorForPlugin(null) == false
+        '''
+    }
+
+    // GROOVY-9863
+    void testPlusShouldNotThrowGroovyBugError() {
+        assertScript '''
+            import static org.junit.Assert.assertEquals
+
+            class C {
+                double getSomeValue() {
+                    0.0d
+                }
+                double test() {
+                    1.0d + someValue
+                }
+            }
+
+            assertEquals(1.0d, new C().test(), 0.00000001d)
         '''
     }
 
@@ -876,17 +895,38 @@ import groovy.transform.TypeCheckingMode
 
     // GROOVY-6113
     void testCallObjectVargsMethodWithPrimitiveIntConstant() {
-        try {
-            assertScript '''
-                int sum(Object... elems) {
-                     (Integer)elems.toList().sum()
-                }
-                int x = sum(Closure.DELEGATE_FIRST)
-                assert x == Closure.DELEGATE_FIRST
-            '''
-        } finally {
-//            println astTrees
-        }
+        assertScript '''
+            int sum(... zeroOrMore) {
+                 (Integer) zeroOrMore.toList().sum()
+            }
+            int x = sum(Closure.DELEGATE_FIRST)
+            assert x == Closure.DELEGATE_FIRST
+        '''
+    }
+
+    // GROOVY-9918
+    void testCallObjectObjectVargsMethodWithObjectArray() {
+        assertScript '''
+            def m(one, ... zeroOrMore) {
+            }
+            Object[] array = ['a', 'b']
+            m(array) // NPE in SC
+        '''
+    }
+
+    void testDefaultArgumentAndVargs() {
+        assertScript '''
+            def m(int x=1, int y, String[] z) {
+                [x as String, y as String] + Arrays.asList(z)
+            }
+            assert m(2,'3') == ['1','2','3']
+        '''
+        assertScript '''
+            def m(int x, int y=2, String[] z) {
+                [x as String, y as String] + Arrays.asList(z)
+            }
+            assert m(1,'3') == ['1','2','3']
+        '''
     }
 
     // GROOVY-6095
@@ -1117,9 +1157,9 @@ assert it.next() == 1G
             def map = new LinkedHashMap<>([a:1,b:2])
             @ASTTest(phase=INSTRUCTION_SELECTION, value={
                 def ift = node.getNodeMetaData(INFERRED_TYPE)
-                assert ift == make(Set)
-                assert ift.isUsingGenerics()
-                assert ift.genericsTypes[0].type==STRING_TYPE
+                assert ift == SET_TYPE
+                assert ift.genericsTypes != null
+                assert ift.genericsTypes[0].type == STRING_TYPE
             })
             def set = map.keySet()
             def key = set[0]
@@ -1129,9 +1169,8 @@ assert it.next() == 1G
             def map = new LinkedHashMap([a:1,b:2])
             @ASTTest(phase=INSTRUCTION_SELECTION, value={
                 def ift = node.getNodeMetaData(INFERRED_TYPE)
-                assert ift == make(Set)
-                assert ift.isUsingGenerics()
-                assert ift.genericsTypes[0].name=='K'
+                assert ift == SET_TYPE
+                assert ift.genericsTypes == null
             })
             def set = map.keySet()
             def key = set[0]
@@ -1462,22 +1501,6 @@ println someInt
             assert Groovy7784.emptyVarArgs() == 'foo-bar'
             assert Groovy7784.singleVarArgs() == 'foo-bar-baz'
             assert Groovy7784.multiVarArgs() == 'foo-bar-baz1-baz2'
-        '''
-    }
-
-    // GROOVY-7160
-    void testGenericsArrayPlaceholder() {
-        assertScript '''
-            import static java.nio.file.AccessMode.*
-
-            class Dummy {
-                static main() {
-                    // more than 5 to match `of(E first, E[] rest)` variant
-                    EnumSet.of(READ, WRITE, EXECUTE, READ, WRITE, EXECUTE)
-                }
-            }
-
-            assert Dummy.main() == [READ, WRITE, EXECUTE].toSet()
         '''
     }
 

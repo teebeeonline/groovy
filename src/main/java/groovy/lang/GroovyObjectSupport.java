@@ -20,6 +20,7 @@ package groovy.lang;
 
 import org.codehaus.groovy.runtime.InvokerHelper;
 
+import java.beans.Transient;
 import java.util.Optional;
 
 /**
@@ -31,6 +32,7 @@ public abstract class GroovyObjectSupport implements GroovyObject {
     private transient MetaClass metaClass = getDefaultMetaClass();
 
     @Override
+    @Transient
     public MetaClass getMetaClass() {
         return this.metaClass;
     }

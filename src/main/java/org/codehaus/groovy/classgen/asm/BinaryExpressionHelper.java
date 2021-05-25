@@ -21,6 +21,7 @@ package org.codehaus.groovy.classgen.asm;
 import org.codehaus.groovy.GroovyBugError;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
+import org.codehaus.groovy.ast.Variable;
 import org.codehaus.groovy.ast.expr.ArgumentListExpression;
 import org.codehaus.groovy.ast.expr.ArrayExpression;
 import org.codehaus.groovy.ast.expr.BinaryExpression;
@@ -40,6 +41,7 @@ import org.codehaus.groovy.ast.expr.TernaryExpression;
 import org.codehaus.groovy.ast.expr.TupleExpression;
 import org.codehaus.groovy.ast.expr.VariableExpression;
 import org.codehaus.groovy.ast.tools.GeneralUtils;
+import org.codehaus.groovy.ast.tools.GenericsUtils;
 import org.codehaus.groovy.ast.tools.WideningCategories;
 import org.codehaus.groovy.classgen.AsmClassGenerator;
 import org.codehaus.groovy.classgen.BytecodeExpression;
@@ -48,6 +50,7 @@ import org.codehaus.groovy.syntax.Token;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 
+import static org.apache.groovy.ast.tools.ExpressionUtils.isNullConstant;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.args;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.binX;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.callX;
@@ -380,8 +383,8 @@ public class BinaryExpressionHelper {
             operandStack.loadOrStoreVariable(var, false);
             return;
         }
-
-        // let's evaluate the RHS and store the result
+        // evaluate the RHS and store the result
+        // TODO: LHS has not been visited, it could be a variable in a closure and type chooser is not aware.
         ClassNode lhsType = controller.getTypeChooser().resolveType(leftExpression, controller.getClassNode());
         if (rightExpression instanceof ListExpression && lhsType.isArray()) {
             ListExpression list = (ListExpression) rightExpression;
@@ -408,15 +411,15 @@ public class BinaryExpressionHelper {
             // ensure we try to unbox null to cause a runtime NPE in case we assign
             // null to a primitive typed variable, even if it is used only in boxed
             // form as it is closure shared
-            if (var.isClosureSharedVariable() && ClassHelper.isPrimitiveType(var.getOriginType()) && AsmClassGenerator.isNullConstant(rightExpression)) {
+            if (var.isClosureSharedVariable() && ClassHelper.isPrimitiveType(var.getOriginType()) && isNullConstant(rightExpression)) {
                 operandStack.doGroovyCast(var.getOriginType());
                 // these two are never reached in bytecode and only there
-                // to avoid verifyerrors and compiler infrastructure hazzle
+                // to avoid verify errors and compiler infrastructure hazzle
                 operandStack.box();
                 operandStack.doGroovyCast(lhsType);
             }
             // normal type transformation
-            if (!ClassHelper.isPrimitiveType(lhsType) && AsmClassGenerator.isNullConstant(rightExpression)) {
+            if (!ClassHelper.isPrimitiveType(lhsType) && isNullConstant(rightExpression)) {
                 operandStack.replace(lhsType);
             } else {
                 operandStack.doGroovyCast(lhsType);
@@ -426,7 +429,7 @@ public class BinaryExpressionHelper {
         } else {
             rhsValueId = compileStack.defineTemporaryVariable("$rhs", rhsType, true);
         }
-        // TODO: if rhs is VariableSlotLoader already, then skip crating a new one
+        // TODO: if RHS is VariableSlotLoader already, then skip creating a new one
         BytecodeExpression rhsValueLoader = new VariableSlotLoader(rhsType,rhsValueId,operandStack);
 
         // assignment for subscript
@@ -446,18 +449,14 @@ public class BinaryExpressionHelper {
             TupleExpression tuple = (TupleExpression) leftExpression;
             int i = 0;
             for (Expression e : tuple.getExpressions()) {
-                VariableExpression var = (VariableExpression) e;
-                MethodCallExpression call = new MethodCallExpression(
-                        rhsValueLoader, "getAt",
-                        new ArgumentListExpression(new ConstantExpression(i)));
-                call.visit(acg);
-                i += 1;
+                callX(rhsValueLoader, "getAt", args(constX(i++))).visit(acg);
                 if (defineVariable) {
-                    operandStack.doGroovyCast(var);
-                    compileStack.defineVariable(var, true);
+                    Variable v = (Variable) e;
+                    operandStack.doGroovyCast(v);
+                    compileStack.defineVariable(v, true);
                     operandStack.remove(1);
                 } else {
-                    acg.visitVariableExpression(var);
+                    e.visit(acg);
                 }
             }
         } else if (defineVariable) {
@@ -469,11 +468,7 @@ public class BinaryExpressionHelper {
         } else {
             // normal assignment
             int mark = operandStack.getStackLength();
-            // to leave a copy of the rightExpression value on the stack after the assignment.
             rhsValueLoader.visit(acg);
-            TypeChooser typeChooser = controller.getTypeChooser();
-            ClassNode targetType = typeChooser.resolveType(leftExpression, controller.getClassNode());
-            operandStack.doGroovyCast(targetType);
             leftExpression.visit(acg);
             operandStack.remove(operandStack.getStackLength() - mark);
         }
@@ -518,7 +513,7 @@ public class BinaryExpressionHelper {
             compareMethod.call(controller.getMethodVisitor());
             ClassNode resType = ClassHelper.boolean_TYPE;
             if (compareMethod == findRegexMethod) {
-                resType = ClassHelper.OBJECT_TYPE;
+                resType = ClassHelper.OBJECT_TYPE.getPlainNodeReference();
             }
             operandStack.replace(resType, 2);
         }
@@ -743,6 +738,9 @@ public class BinaryExpressionHelper {
                 subscript.visit(acg);
                 OperandStack operandStack = controller.getOperandStack();
                 ClassNode subscriptType = operandStack.getTopOperand();
+                if (subscriptType.isGenericsPlaceHolder() || GenericsUtils.hasPlaceHolders(subscriptType)) {
+                    subscriptType = controller.getTypeChooser().resolveType(bexp, controller.getClassNode());
+                }
                 int id = controller.getCompileStack().defineTemporaryVariable("$subscript", subscriptType, true);
                 VariableSlotLoader subscriptExpression = new VariableSlotLoader(subscriptType, id, operandStack);
                 BinaryExpression rewrite = binX(bexp.getLeftExpression(), bexp.getOperation(), subscriptExpression);

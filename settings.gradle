@@ -19,7 +19,7 @@
 import org.gradle.util.GradleVersion
 
 plugins {
-    id "com.gradle.enterprise" version "3.1.1"
+    id "com.gradle.enterprise" version "3.5.2"
 }
 
 gradleEnterprise {
@@ -29,22 +29,27 @@ gradleEnterprise {
     }
 }
 
-def subprojects = ['groovy-ant',
+def subprojects = [
+        'groovy-all',
+        'groovy-ant',
         'groovy-astbuilder',
-        'groovy-bsf',
+        'groovy-binary',
+        'groovy-bom',
         'groovy-cli-commons',
         'groovy-cli-picocli',
         'groovy-console',
+        'groovy-contracts',
         'groovy-datetime',
         'groovy-dateutil',
         'groovy-docgenerator',
         'groovy-groovydoc',
         'groovy-groovysh',
-        'groovy-jaxb',
         'groovy-jmx',
         'groovy-json',
         'groovy-jsr223',
+        'groovy-ginq',
         'groovy-macro',
+        'groovy-macro-library',
         'groovy-nio',
         'groovy-servlet',
         'groovy-sql',
@@ -53,19 +58,18 @@ def subprojects = ['groovy-ant',
         'groovy-test',
         'groovy-test-junit5',
         'groovy-testng',
+        'groovy-toml',
+        'groovy-typecheckers',
         'groovy-xml',
         'groovy-yaml',
         'performance',
         'tests-preview',
-        'binary-compatibility'
+        'binary-compatibility',
+        'stress'
 ]
 
-if (hasProperty('stressTests')) {
-    subprojects << 'stress'
-}
-
 include(subprojects as String[])
-        
+
 rootProject.children.each { prj ->
     prj.projectDir = new File("$rootDir/subprojects/$prj.name")
 }

@@ -109,7 +109,7 @@ class AnnotationCollectorLegacyTest extends GroovyTestCase {
             class Foo {
                 Integer a, b
             }
-            assert Foo.class.annotations.size() == 3 
+            assert Foo.class.annotations.size() == 3
             assert new Foo(a: 1, b: 2).toString() == "Foo(2)"
             assert NotPreCompiledAlias.value().length == 0
             assert NotPreCompiledAlias.value() instanceof Object[][]
@@ -141,7 +141,7 @@ class AnnotationCollectorLegacyTest extends GroovyTestCase {
         '''
         assertScript '''
             import groovy.transform.*
-    
+
             @OtherPreCompiledAliasL(applyToAllClasses=false, value={ counter++> 10})
             class X {
                 def counter = 0
@@ -162,13 +162,13 @@ class AnnotationCollectorLegacyTest extends GroovyTestCase {
     }
 
     void testAST() {
-        assertScript """
+        assertScript '''
             import groovy.transform.*
             @AnnotationCollector(value = [ToString, EqualsAndHashCode, Sortable], serializeClass = Alias)
             @interface Alias {}
 
             @Alias(excludes=["a"])
-            @ASTTest(phase=org.codehaus.groovy.control.CompilePhase.INSTRUCTION_SELECTION, value={
+            @ASTTest(phase=INSTRUCTION_SELECTION, value={
                 def annotations = node.annotations
                 assert annotations.size() == 4 //ASTTest + 3
                 annotations.each {
@@ -178,11 +178,11 @@ class AnnotationCollectorLegacyTest extends GroovyTestCase {
             class Foo {
                 Integer a, b
             }
-            assert Foo.class.annotations.size() == 4
+            assert Foo.class.annotations.size() == 3
             assert new Foo(a: 1, b: 2).toString() == "Foo(2)"
             assert Alias.value().length == 0
             assert Alias.value() instanceof Object[][]
-        """
+        '''
     }
 
     void testConflictingAnnotations() {

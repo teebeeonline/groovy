@@ -34,8 +34,15 @@ import org.codehaus.groovy.runtime.typehandling.NumberMath;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.Arrays;
-import java.util.stream.IntStream;
 
+import static org.codehaus.groovy.ast.ClassHelper.isStringType;
+import static org.codehaus.groovy.ast.ClassHelper.isWrapperByte;
+import static org.codehaus.groovy.ast.ClassHelper.isWrapperCharacter;
+import static org.codehaus.groovy.ast.ClassHelper.isWrapperDouble;
+import static org.codehaus.groovy.ast.ClassHelper.isWrapperFloat;
+import static org.codehaus.groovy.ast.ClassHelper.isWrapperInteger;
+import static org.codehaus.groovy.ast.ClassHelper.isWrapperLong;
+import static org.codehaus.groovy.ast.ClassHelper.isWrapperShort;
 import static org.codehaus.groovy.syntax.Types.BITWISE_AND;
 import static org.codehaus.groovy.syntax.Types.BITWISE_OR;
 import static org.codehaus.groovy.syntax.Types.BITWISE_XOR;
@@ -48,16 +55,19 @@ import static org.codehaus.groovy.syntax.Types.POWER;
 import static org.codehaus.groovy.syntax.Types.RIGHT_SHIFT;
 import static org.codehaus.groovy.syntax.Types.RIGHT_SHIFT_UNSIGNED;
 
-public class ExpressionUtils {
+public final class ExpressionUtils {
 
     // NOTE: values are sorted in ascending order
-    private static final int[] HANDLED_TYPES = IntStream.of(
+    private static final int[] HANDLED_TYPES = {
             PLUS, MINUS, MULTIPLY, DIVIDE, POWER,
             LEFT_SHIFT, RIGHT_SHIFT, RIGHT_SHIFT_UNSIGNED,
-            BITWISE_OR, BITWISE_AND, BITWISE_XOR).sorted().toArray();
-
-    private ExpressionUtils() {
+            BITWISE_OR, BITWISE_AND, BITWISE_XOR
+    };
+    static {
+        Arrays.sort(HANDLED_TYPES);
     }
+
+    private ExpressionUtils() { }
 
     /**
      * Turns expressions of the form ConstantExpression(40) + ConstantExpression(2)
@@ -124,22 +134,22 @@ public class ExpressionUtils {
                             break;
                     }
                     if (result != null) {
-                        if (ClassHelper.Byte_TYPE.equals(wrapperType)) {
+                        if (isWrapperByte(wrapperType)) {
                             return configure(be, new ConstantExpression(result.byteValue(), true));
                         }
-                        if (ClassHelper.Short_TYPE.equals(wrapperType)) {
+                        if (isWrapperShort(wrapperType)) {
                             return configure(be, new ConstantExpression(result.shortValue(), true));
                         }
-                        if (ClassHelper.Long_TYPE.equals(wrapperType)) {
+                        if (isWrapperLong(wrapperType)) {
                             return configure(be, new ConstantExpression(result.longValue(), true));
                         }
-                        if (ClassHelper.Integer_TYPE.equals(wrapperType) || ClassHelper.Character_TYPE.equals(wrapperType)) {
+                        if (isWrapperInteger(wrapperType) || isWrapperCharacter(wrapperType)) {
                             return configure(be, new ConstantExpression(result.intValue(), true));
                         }
-                        if (ClassHelper.Float_TYPE.equals(wrapperType)) {
+                        if (isWrapperFloat(wrapperType)) {
                             return configure(be, new ConstantExpression(result.floatValue(), true));
                         }
-                        if (ClassHelper.Double_TYPE.equals(wrapperType)) {
+                        if (isWrapperDouble(wrapperType)) {
                             return configure(be, new ConstantExpression(result.doubleValue(), true));
                         }
                         return configure(be, new ConstantExpression(result, true));
@@ -307,8 +317,15 @@ public class ExpressionUtils {
             }
         } else if (exp instanceof BinaryExpression) {
             BinaryExpression be = (BinaryExpression) exp;
-            be.setLeftExpression(transformInlineConstants(be.getLeftExpression()));
-            be.setRightExpression(transformInlineConstants(be.getRightExpression()));
+            Expression lhs = transformInlineConstants(be.getLeftExpression());
+            Expression rhs = transformInlineConstants(be.getRightExpression());
+            if (be.getOperation().getType() == PLUS && lhs instanceof ConstantExpression && rhs instanceof ConstantExpression &&
+                    isStringType(lhs.getType()) && isStringType(rhs.getType())) {
+                // GROOVY-9855: inline string concat
+                return configure(be, new ConstantExpression(lhs.getText() + rhs.getText()));
+            }
+            be.setLeftExpression(lhs);
+            be.setRightExpression(rhs);
             return be;
         } else if (exp instanceof ListExpression) {
             ListExpression origList = (ListExpression) exp;
@@ -335,5 +352,21 @@ public class ExpressionUtils {
             return fn.getInitialValueExpression();
         }
         return null;
+    }
+
+    public static boolean isNullConstant(final Expression expression) {
+        return expression instanceof ConstantExpression && ((ConstantExpression) expression).isNullExpression();
+    }
+
+    public static boolean isThisExpression(final Expression expression) {
+        return expression instanceof VariableExpression && ((VariableExpression) expression).isThisExpression();
+    }
+
+    public static boolean isSuperExpression(final Expression expression) {
+        return expression instanceof VariableExpression && ((VariableExpression) expression).isSuperExpression();
+    }
+
+    public static boolean isThisOrSuper(final Expression expression) {
+        return isThisExpression(expression) || isSuperExpression(expression);
     }
 }

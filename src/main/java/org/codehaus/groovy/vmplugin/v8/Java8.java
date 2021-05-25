@@ -18,6 +18,7 @@
  */
 package org.codehaus.groovy.vmplugin.v8;
 
+import groovy.lang.GroovyRuntimeException;
 import groovy.lang.MetaClass;
 import groovy.lang.MetaMethod;
 import org.codehaus.groovy.GroovyBugError;
@@ -39,6 +40,7 @@ import org.codehaus.groovy.ast.expr.ListExpression;
 import org.codehaus.groovy.ast.expr.PropertyExpression;
 import org.codehaus.groovy.ast.stmt.ReturnStatement;
 import org.codehaus.groovy.reflection.ReflectionUtils;
+import org.codehaus.groovy.runtime.MetaClassHelper;
 import org.codehaus.groovy.vmplugin.VMPlugin;
 import org.codehaus.groovy.vmplugin.VMPluginFactory;
 
@@ -75,7 +77,6 @@ import java.util.List;
 public class Java8 implements VMPlugin {
 
     private static final Class<?>[] PLUGIN_DGM = {PluginDefaultGroovyMethods.class};
-    private static final Class<?>[] EMPTY_CLASS_ARRAY = new Class[0];
     private static final Method[] EMPTY_METHOD_ARRAY = new Method[0];
     private static final Annotation[] EMPTY_ANNOTATION_ARRAY = new Annotation[0];
     private static final Permission ACCESS_PERMISSION = new ReflectPermission("suppressAccessChecks");
@@ -140,6 +141,10 @@ public class Java8 implements VMPlugin {
         mn.setAnnotationDefault(true);
     }
 
+    protected MethodHandles.Lookup newLookup(final Class<?> declaringClass) {
+        return of(declaringClass);
+    }
+
     private static Constructor<MethodHandles.Lookup> getLookupConstructor() {
         return LookupHolder.LOOKUP_Constructor;
     }
@@ -199,6 +204,7 @@ public class Java8 implements VMPlugin {
         return params;
     }
 
+    @Override
     public void setAdditionalClassInformation(ClassNode cn) {
         setGenericsTypes(cn);
     }
@@ -296,8 +302,9 @@ public class Java8 implements VMPlugin {
         return gts;
     }
 
+    @Override
     public Class<?>[] getPluginStaticGroovyMethods() {
-        return EMPTY_CLASS_ARRAY;
+        return MetaClassHelper.EMPTY_TYPE_ARRAY;
     }
 
     private void setAnnotationMetaData(Annotation[] annotations, AnnotatedNode an) {
@@ -308,16 +315,18 @@ public class Java8 implements VMPlugin {
         }
     }
 
+    @Override
     public void configureAnnotationNodeFromDefinition(AnnotationNode definition, AnnotationNode root) {
         ClassNode type = definition.getClassNode();
-        if ("java.lang.annotation.Retention".equals(type.getName())) {
+        final String typeName = type.getName();
+        if ("java.lang.annotation.Retention".equals(typeName)) {
             Expression exp = definition.getMember("value");
             if (!(exp instanceof PropertyExpression)) return;
             PropertyExpression pe = (PropertyExpression) exp;
             String name = pe.getPropertyAsString();
             RetentionPolicy policy = RetentionPolicy.valueOf(name);
             setRetentionPolicy(policy, root);
-        } else if ("java.lang.annotation.Target".equals(type.getName())) {
+        } else if ("java.lang.annotation.Target".equals(typeName)) {
             Expression exp = definition.getMember("value");
             if (!(exp instanceof ListExpression)) return;
             ListExpression le = (ListExpression) exp;
@@ -333,6 +342,7 @@ public class Java8 implements VMPlugin {
         }
     }
 
+    @Override
     public void configureAnnotation(AnnotationNode node) {
         ClassNode type = node.getClassNode();
         VMPlugin plugin = VMPluginFactory.getPlugin();
@@ -401,6 +411,7 @@ public class Java8 implements VMPlugin {
         return null;
     }
 
+    @Override
     public void configureClassNode(CompileUnit compileUnit, ClassNode classNode) {
         try {
             Class<?> clazz = classNode.getTypeClass();
@@ -613,10 +624,16 @@ public class Java8 implements VMPlugin {
     }
 
     @Override
-    public Object getInvokeSpecialHandle(final Method method, final Object receiver) {
-        if (getLookupConstructor() == null) {
-            throw new GroovyBugError("getInvokeSpecialHandle requires at least JDK 7 wot private access to Lookup");
+    public Object getInvokeSpecialHandle(Method method, Object receiver) {
+        final Class<?> receiverType = receiver.getClass();
+        try {
+            return newLookup(receiverType).unreflectSpecial(method, receiverType).bindTo(receiver);
+        } catch (ReflectiveOperationException e) {
+            return getInvokeSpecialHandleFallback(method, receiver);
         }
+    }
+
+    private Object getInvokeSpecialHandleFallback(Method method, Object receiver) {
         if (!method.isAccessible()) {
             AccessController.doPrivileged((PrivilegedAction<Object>) () -> {
                 ReflectionUtils.trySetAccessible(method);
@@ -625,7 +642,7 @@ public class Java8 implements VMPlugin {
         }
         Class<?> declaringClass = method.getDeclaringClass();
         try {
-            return getLookupConstructor().newInstance(declaringClass, -1).
+            return newLookup(declaringClass).
                     unreflectSpecial(method, declaringClass).
                     bindTo(receiver);
         } catch (ReflectiveOperationException e) {
@@ -639,32 +656,40 @@ public class Java8 implements VMPlugin {
         return mh.invokeWithArguments(args);
     }
 
+    public static MethodHandles.Lookup of(final Class<?> declaringClass) {
+        try {
+            return getLookupConstructor().newInstance(declaringClass, MethodHandles.Lookup.PRIVATE).in(declaringClass);
+        } catch (final IllegalAccessException | InstantiationException e) {
+            throw new IllegalArgumentException(e);
+        } catch (final InvocationTargetException e) {
+            throw new GroovyRuntimeException(e);
+        }
+    }
+
     private static class LookupHolder {
         private static final Constructor<MethodHandles.Lookup> LOOKUP_Constructor;
 
         static {
-            Constructor<MethodHandles.Lookup> con;
+            Constructor<MethodHandles.Lookup> lookup;
             try {
-                con = MethodHandles.Lookup.class.getDeclaredConstructor(Class.class, int.class);
-            } catch (NoSuchMethodException e) {
-                throw new GroovyBugError(e);
+                lookup = MethodHandles.Lookup.class.getDeclaredConstructor(Class.class, Integer.TYPE);
+            } catch (final NoSuchMethodException ex) {
+                throw new IllegalStateException("Incompatible JVM", ex);
             }
             try {
-                if (!con.isAccessible()) {
-                    final Constructor tmp = con;
+                if (!lookup.isAccessible()) {
+                    final Constructor tmp = lookup;
                     AccessController.doPrivileged((PrivilegedAction<Object>) () -> {
                         ReflectionUtils.trySetAccessible(tmp);
                         return null;
                     });
                 }
-            } catch (SecurityException se) {
-                con = null;
+            } catch (SecurityException ignore) {
+                lookup = null;
             } catch (RuntimeException re) {
-                // test for JDK9 JIGSAW
-                if (!"java.lang.reflect.InaccessibleObjectException".equals(re.getClass().getName())) throw re;
-                con = null;
+                throw re;
             }
-            LOOKUP_Constructor = con;
+            LOOKUP_Constructor = lookup;
         }
     }
 }

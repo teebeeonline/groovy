@@ -157,12 +157,12 @@ public class JsonParserLax extends JsonParserCharArray {
 
                 case '/': /* */ //
                     handleComment();
-                    startIndexOfKey = __index;
+                    startIndexOfKey = __index + 1;
                     break;
 
                 case '#':
                     handleBashComment();
-                    startIndexOfKey = __index;
+                    startIndexOfKey = __index + 1;
                     break;
             }
         }
@@ -210,6 +210,7 @@ public class JsonParserLax extends JsonParserCharArray {
         return new CharSequenceValue(chop, Type.STRING, startIndexOfKey, endIndex + 1, this.charArray, encoded, checkDate);
     }
 
+    @Override
     protected final Object decodeValue() {
         return this.decodeValueInternal();
     }
@@ -320,7 +321,6 @@ public class JsonParserLax extends JsonParserCharArray {
             __currentChar = charArray[__index];
 
             if (__currentChar == '\n') {
-                __index++;
                 return;
             }
         }
@@ -341,28 +341,20 @@ public class JsonParserLax extends JsonParserCharArray {
                                 __index++;
                                 __currentChar = charArray[__index];
                                 if (__currentChar == '/') {
-                                    if (hasMore()) {
-                                        __index++;
-                                        return;
-                                    }
+                                    return;
                                 }
                             } else {
                                 complain("missing close of comment");
                             }
                         }
                     }
-
+                    // fall through
                 case '/':
                     for (; __index < charArray.length; __index++) {
                         __currentChar = charArray[__index];
 
                         if (__currentChar == '\n') {
-                            if (hasMore()) {
-                                __index++;
-                                return;
-                            } else {
-                                return;
-                            }
+                            return;
                         }
                     }
             }
@@ -634,9 +626,11 @@ public class JsonParserLax extends JsonParserCharArray {
                 switch (__currentChar) {
                     case '/':
                         handleComment();
+                        __index++;
                         continue;
                     case '#':
                         handleBashComment();
+                        __index++;
                         continue;
                     case ',':
                         __index++;
@@ -663,6 +657,7 @@ public class JsonParserLax extends JsonParserCharArray {
         return value;
     }
 
+    @Override
     protected final Object decodeFromChars(char[] cs) {
         Value value = ((Value) super.decodeFromChars(cs));
         if (value.isContainer()) {

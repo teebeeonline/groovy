@@ -46,6 +46,7 @@ import java.math.BigInteger;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -54,6 +55,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -63,6 +66,16 @@ import java.util.stream.Collectors;
  */
 public class Java9 extends Java8 {
     private static final Logger LOGGER = Logger.getLogger(Java9.class.getName());
+
+    private final Class<?>[] PLUGIN_DGM;
+
+    public Java9() {
+        super();
+        List<Class<?>> dgmClasses = new ArrayList<>();
+        Collections.addAll(dgmClasses, super.getPluginDefaultGroovyMethods());
+        dgmClasses.add(PluginDefaultGroovyMethods.class);
+        PLUGIN_DGM = dgmClasses.toArray(new Class<?>[0]);
+    }
 
     @Override
     public Map<String, Set<String>> getDefaultImportClasses(String[] packageNames) {
@@ -82,16 +95,25 @@ public class Java9 extends Java8 {
 
         Map<String, Set<String>> result = new LinkedHashMap<>(2048);
         try (GroovyClassLoader gcl = new GroovyClassLoader(this.getClass().getClassLoader())) {
-            result.putAll(doFindClasses(URI.create("jrt:/modules/java.base/"), "java", javaPns));
+            CompletableFuture<Map<String, Set<String>>> javaDefaultImportsFuture =
+                    CompletableFuture.supplyAsync(() -> doFindClasses(URI.create("jrt:/modules/java.base/"), "java", javaPns));
+            try {
+                URI gsLocation = DefaultGroovyMethods.getLocation(gcl.loadClass("groovy.lang.GroovySystem")).toURI();
+                CompletableFuture<Map<String, Set<String>>> groovyDefaultImportsFuture1 =
+                        CompletableFuture.supplyAsync(() -> doFindClasses(gsLocation, "groovy", groovyPns));
 
-            URI gsLocation = DefaultGroovyMethods.getLocation(gcl.loadClass("groovy.lang.GroovySystem")).toURI();
-            result.putAll(doFindClasses(gsLocation, "groovy", groovyPns));
+                // in production environment, groovy-core classes, e.g. `GroovySystem`(java class) and `GrapeIvy`(groovy class) are all packaged in the groovy-core jar file,
+                // but in Groovy development environment, groovy-core classes are distributed in different directories
+                URI giLocation = DefaultGroovyMethods.getLocation(gcl.loadClass("groovy.grape.GrapeIvy")).toURI();
+                CompletableFuture<Map<String, Set<String>>> groovyDefaultImportsFuture2 =
+                        gsLocation.equals(giLocation)
+                                ? CompletableFuture.completedFuture(Collections.emptyMap())
+                                : CompletableFuture.supplyAsync(() -> doFindClasses(giLocation, "groovy", groovyPns));
 
-            // in production environment, groovy-core classes, e.g. `GroovySystem`(java class) and `GrapeIvy`(groovy class) are all packaged in the groovy-core jar file,
-            // but in Groovy development environment, groovy-core classes are distributed in different directories
-            URI giLocation = DefaultGroovyMethods.getLocation(gcl.loadClass("groovy.grape.GrapeIvy")).toURI();
-            if (!gsLocation.equals(giLocation)) {
-                result.putAll(doFindClasses(giLocation, "groovy", groovyPns));
+                result.putAll(groovyDefaultImportsFuture1.get());
+                result.putAll(groovyDefaultImportsFuture2.get());
+            } finally {
+                result.putAll(javaDefaultImportsFuture.get());
             }
         } catch (Exception ignore) {
             if (LOGGER.isLoggable(Level.FINEST)) {
@@ -142,6 +164,11 @@ public class Java9 extends Java8 {
         }
     }
 
+    @Override
+    protected MethodHandles.Lookup newLookup(final Class<?> declaringClass) {
+        return of(declaringClass);
+    }
+
     private static Constructor<MethodHandles.Lookup> getLookupConstructor() {
         return LookupHolder.LOOKUP_Constructor;
     }
@@ -165,18 +192,13 @@ public class Java9 extends Java8 {
     }
 
     @Override
-    public int getVersion() {
-        return 9;
+    public Class<?>[] getPluginDefaultGroovyMethods() {
+        return PLUGIN_DGM;
     }
 
     @Override
-    public Object getInvokeSpecialHandle(Method method, Object receiver) {
-        final Class<?> receiverType = receiver.getClass();
-        try {
-            return of(receiverType).unreflectSpecial(method, receiverType).bindTo(receiver);
-        } catch (ReflectiveOperationException e) {
-            return super.getInvokeSpecialHandle(method, receiver);
-        }
+    public int getVersion() {
+        return 9;
     }
 
     /**
@@ -192,6 +214,7 @@ public class Java9 extends Java8 {
      * @param callerClass           the callerClass to invoke {@code setAccessible}
      * @return the check result
      */
+    @Override
     public boolean checkCanSetAccessible(AccessibleObject accessibleObject, Class<?> callerClass) {
 
         if (!super.checkCanSetAccessible(accessibleObject, callerClass)) return false;
@@ -423,8 +446,8 @@ public class Java9 extends Java8 {
                 .map(ModuleReference::descriptor)
                 .forEach(md -> md.packages().forEach(pn -> map.putIfAbsent(pn, md)));
 
-        final Map<String, Set<String>> concealedPackagesToOpen = new HashMap<>();
-        final Map<String, Set<String>> exportedPackagesToOpen = new HashMap<>();
+        final Map<String, Set<String>> concealedPackagesToOpen = new ConcurrentHashMap<>();
+        final Map<String, Set<String>> exportedPackagesToOpen = new ConcurrentHashMap<>();
 
         Arrays.stream(JAVA8_PACKAGES())
                 .forEach(pn -> {
@@ -469,6 +492,7 @@ public class Java9 extends Java8 {
     }
 
     private static String[] JAVA8_PACKAGES() {
+        // The following package list should NOT be changed!
         return new String[] {
                 "apple.applescript",
                 "apple.laf",

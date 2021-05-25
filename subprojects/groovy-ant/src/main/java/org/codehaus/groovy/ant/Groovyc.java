@@ -119,7 +119,6 @@ import java.util.StringTokenizer;
  * <li>includeDestClasses</li>
  * <li>jointCompilationOptions</li>
  * <li>stacktrace</li>
- * <li>indy</li>
  * <li>scriptBaseClass</li>
  * <li>stubdir</li>
  * <li>keepStubs</li>
@@ -218,7 +217,6 @@ public class Groovyc extends MatchingTask {
     private File stubDir;
     private boolean keepStubs;
     private boolean forceLookupUnnamedFiles;
-    private boolean useIndy;
     private String scriptBaseClass;
     private String configscript;
 
@@ -705,21 +703,23 @@ public class Groovyc extends MatchingTask {
     }
 
     /**
-     * Set the indy flag.
+     * Legacy method to set the indy flag (only true is allowed)
      *
-     * @param useIndy the indy flag
+     * @param indy true means invokedynamic support is active
      */
-    public void setIndy(boolean useIndy) {
-        this.useIndy = useIndy;
+    @Deprecated
+    public void setIndy(final boolean indy) {
+        if (!indy) {
+            throw new BuildException("Disabling indy is no longer supported!", getLocation());
+        }
     }
 
     /**
-     * Get the value of the indy flag.
-     *
-     * @return if to use indy
+     * Get the value of the indy flag (always true).
      */
+    @Deprecated
     public boolean getIndy() {
-        return this.useIndy;
+        return true;
     }
 
     /**
@@ -863,6 +863,7 @@ public class Groovyc extends MatchingTask {
      *
      * @throws BuildException if an error occurs
      */
+    @Override
     public void execute() throws BuildException {
         checkParameters();
         resetFileLists();
@@ -1206,9 +1207,6 @@ public class Groovyc extends MatchingTask {
         if (previewFeatures) {
             commandLineList.add("--enable-preview");
         }
-        if (useIndy) {
-            commandLineList.add("--indy");
-        }
         if (scriptBaseClass != null) {
             commandLineList.add("-b");
             commandLineList.add(scriptBaseClass);
@@ -1415,7 +1413,7 @@ public class Groovyc extends MatchingTask {
         ClassLoader loader = getClass().getClassLoader();
         if (loader instanceof AntClassLoader) {
             AntClassLoader antLoader = (AntClassLoader) loader;
-            String[] pathElm = antLoader.getClasspath().split(File.pathSeparator);
+            String[] pathElm = antLoader.getClasspath().split(File.pathSeparator, -1);
             List<String> classpath = configuration.getClasspath();
             /*
              * Iterate over the classpath provided to groovyc, and add any missing path

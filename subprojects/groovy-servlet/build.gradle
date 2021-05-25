@@ -16,23 +16,25 @@
  *  specific language governing permissions and limitations
  *  under the License.
  */
+plugins {
+    id 'org.apache.groovy-library'
+}
+
 dependencies {
-    api('javax.servlet:javax.servlet-api:3.0.1') { dep ->
-        provided dep
-    }
-    api('javax.servlet:jsp-api:2.0') { dep ->
-        provided dep
-        exclude(group: 'javax.servlet', module: 'servlet-api')
+    compileOnlyApi("javax.servlet:javax.servlet-api:${versions.javaxServletApi}")
+    compileOnlyApi("javax.servlet.jsp:javax.servlet.jsp-api:${versions.javaxJspApi}") {
+        transitive = false
     }
 
     api rootProject  // ServletBinding extends Binding...
-    // needed for MarkupBuilder
-    implementation project(':groovy-xml')
-    // needed by TemplateServlet
-    implementation project(':groovy-templates')
+    implementation project(':groovy-xml') // needed for MarkupBuilder
+    implementation project(':groovy-templates') // needed by TemplateServlet
 
-    testImplementation "jmock:jmock:$jmockVersion"
-    testImplementation rootProject.sourceSets.test.runtimeClasspath
+    testImplementation("javax.servlet:javax.servlet-api:${versions.javaxServletApi}")
+    testImplementation("javax.servlet.jsp:javax.servlet.jsp-api:${versions.javaxJspApi}") {
+        transitive = false
+    }
+    testImplementation "jmock:jmock:${versions.jmock}"
     testImplementation project(':groovy-json')
     testImplementation project(':groovy-test')
 }

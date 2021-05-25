@@ -97,6 +97,7 @@ public abstract class BaseDuration implements Comparable<BaseDuration> {
         return cal.getTime();
     }
 
+    @Override
     public String toString() {
         List buffer = new ArrayList();
 
@@ -126,6 +127,7 @@ public abstract class BaseDuration implements Comparable<BaseDuration> {
 
     public abstract From getFrom();
 
+    @Override
     public int compareTo(BaseDuration otherDuration) {
         return Long.signum(toMilliseconds() - otherDuration.toMilliseconds());
     }
